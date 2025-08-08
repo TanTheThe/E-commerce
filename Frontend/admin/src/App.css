@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+.body {
+  font-family: "Montserrat", sans-serif;
+  background: #f1f1f1;
+}
+
+.MuiBadge-badge {
+  background: #ff5252 !important;
+}
+
+.ReactCollapse--collapse {
+  transition: height 500ms;
+}
+
+::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc !important;
+}
+
+.btn {
+  padding: 8px 20px !important;
+}
+
+.btn svg {
+  font-size: 22px;
+}
+
+.btn-sm {
+  padding: 6px 20px !important;
+  font-size: 13px !important;
+}
+
+.btn-lg {
+  padding: 8px 20px !important;
+  font-size: 16px !important;
+}
+
+.btn-blue {
+  background: #3872fa !important;
+  color: #fff !important;
+  padding: 8px 20px !important;
+}
+
+.btn-outline-blue {
+  background-color: white !important;
+  color: #3b82f6 !important;
+  border: 1px solid #3b82f6 !important;
+  border-radius: 6px !important;
+  padding: 10px 16px !important;
+  font-weight: 500 !important;
+}
+
+.btn-outline-blue:hover {
+  opacity: 0.9 !important;
+}
+
+.btn-blue:hover {
+  background: #3067e5 !important;
+}
+
+.contentRight {
+  font-family: "Montserrat", sans-serif;
+}
+
+th.MuiTableCell-root {
+  @apply bg-gray-50 py-2 text-xs text-gray-700 uppercase dark:bg-gray-700 dark:text-gray-400 font-bold;
+  color: black;
+  font-family: "Montserrat", sans-serif;
+}
+
+tr.MuiTableCell-root {
+  font-family: "Montserrat", sans-serif;
+}
+
+a.active button {
+  background: #dcdcdc !important;
+}
+
+.MuiButton-icon svg {
+  font-size: 30px !important;
+}
+
+.css-rizt0-MuiTypography-root {
+  font-size: 14px !important;
+}
+
+.MuiAppBar-colorPrimary {
+  background: #e6e6e6 !important;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.MuiSelect-select {
+  background: #fff !important;
+}
+
+.MuiDialog-paper {
+  background: #f9fafb !important;
+}
+
+.otpBox input {
+  border: 1px solid rgba(0, 0, 0, 0.3) !important;
+  outline: none !important;
+  border-radius: 4px;
+}
+
+.otpBox input:focus {
+  border: 1px solid rgba(0, 0, 0, 0.7) !important;
+}
+
+.otpPage .container {
+  height: 90vh;
+  display: flex;
+}
+
+.bg-black-popup {
+  --tw-bg-opacity: 1;
+  background-color: rgba(0, 0, 0, var(--tw-bg-opacity));
+}
+
+.bg-opacity-50 {
+  --tw-bg-opacity: 0.5;
+}
+
+.react-colorful {
+  width: 435px !important;
+}
+
+.btn-color-picker {
+  background: #3872fa !important;
+  color: #fff !important;
+}
+
+.btn-color-picker:hover {
+  background: #3067e5 !important;
+}
+
+.btn-color-remove {
+  background-color: white !important;
+  color: #3b82f6 !important;
+  border: 1px solid #3b82f6 !important;
+  border-radius: 6px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+}
+
+.btn-color-remove:hover {
+  opacity: 0.9 !important;
+}
