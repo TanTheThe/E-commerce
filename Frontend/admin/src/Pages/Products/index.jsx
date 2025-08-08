@@ -75,9 +75,12 @@ const Products = () => {
 
     const fetchCategories = async () => {
         try {
-            const res = await getDataApi(`/admin/categories`);
+            const filterData = {
+                search: ""
+            };
+            const res = await postDataApi(`/admin/categories/all?skip=${0}&limit=${1000}`, filterData);
             if (res.success === true) {
-                setCategories(res.data || []);
+                setCategories(res.data.data || []);
             } else {
                 console.error("Failed to fetch categories:", res.message);
                 setCategories([]);
