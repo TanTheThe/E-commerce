@@ -44,12 +44,18 @@ const Users = () => {
             const skip = page * rowsPerPage;
             const limit = rowsPerPage;
 
-            const body = {
-                search: searchVal,
-                customer_status: statusFilterVal,
-            };
+            const queryParams = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+            });
 
-            const response = await postDataApi(`/admin/user/all?skip=${skip}&limit=${limit}`, body);
+            if (searchVal) queryParams.append('search', searchVal);
+            if (statusFilterVal) queryParams.append('customer_status', statusFilterVal);
+            if (emailFilterVal) queryParams.append('email', emailFilterVal);
+            if (phoneFilterVal) queryParams.append('phone', phoneFilterVal);
+            if (createdAtFilterVal) queryParams.append('created_at', createdAtFilterVal);
+
+            const response = await getDataApi(`/admin/user/all?${queryParams.toString()}`);
             console.log(response);
 
             if (response.success === true) {

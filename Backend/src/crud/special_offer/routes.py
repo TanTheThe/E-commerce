@@ -1,11 +1,12 @@
 from fastapi import APIRouter, status, Depends
 from src.crud.special_offer.services import SpecialOfferService
 from src.dependencies import AccessTokenBearer
-from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel
+from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware, customer_role_middleware
+from typing import Optional
 
 special_offer_admin_router = APIRouter(prefix="/special-offer")
 special_offer_customer_router = APIRouter(prefix="/special-offer")
@@ -15,11 +16,11 @@ special_offer_service = SpecialOfferService()
 access_token_bearer = AccessTokenBearer()
 
 
-@special_offer_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
+@special_offer_admin_router.post("/", status_code=status.HTTP_201_CREATED,
+                                 dependencies=[Depends(admin_role_middleware)])
 async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
-                            token_details: dict = Depends(access_token_bearer),
-                            session: AsyncSession = Depends(get_session)):
-
+                               token_details: dict = Depends(access_token_bearer),
+                               session: AsyncSession = Depends(get_session)):
     new_special_offer_dict = await special_offer_service.create_special_offer_service(special_offer_data, session)
 
     return JSONResponse(
@@ -32,10 +33,25 @@ async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
 
 
 @special_offer_admin_router.get('/', dependencies=[Depends(admin_role_middleware)])
-async def get_all_special_offer_admin(skip: int = 0, limit: int = 10, search: str = None,
-                                      session:AsyncSession = Depends(get_session),
+async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
+                                      search: Optional[str] = None,
+                                      type: Optional[str] = None,
+                                      discount_min: Optional[int] = None,
+                                      discount_max: Optional[int] = None,
+                                      quantity_status: Optional[str] = None,
+                                      time_status: Optional[str] = None,
+                                      session: AsyncSession = Depends(get_session),
                                       token_details: dict = Depends(access_token_bearer)):
-    special_offers = await special_offer_service.get_all_special_offer_service(session, skip=skip, limit=limit, search=search)
+    filter_data = SpecialOfferFilterModel(
+        search=search,
+        type=type,
+        discount_min=discount_min,
+        discount_max=discount_max,
+        quantity_status=quantity_status,
+        time_status=time_status
+    )
+
+    special_offers = await special_offer_service.get_all_special_offer_service(session, filter_data, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -47,8 +63,8 @@ async def get_all_special_offer_admin(skip: int = 0, limit: int = 10, search: st
 
 
 @special_offer_customer_router.get('/', dependencies=[Depends(customer_role_middleware)])
-async def get_all_special_offer_customer(session:AsyncSession = Depends(get_session),
-                                      token_details: dict = Depends(access_token_bearer)):
+async def get_all_special_offer_customer(session: AsyncSession = Depends(get_session),
+                                         token_details: dict = Depends(access_token_bearer)):
     special_offers = await special_offer_service.get_all_special_offer_service(session)
 
     filtered_special_offers = [
@@ -101,19 +117,3 @@ async def delete_categories(id: str, token_details: dict = Depends(access_token_
             "content": special_offer_delete
         }
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

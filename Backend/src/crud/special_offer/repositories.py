@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import ColumnElement
 from src.database.models import Special_Offer
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_
+from sqlmodel import select, desc, and_, func
 from datetime import datetime
 import time
 from src.errors.special_offer import SpecialOfferException
@@ -21,27 +21,18 @@ class SpecialOfferRepository:
         return new_special_offer
 
 
-    async def get_all_special_offer(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, skip: int = 0,
-                            limit: int = 10, search: str = ''):
-        base_condition = Special_Offer.deleted_at.is_(None)
+    async def get_all_special_offer(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0,
+                            limit: int = 10):
+        count_stmt = select(func.count()).where(*conditions)
+        total_result = await session.exec(count_stmt)
+        total = total_result.one()
 
-        if search:
-            search_condition = Special_Offer.code.ilike(f"%{search}%")
-            base_condition = and_(base_condition, search_condition)
-
-        if conditions is not None:
-            base_condition = and_(base_condition, conditions)
-
-        statement = (
-            select(Special_Offer)
-            .where(base_condition)
-            .order_by(desc(Special_Offer.created_at))
-            .offset(skip)
-            .limit(limit)
-        )
+        statement = select(Special_Offer).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)
-        return result.all()
+        special_offers = result.all()
+
+        return special_offers, total
 
 
     async def get_special_offer(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):

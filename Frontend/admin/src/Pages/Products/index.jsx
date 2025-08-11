@@ -75,10 +75,12 @@ const Products = () => {
 
     const fetchCategories = async () => {
         try {
-            const filterData = {
-                search: ""
-            };
-            const res = await postDataApi(`/admin/categories/all?skip=${0}&limit=${1000}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: "0",
+                limit: "1000",
+            });
+
+            const res = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
             if (res.success === true) {
                 setCategories(res.data.data || []);
             } else {
@@ -120,7 +122,26 @@ const Products = () => {
             const limit = rowsPerPage;
             const filterData = buildFilterData();
 
-            const response = await postDataApi(`/admin/product/all?skip=${skip}&limit=${limit}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+            });
+
+            if (filterData.search) queryParams.append('search', filterData.search);
+            if (filterData.category_ids?.length) {
+                filterData.category_ids.forEach(id => queryParams.append('category_ids', id));
+            }
+            if (filterData.min_price) queryParams.append('min_price', filterData.min_price);
+            if (filterData.max_price) queryParams.append('max_price', filterData.max_price);
+            if (filterData.sort_by) queryParams.append('sort_by', filterData.sort_by);
+            if (filterData.colors?.length) {
+                filterData.colors.forEach(c => queryParams.append('colors', c));
+            }
+            if (filterData.sizes?.length) {
+                filterData.sizes.forEach(s => queryParams.append('sizes', s));
+            }
+
+            const response = await getDataApi(`/admin/product/all?${queryParams.toString()}`);
 
             if (response.success === true) {
                 setProducts(response.data.data || []);

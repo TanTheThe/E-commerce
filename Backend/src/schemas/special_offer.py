@@ -35,3 +35,11 @@ class SpecialOfferUpdateModel(BaseModel):
     total_quantity: Optional[int] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
+
+class SpecialOfferFilterModel(BaseModel):
+    search: Optional[str] = None
+    type: Optional[str] = None
+    discount_min: Optional[int] = None
+    discount_max: Optional[int] = None
+    quantity_status: Optional[str] = None
+    time_status: Optional[str] = None

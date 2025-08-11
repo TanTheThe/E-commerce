@@ -161,9 +161,17 @@ const CategoryList = () => {
         try {
             const skip = page * rowsPerPage;
             const limit = rowsPerPage;
+
             const filterData = buildFilterData();
 
-            const response = await postDataApi(`/admin/categories/all?skip=${skip}&limit=${limit}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+            });
+
+            if (filterData.search) queryParams.append('search', filterData.search);
+
+            const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
 
             if (response.success) {
                 setCategories(response.data.data || []);

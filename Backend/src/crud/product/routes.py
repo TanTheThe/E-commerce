@@ -5,7 +5,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel
-from src.dependencies import admin_role_middleware, customer_role_middleware
+from src.dependencies import admin_role_middleware
+from typing import Optional, List
 
 product_admin_router = APIRouter(prefix="/product")
 product_customer_router = APIRouter(prefix="/product")
@@ -28,7 +29,9 @@ async def create_product(product_data: ProductCreateModel,
         }
     )
 
-@product_admin_router.get("/statistics/count-products", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
+
+@product_admin_router.get("/statistics/count-products", status_code=status.HTTP_200_OK,
+                          dependencies=[Depends(admin_role_middleware)])
 async def count_new_products(token_details: dict = Depends(access_token_bearer),
                              session: AsyncSession = Depends(get_session)):
     count_products = await product_service.count_all_products(session)
@@ -43,8 +46,9 @@ async def count_new_products(token_details: dict = Depends(access_token_bearer),
         }
     )
 
+
 @product_customer_router.get('/{id}')
-async def get_detail_product_customer(id: str, session:AsyncSession = Depends(get_session)):
+async def get_detail_product_customer(id: str, session: AsyncSession = Depends(get_session)):
     product_dict = await product_service.get_detail_product_customer_service(id, session)
 
     return JSONResponse(
@@ -58,8 +62,8 @@ async def get_detail_product_customer(id: str, session:AsyncSession = Depends(ge
 
 @product_admin_router.get('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def get_detail_product_admin(id: str,
-                             token_details: dict = Depends(access_token_bearer),
-                             session:AsyncSession = Depends(get_session)):
+                                   token_details: dict = Depends(access_token_bearer),
+                                   session: AsyncSession = Depends(get_session)):
     product_dict = await product_service.get_detail_product_admin_service(id, session)
 
     return JSONResponse(
@@ -74,8 +78,9 @@ async def get_detail_product_admin(id: str,
 @product_customer_router.get('/')
 async def get_all_product_customer(filter_data: ProductFilterModel,
                                    skip: int = 0, limit: int = 10,
-                                   session:AsyncSession = Depends(get_session)):
-    product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit, include_status=False)
+                                   session: AsyncSession = Depends(get_session)):
+    product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit,
+                                                                               include_status=False)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -86,12 +91,29 @@ async def get_all_product_customer(filter_data: ProductFilterModel,
     )
 
 
-@product_admin_router.post('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_product_admin(filter_data: ProductFilterModel,
+@product_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
+async def get_all_product_admin(search: Optional[str] = None,
+                                category_ids: Optional[List[str]] = None,
+                                min_price: Optional[int] = None,
+                                max_price: Optional[int] = None,
+                                sort_by: Optional[str] = None,
+                                colors: Optional[List[str]] = None,
+                                sizes: Optional[List[str]] = None,
                                 token_details: dict = Depends(access_token_bearer),
                                 skip: int = 0, limit: int = 10,
-                                session:AsyncSession = Depends(get_session)):
-    product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit, include_status=True)
+                                session: AsyncSession = Depends(get_session)):
+    filter_data = ProductFilterModel(
+        search=search,
+        category_ids=category_ids,
+        min_price=min_price,
+        max_price=max_price,
+        sort_by=sort_by,
+        colors=colors,
+        sizes=sizes
+    )
+
+    product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit,
+                                                                            include_status=True)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -105,7 +127,7 @@ async def get_all_product_admin(filter_data: ProductFilterModel,
 @product_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def update_product(id: str, product_data: ProductUpdateModel,
                          token_details: dict = Depends(access_token_bearer),
-                         session:AsyncSession = Depends(get_session)):
+                         session: AsyncSession = Depends(get_session)):
     product = await product_service.update_product(id, product_data, session)
 
     return JSONResponse(
@@ -130,9 +152,10 @@ async def delete_product(id: str, token_details: dict = Depends(access_token_bea
         }
     )
 
+
 @product_admin_router.post('/delete', dependencies=[Depends(admin_role_middleware)])
 async def delete_multiple_product(data: DeleteMultipleProductModel, token_details: dict = Depends(access_token_bearer),
-                         session: AsyncSession = Depends(get_session)):
+                                  session: AsyncSession = Depends(get_session)):
     product_ids = await product_service.delete_multiple_product(data, session)
 
     return JSONResponse(
@@ -144,17 +167,3 @@ async def delete_multiple_product(data: DeleteMultipleProductModel, token_detail
             }
         }
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
