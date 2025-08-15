@@ -7,6 +7,7 @@ import { LazyLoadImage } from "react-lazy-load-image-component";
 import { FaCloudUploadAlt, FaPlus } from "react-icons/fa";
 import ColorPicker from "../../Components/ColorPicker";
 import { v4 as uuidv4 } from 'uuid';
+import HierarchicalCategorySelect from "./categoriesSelect";
 
 
 const EditProduct = ({ productId, onClose, onProductUpdated }) => {
@@ -16,6 +17,7 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState([]);
     const [selectedCategories, setSelectedCategories] = useState([]);
+    const [colors, setColors] = useState([]);
     const [initialLoading, setInitialLoading] = useState(true);
     const [deletedVariantIds, setDeletedVariantIds] = useState([]);
 
@@ -25,18 +27,50 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const res = await fetchWithAutoRefresh('/admin/categories/');
-                if (res?.success === true) {
-                    setCategories(res?.data);
+                const queryParams = new URLSearchParams({
+                    skip: "0",
+                    limit: "1000",
+                });
+
+                const res = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
+                if (res.success === true) {
+                    setCategories(res.data.data || []);
                 } else {
+                    console.error("Failed to fetch categories:", res.message);
+                    setCategories([]);
                     context.openAlertBox("error", "Không lấy được danh sách danh mục");
                 }
-            } catch (err) {
-                console.error("Error fetching categories:", err);
+            } catch (error) {
+                console.error("Error fetching categories:", error);
+                setCategories([]);
                 context.openAlertBox("error", "Lỗi khi lấy danh mục");
             }
         };
         fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        const fetchColors = async () => {
+            try {
+                const queryParams = new URLSearchParams({
+                    skip: "0",
+                    limit: "1000",
+                });
+
+                const res = await getDataApi(`/admin/color?${queryParams.toString()}`);
+                console.log(res);
+                if (res.success === true) {
+                    setColors(res.data.data || []);
+                } else {
+                    console.error("Failed to fetch colors:", res.message);
+                    setColors([]);
+                }
+            } catch (error) {
+                console.error("Error fetching colors:", error);
+                setColors([]);
+            }
+        };
+        fetchColors();
     }, []);
 
     useEffect(() => {
@@ -72,7 +106,9 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                         quantity: variant.quantity || '',
                         price: variant.price || '',
                         sku: variant.sku || '',
-                        color: variant.color || null,
+                        color_id: variant.color_id || null,
+                        color_name: variant.color_name || null,
+                        color_code: variant.color_code || null,
                         isExisting: true
                     })) || [];
                     setVariants(productVariants);
@@ -133,12 +169,13 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                 quantity: '',
                 price: '',
                 sku: '',
-                color: null,
+                color_id: null,
+                color_name: null,
+                color_code: null,
                 isExisting: false
             }
         ]);
     };
-
 
     const handleRemoveVariant = (variantId) => {
         const variantToRemove = variants.find(variant => variant.id === variantId);
@@ -155,16 +192,40 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
         }
     };
 
-    const handleVariantChange = (variantId, field, value) => {
-        const processedValue = (field === 'color' && value === '') ? null : value;
-
+    const handleVariantChange = (id, field, value) => {
         setVariants(prev =>
-            prev.map(v => (v.id === variantId ? { ...v, [field]: processedValue } : v))
+            prev.map(v => {
+                if (v.id !== id) return v;
+
+                if (field === 'color_id') {
+                    return {
+                        ...v,
+                        color_id: value || null,
+                        color_name: null,
+                        color_code: null
+                    };
+                }
+
+                if (field === 'color_override') {
+                    return {
+                        ...v,
+                        color_id: null,
+                        color_name: value?.name || null,
+                        color_code: value?.code || null
+                    };
+                }
+
+                return { ...v, [field]: value };
+            })
         );
     };
 
     const handleFormDataChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleCategorySelectionChange = (selectedIds) => {
+        setSelectedCategories(selectedIds);
     };
 
     const validateForm = () => {
@@ -226,16 +287,26 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                 images: images.map(img => img.base64),
                 categories_id: validCategoryIds,
                 product_variant: variants.map(variant => {
-                    const variantData = {
-                        id: variant.isExisting ? variant.id : null,
-                        size: variant.size || null,
-                        color: variant.color,
-                        price: parseInt(variant.price),
-                        quantity: parseInt(variant.quantity),
-                        sku: variant.sku.trim()
-                    };
-
-                    return variantData;
+                    if (variant.color_id) {
+                        return {
+                            id: variant.isExisting ? variant.id : null,
+                            size: variant.size || null,
+                            color_id: variant.color_id,
+                            price: parseInt(variant.price),
+                            quantity: parseInt(variant.quantity),
+                            sku: variant.sku.trim()
+                        };
+                    } else {
+                        return {
+                            id: variant.isExisting ? variant.id : null,
+                            size: variant.size || null,
+                            color_name: variant.color_name,
+                            color_code: variant.color_code,
+                            price: parseInt(variant.price),
+                            quantity: parseInt(variant.quantity),
+                            sku: variant.sku.trim()
+                        };
+                    }
                 }),
                 deleted_variant_ids: deletedVariantIds
             };
@@ -297,27 +368,13 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
 
                     <div className="mb-5">
                         <h3 className="text-[14px] font-[500] mb-1">Danh mục sản phẩm</h3>
-                        <Select
-                            size="small"
-                            className="w-full"
-                            multiple
-                            displayEmpty
-                            value={selectedCategories}
-                            onChange={(e) => setSelectedCategories(e.target.value)}
-                            renderValue={(selected) => {
-                                const selectedNames = categories
-                                    .filter(cat => selected.includes(cat.id))
-                                    .map(cat => cat.name);
-                                return selectedNames.join(', ');
-                            }}
-                        >
-                            {categories.map((cat) => (
-                                <MenuItem key={cat.id} value={cat.id}>
-                                    <Checkbox checked={selectedCategories.includes(cat.id)} />
-                                    <ListItemText primary={cat.name} />
-                                </MenuItem>
-                            ))}
-                        </Select>
+                        <HierarchicalCategorySelect
+                            categories={categories}
+                            selectedCategoryIds={selectedCategories}
+                            onSelectionChange={handleCategorySelectionChange}
+                            label=""
+                            placeholder="Chọn danh mục sản phẩm"
+                        />
                     </div>
 
                     <div className="mb-4">
@@ -368,8 +425,6 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                                 <IoMdClose size={20} />
                             </button>
 
-
-
                             <div className="grid grid-cols-6 gap-4 mb-3">
                                 <div className="col-span-1">
                                     <h3 className="text-sm font-medium mb-1">Kích cỡ</h3>
@@ -414,11 +469,32 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                                         className="w-full h-[40px] border border-gray-300 p-3 text-sm rounded-sm"
                                     />
                                 </div>
+                                <div className="col-span-1">
+                                    <h3 className="text-sm font-medium mb-1">Màu (có sẵn)</h3>
+                                    <Select
+                                        size="small"
+                                        className="w-full"
+                                        value={variant.color_id || ""}
+                                        onChange={(e) =>
+                                            handleVariantChange(variant.id, 'color_id', e.target.value)
+                                        }
+                                    >
+                                        <MenuItem value="">None</MenuItem>
+                                        {colors.map((c) => (
+                                            <MenuItem key={c.id} value={c.id}>
+                                                {c.name} ({c.code})
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </div>
                                 <div className="col-span-2">
                                     <ColorPicker
-                                        color={variant.color}
-                                        onChange={(newColor) =>
-                                            handleVariantChange(variant.id, 'color', newColor)
+                                        color={variant.color_code || ""}
+                                        onChange={(newCode) =>
+                                            handleVariantChange(variant.id, 'color_override', {
+                                                name: `Custom-${variant.id}`,
+                                                code: newCode
+                                            })
                                         }
                                     />
                                 </div>

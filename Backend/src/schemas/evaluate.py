@@ -41,3 +41,9 @@ class SupplementEvaluateModel(BaseModel):
 class GetEvaluateByProduct(BaseModel):
     product_variant_id: Optional[str] = None
     rate: Optional[int] = None
+
+class EvaluateFilterModel(BaseModel):
+    search: Optional[str] = None
+    rate: Optional[int] = None
+    sort_by_created_at: Optional[str] = None
+    sort_by_rate: Optional[str] = None

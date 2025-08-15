@@ -6,7 +6,7 @@ from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
-from src.schemas.order import OrderCreateModel, StatusUpdateModel
+from src.schemas.order import OrderCreateModel, StatusUpdateModel, OrderFilterModel
 from src.dependencies import admin_role_middleware, customer_role_middleware
 
 order_admin_router = APIRouter(prefix="/order")
@@ -135,11 +135,21 @@ async def get_all_order_customer(skip: int = 0, limit: int = 10,
     )
 
 
-@order_admin_router.get("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
-async def get_all_order_admin(skip: int = 0, limit: int = 10, search: str = None,
+@order_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
+async def get_all_order_admin(skip: int = 0, limit: int = 10,
+                              search: Optional[str] = None,
+                              sort_by_total_price: Optional[str] = None,
+                              sort_by_created_at: Optional[str] = None,
+                              status_filter: Optional[str] = None,
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
-    order_dict = await order_service.get_all_order_admin(session, skip=skip, limit=limit, search=search)
+    filter_data = OrderFilterModel(
+        search=search,
+        sort_by_total_price=sort_by_total_price,
+        sort_by_created_at=sort_by_created_at,
+        status=status_filter,
+    )
+    order_dict = await order_service.get_all_order_admin(session, filter_data, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

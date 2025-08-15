@@ -1,11 +1,12 @@
 from typing import Optional, List
 from sqlalchemy import ColumnElement
-from src.database.models import Product, Product_Variant
+from src.database.models import Product, Product_Variant, Categories
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, update, func
 from datetime import datetime
 from fastapi import HTTPException, status
-from sqlalchemy import and_
+from sqlalchemy import and_, text
+from sqlalchemy.orm import noload, selectinload
 
 from src.errors.product import ProductException
 from src.schemas.product import DeleteMultipleProductModel
@@ -40,35 +41,41 @@ class ProductRepository:
 
         return new_product
 
-
-    async def get_all_product(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, joins: list = None, skip: int = 0, limit: int = 10, order_by_clause = None):
-        count_stmt = select(func.count()).where(*conditions)
+    async def get_all_product(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
+                              joins: list = None, skip: int = 0, limit: int = 10, order_by_clause=None):
+        count_stmt = select(func.count(Product.id)).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(Product).where(*conditions).offset(skip).limit(limit)
+        statement = select(Product).options(
+            noload(Product.order_detail),
+            noload(Product.categories_product),
+            noload(Product.evaluate),
+            noload(Product.special_offer),
+            *joins if joins else []
+        ).where(*conditions).offset(skip).limit(limit)
 
         if order_by_clause is not None:
             statement = statement.order_by(order_by_clause)
 
-        if joins:
-            statement = statement.options(*joins)
-
         result = await session.exec(statement)
-        products = result.all()
+        products = result.unique().all()
 
         return products, total
 
 
     async def get_product(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Product).where(conditions)
-        if joins:
-            statement = statement.options(*joins)
+        statement = select(Product).options(
+            noload(Product.order_detail),
+            noload(Product.categories),
+            noload(Product.evaluate),
+            noload(Product.special_offer),
+            *joins if joins else []
+        ).where(*conditions)
 
         result = await session.exec(statement)
 
         return result.one_or_none()
-
 
     async def update_product(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
@@ -79,7 +86,6 @@ class ProductRepository:
         await session.commit()
 
         return data_need_update
-
 
     async def delete_product(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         product_to_delete = await self.get_product(condition, session)
@@ -127,9 +133,3 @@ class ProductRepository:
 
         result = await session.exec(statement)
         return result.one_or_none() or 0
-
-
-
-
-
-

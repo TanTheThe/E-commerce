@@ -52,7 +52,7 @@ async def get_all_customer(search: Optional[str] = None,
                            email: Optional[str] = None,
                            phone: Optional[str] = None,
                            customer_status: Optional[str] = None,
-                           created_at: Optional[datetime] = None,
+                           sort_by_created_at: Optional[str] = None,
                            token_details: dict = Depends(access_token_bearer),
                            skip: int = 0, limit: int = 10,
                            session: AsyncSession = Depends(get_session)):
@@ -61,7 +61,7 @@ async def get_all_customer(search: Optional[str] = None,
         email=email,
         phone=phone,
         customer_status=customer_status,
-        created_at=created_at
+        sort_by_created_at=sort_by_created_at
     )
 
     filtered_users = await user_service.get_all_customer_service(filter_data, session, skip, limit)

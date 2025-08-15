@@ -28,7 +28,7 @@ const ColorPicker = ({ color = "", onChange }) => {
 
     return (
         <div className="col">
-            <h3 className="text-[14px] font-[500] mb-0.5">Màu sắc</h3>
+            <h3 className="text-[14px] font-[500] mb-0.5">Override màu</h3>
             <div className="flex items-center gap-2">
                 <TextField
                     value={color ?? ''}

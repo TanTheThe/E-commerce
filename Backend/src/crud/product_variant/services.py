@@ -1,19 +1,23 @@
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, case
+from sqlalchemy import literal, text
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.database.models import Product_Variant
 from uuid import UUID
 
+from src.errors.color import ColorException
+
 product_variant_repository = ProductVariantRepository()
+
 
 class ProductVariantService:
     async def update_product_variant(self, product_id: str, new_variants: list, session: AsyncSession):
         condition = and_(Product_Variant.product_id == product_id)
         existing_variants = await product_variant_repository.get_all_product_variant(condition, session)
 
-        existing_dict  = {str(v.id): v for v in existing_variants}
-        new_dict = {str(v["id"]): v for v in new_variants if v.get("id") is not None}
+        existing_dict = {str(v.id): v for v in existing_variants}
+        new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}
 
         # VD: v1, v2, v3
         old_ids = set(existing_dict.keys())
@@ -33,15 +37,33 @@ class ProductVariantService:
         for variant_id in new_ids & old_ids:
             data = new_dict[variant_id]
 
-            to_update_data[UUID(variant_id)] = {
-                "size": data.get("size"),
-                "color": data.get("color"),
-                "price": data["price"],
-                "quantity": data["quantity"],
-                "sku": data["sku"],
-                "deleted_at": None,
-                "updated_at": datetime.now()
-            }
+            if data.get("color_id") and (data.get("color_name") or data.get("color_code")):
+                ColorException.invalid_color_format()
+            if not data.get("color_id") and (not data.get("color_name") or not data.get("color_code")):
+                ColorException.invalid_color_format()
+
+            if data.get("color_id") and (not data.get("color_name") and not data.get("color_code")):
+                to_update_data[UUID(variant_id)] = {
+                    "size": data.get("size"),
+                    "color_id": UUID(data.get("color_id")),
+                    "price": data["price"],
+                    "quantity": data["quantity"],
+                    "sku": data["sku"],
+                    "deleted_at": None,
+                    "updated_at": datetime.now()
+                }
+
+            if not data.get("color_id") and (data.get("color_name") and data.get("color_code")):
+                to_update_data[UUID(variant_id)] = {
+                    "size": data.get("size"),
+                    "color_name": data.get("color_name"),
+                    "color_code": data.get("color_code"),
+                    "price": data["price"],
+                    "quantity": data["quantity"],
+                    "sku": data["sku"],
+                    "deleted_at": None,
+                    "updated_at": datetime.now()
+                }
 
         if to_update_data:
             await self._bulk_update_variants(to_update_data, session)
@@ -52,20 +74,28 @@ class ProductVariantService:
 
         await session.commit()
 
-
     async def _bulk_update_variants(self, update_data: dict[UUID, dict], session: AsyncSession):
         ids = list(update_data.keys())
 
         def build_case(field: str):
-            return case(
-                *((Product_Variant.id == uid, data[field]) for uid, data in update_data.items()),
-                else_=getattr(Product_Variant, field)
-            )
+            col = getattr(Product_Variant, field)
+            cases = []
+
+            for uid, data in update_data.items():
+                field_value = data.get(field)
+                if field_value is not None:
+                    cases.append((Product_Variant.id == uid, field_value))
+                else:
+                    cases.append((Product_Variant.id == uid, None))
+
+            return case(*cases, else_=col)
 
         condition = Product_Variant.id.in_(ids)
         values_dict = {
             "size": build_case("size"),
-            "color": build_case("color"),
+            "color_id": build_case("color_id"),
+            "color_name": build_case("color_name"),
+            "color_code": build_case("color_code"),
             "price": build_case("price"),
             "quantity": build_case("quantity"),
             "sku": build_case("sku"),
@@ -74,9 +104,5 @@ class ProductVariantService:
         }
         await product_variant_repository.update_product_variant(values_dict, condition, session)
 
-
     async def _bulk_create_variants(self, items: list[dict], product_id: str, session: AsyncSession):
         await product_variant_repository.create_product_variant(items, product_id, session)
-
-
-

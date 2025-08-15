@@ -83,6 +83,6 @@ class FilterUserInputModel(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     customer_status: Optional[str] = None
-    created_at: Optional[datetime] = None
+    sort_by_created_at: Optional[str] = None
 
 

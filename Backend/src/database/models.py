@@ -194,7 +194,6 @@ class Product_Variant(SQLModel, table=True):
     )
 
     size: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    color: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     price: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     sku: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
@@ -203,12 +202,19 @@ class Product_Variant(SQLModel, table=True):
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     product_id: uuid.UUID = Field(foreign_key="product.id")
 
+    color_id: Optional[uuid.UUID] = Field(foreign_key="color.id", nullable=True)
+
+    color_name: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    color_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+
     order_detail: List["Order_Detail"] = Relationship(back_populates="product_variant",
                                                       sa_relationship_kwargs={'lazy': 'selectin'})
     product: Optional["Product"] = Relationship(back_populates="product_variant",
                                                 sa_relationship_kwargs={'lazy': 'joined'})
     evaluate: List["Evaluate"] = Relationship(back_populates="product_variant",
                                               sa_relationship_kwargs={'lazy': 'selectin'})
+    color: Optional["Color"] = Relationship(back_populates="product_variant",
+                                                sa_relationship_kwargs={'lazy': 'joined'})
 
 
 class Categories(SQLModel, table=True):
@@ -239,7 +245,7 @@ class Categories(SQLModel, table=True):
     )
     children: List["Categories"] = Relationship(
         back_populates="parent",
-        sa_relationship_kwargs={"lazy": "selectin"}
+        sa_relationship_kwargs={"lazy": "noload"}
     )
 
 Categories.model_rebuild()
@@ -324,8 +330,13 @@ class Color(SQLModel, table=True):
     )
 
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    product_variant: List["Product_Variant"] = Relationship(back_populates="color",
+                                                                sa_relationship_kwargs={'lazy': 'selectin'})
+
 
 

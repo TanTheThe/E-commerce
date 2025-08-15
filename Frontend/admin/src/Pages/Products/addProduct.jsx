@@ -9,7 +9,8 @@ import { FaCloudUploadAlt, FaPlus } from "react-icons/fa";
 import ColorPicker from "../../Components/ColorPicker";
 import { Checkbox, ListItemText } from "@mui/material";
 import { MyContext } from "../../App";
-import { fetchWithAutoRefresh, postDataApi } from "../../utils/api";
+import { fetchWithAutoRefresh, getDataApi, postDataApi } from "../../utils/api";
+import HierarchicalCategorySelect from "./categoriesSelect";
 
 
 const AddProduct = () => {
@@ -19,24 +20,55 @@ const AddProduct = () => {
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState([]);
     const [selectedCategories, setSelectedCategories] = useState([]);
+    const [colors, setColors] = useState([]);
     const context = useContext(MyContext);
     const { onUpdated } = context?.isOpenFullScreenPanel || {};
 
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const res = await fetchWithAutoRefresh('/admin/categories/');
-                if (res?.success === true) {
-                    setCategories(res?.data);
+                const queryParams = new URLSearchParams({
+                    skip: "0",
+                    limit: "1000",
+                });
+
+                const res = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
+                if (res.success === true) {
+                    setCategories(res.data.data || []);
                 } else {
-                    context.openAlertBox("error", "Không lấy được danh sách danh mục");
+                    console.error("Failed to fetch categories:", res.message);
+                    setCategories([]);
                 }
-            } catch (err) {
-                console.error("Error fetching categories:", err);
-                context.openAlertBox("error", "Lỗi khi lấy danh mục");
+            } catch (error) {
+                console.error("Error fetching categories:", error);
+                setCategories([]);
             }
         };
         fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        const fetchColors = async () => {
+            try {
+                const queryParams = new URLSearchParams({
+                    skip: "0",
+                    limit: "1000",
+                });
+
+                const res = await getDataApi(`/admin/color?${queryParams.toString()}`);
+                console.log(res);
+                if (res.success === true) {
+                    setColors(res.data.data || []);
+                } else {
+                    console.error("Failed to fetch colors:", res.message);
+                    setColors([]);
+                }
+            } catch (error) {
+                console.error("Error fetching colors:", error);
+                setColors([]);
+            }
+        };
+        fetchColors();
     }, []);
 
     const convertToBase64 = (file) => {
@@ -87,15 +119,39 @@ const AddProduct = () => {
     };
 
     const handleVariantChange = (id, field, value) => {
-        const processedValue = (field === 'color' && value === '') ? null : value;
-
         setVariants(prev =>
-            prev.map(v => (v.id === id ? { ...v, [field]: processedValue } : v))
+            prev.map(v => {
+                if (v.id !== id) return v;
+
+                if (field === 'color_id') {
+                    return {
+                        ...v,
+                        color_id: value || null,
+                        color_name: null,
+                        color_code: null
+                    };
+                }
+
+                if (field === 'color_override') {
+                    return {
+                        ...v,
+                        color_id: null,
+                        color_name: value?.name || null,
+                        color_code: value?.code || null
+                    };
+                }
+
+                return { ...v, [field]: value };
+            })
         );
     };
 
     const handleFormDataChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleCategorySelectionChange = (selectedIds) => {
+        setSelectedCategories(selectedIds);
     };
 
     const validateForm = () => {
@@ -147,16 +203,30 @@ const AddProduct = () => {
                 description: formData.description?.trim() || null,
                 images: images.map(img => img.base64),
                 categories_id: selectedCategories,
-                product_variant: variants.map(variant => ({
-                    size: variant.size || null,
-                    color: variant.color,
-                    price: parseInt(variant.price),
-                    quantity: parseInt(variant.quantity),
-                    sku: variant.sku.trim()
-                }))
+                product_variant: variants.map(variant => {
+                    if (variant.color_id) {
+                        return {
+                            size: variant.size || null,
+                            color_id: variant.color_id,
+                            price: parseInt(variant.price),
+                            quantity: parseInt(variant.quantity),
+                            sku: variant.sku.trim()
+                        };
+                    } else {
+                        return {
+                            size: variant.size || null,
+                            color_name: variant.color_name,
+                            color_code: variant.color_code,
+                            price: parseInt(variant.price),
+                            quantity: parseInt(variant.quantity),
+                            sku: variant.sku.trim()
+                        };
+                    }
+                })
             };
 
             const result = await postDataApi('/admin/product/', submitData);
+            console.log(result);
 
             if (!result.success) {
                 context.openAlertBox("error", result?.data?.detail.message || 'Có lỗi xảy ra khi tạo sản phẩm');
@@ -165,7 +235,7 @@ const AddProduct = () => {
 
             context.openAlertBox("success", result?.message);
             if (onUpdated) {
-                onUpdated(); 
+                onUpdated();
             }
             context.setIsOpenFullScreenPanel({ open: false });
             setFormData({ name: '', description: '' });
@@ -206,27 +276,13 @@ const AddProduct = () => {
 
                     <div className="mb-5">
                         <h3 className="text-[14px] font-[500] mb-1">Danh mục sản phẩm</h3>
-                        <Select
-                            size="small"
-                            className="w-full"
-                            multiple
-                            displayEmpty
-                            value={selectedCategories}
-                            onChange={(e) => setSelectedCategories(e.target.value)}
-                            renderValue={(selected) => {
-                                const selectedNames = categories
-                                    .filter(cat => selected.includes(cat.id))
-                                    .map(cat => cat.name);
-                                return selectedNames.join(', ');
-                            }}
-                        >
-                            {categories.map((cat) => (
-                                <MenuItem key={cat.id} value={cat.id}>
-                                    <Checkbox checked={selectedCategories.includes(cat.id)} />
-                                    <ListItemText primary={cat.name} />
-                                </MenuItem>
-                            ))}
-                        </Select>
+                        <HierarchicalCategorySelect
+                            categories={categories}
+                            selectedCategoryIds={selectedCategories}
+                            onSelectionChange={handleCategorySelectionChange}
+                            label=""
+                            placeholder="Chọn danh mục sản phẩm"
+                        />
                     </div>
 
                     <div className="mb-4">
@@ -321,11 +377,33 @@ const AddProduct = () => {
                                         className="w-full h-[40px] border border-gray-300 p-3 text-sm rounded-sm"
                                     />
                                 </div>
+                                <div className="col-span-1">
+                                    <h3 className="text-sm font-medium mb-1">Màu (có sẵn)</h3>
+                                    <Select
+                                        size="small"
+                                        className="w-full"
+                                        value={variant.color_id || ""}
+                                        onChange={(e) =>
+                                            handleVariantChange(variant.id, 'color_id', e.target.value)
+                                        }
+                                    >
+                                        <MenuItem value="">None</MenuItem>
+                                        {colors.map((c) => (
+                                            <MenuItem key={c.id} value={c.id}>
+                                                {c.name} ({c.code})
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </div>
+
                                 <div className="col-span-2">
                                     <ColorPicker
-                                        color={variant.color}
-                                        onChange={(newColor) =>
-                                            handleVariantChange(variant.id, 'color', newColor)
+                                        color={variant.color_code || ""}
+                                        onChange={(newCode) =>
+                                            handleVariantChange(variant.id, 'color_override', {
+                                                name: `Custom-${variant.id}`,
+                                                code: newCode
+                                            })
                                         }
                                     />
                                 </div>

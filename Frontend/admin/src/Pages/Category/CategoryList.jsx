@@ -132,7 +132,7 @@ const CategoryList = () => {
     const [categories, setCategories] = useState([]);
     const [totalCategories, setTotalCategories] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(5);
     const [page, setPage] = useState(0);
 
     const [isOpen, setIsOpen] = useState(false);

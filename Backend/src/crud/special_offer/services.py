@@ -2,7 +2,7 @@ from src.database.models import Special_Offer
 from src.errors.special_offer import SpecialOfferException
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, or_
+from sqlmodel import and_, or_, func
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from datetime import datetime
 from typing import Any
@@ -45,8 +45,8 @@ class SpecialOfferService:
                 Special_Offer.name.ilike(f"%{filter_data.search}%")
             ))
 
-        if filter_data.type in ["percentage", "fixed_amount"]:
-            conditions.append(Special_Offer.type == type)
+        if filter_data.type in ["percent", "fixed"]:
+            conditions.append(Special_Offer.type == filter_data.type)
 
         if filter_data.discount_min is not None:
             conditions.append(Special_Offer.discount >= filter_data.discount_min)
@@ -58,7 +58,7 @@ class SpecialOfferService:
         elif filter_data.quantity_status == "out":
             conditions.append(Special_Offer.total_quantity <= Special_Offer.used_quantity)
 
-        now = datetime.now()
+        now = datetime.now().replace(microsecond=0)
         if filter_data.time_status == "upcoming":
             conditions.append(Special_Offer.start_time > now)
         elif filter_data.time_status == "active":
@@ -70,9 +70,6 @@ class SpecialOfferService:
             conditions.append(Special_Offer.end_time < now)
 
         special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit)
-
-        if len(special_offers) == 0:
-            SpecialOfferException.empty_list()
 
         response = []
         for offer in special_offers:
@@ -91,7 +88,7 @@ class SpecialOfferService:
             response.append(offer_dict)
 
         return {
-            "data": special_offers,
+            "data": response,
             "total": total
         }
 

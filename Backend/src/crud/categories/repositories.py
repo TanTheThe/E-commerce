@@ -1,9 +1,9 @@
 from typing import Optional, List
-from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
 from src.database.models import Categories
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, func
+from sqlmodel import select, func, and_
+from sqlalchemy.orm import noload
 from datetime import datetime
 from src.errors.categories import CategoriesException
 
@@ -20,7 +20,7 @@ class CategoriesRepository:
 
         new_categories = Categories(
             **categories_data_dict,
-            created_at = datetime.now()
+            created_at=datetime.now()
         )
         session.add(new_categories)
         await session.commit()
@@ -28,13 +28,18 @@ class CategoriesRepository:
 
         return new_categories
 
-
-    async def get_all_categories(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0, limit: int = 10):
+    async def get_all_categories(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
+                                 skip: int = 0, limit: int = 5):
         count_stmt = select(func.count()).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(Categories).where(*conditions).offset(skip).limit(limit)
+        statement = select(Categories).options(
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent)
+        ).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)
 
@@ -42,13 +47,22 @@ class CategoriesRepository:
 
         return categories, total
 
-
     async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        statement = select(Categories).where(conditions)
+        base_condition = Categories.deleted_at.is_(None)
+        if conditions is not None:
+            combined_condition = and_(base_condition, conditions)
+        else:
+            combined_condition = base_condition
+
+        statement = select(Categories).options(
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent)
+        ).where(combined_condition)
         result = await session.exec(statement)
 
         return result.one_or_none()
-
 
     async def update_categories(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
@@ -59,7 +73,6 @@ class CategoriesRepository:
 
         return data_need_update
 
-
     async def delete_categories(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         categories_to_delete = await self.get_category(condition, session)
 
@@ -68,14 +81,11 @@ class CategoriesRepository:
 
         categories_to_delete.deleted_at = datetime.now()
 
-    async def delete_sub_categories(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        sub_categories = await self.get_all_categories(condition, session)
+    async def delete_sub_categories(self, condition: List[Optional[ColumnElement[bool]]], session: AsyncSession):
+        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000)
 
         if sub_categories is None:
             CategoriesException.not_found_to_delete()
 
         for sub_cat in sub_categories:
             sub_cat.deleted_at = datetime.now()
-
-
-

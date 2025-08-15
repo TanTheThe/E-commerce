@@ -6,7 +6,7 @@ from src.schemas.user import UserCreateModel, UserReadModel, UserDeleteModel, \
     FilterUserInputModel
 from src.crud.authentication.utils import generate_password_hash, create_url_safe_token, decode_url_safe_token, \
     verify_password
-from sqlmodel import and_, or_, func
+from sqlmodel import and_, or_, func, desc, asc
 from src.mail import create_message, mail
 from fastapi import HTTPException, BackgroundTasks
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -60,12 +60,19 @@ class UserService:
         if filter_data.customer_status:
             filters.append(User.customer_status == filter_data.customer_status)
 
-        if filter_data.created_at:
-            filters.append(User.created_at == filter_data.created_at)
+        order_by = []
+        if filter_data.sort_by_created_at:
+            if filter_data.sort_by_created_at == "newest":
+                order_by.append(desc(User.created_at))
+            else:
+                order_by.append(asc(User.created_at))
+
+        if not order_by:
+            order_by = [desc(User.created_at)]
 
         condition = and_(*filters) if filters else None
 
-        users, total = await user_repository.get_all_user(condition, session, skip, limit)
+        users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit)
 
         filtered_users = [
             {

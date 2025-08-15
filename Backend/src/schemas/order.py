@@ -32,3 +32,9 @@ class StatusUpdateModel(BaseModel):
 class CheckOut(BaseModel):
     payment_method: str = Field(default="vnpay")
     transaction_no: Optional[str]
+
+class OrderFilterModel(BaseModel):
+    search: Optional[str] = None
+    sort_by_total_price: Optional[str] = None
+    sort_by_created_at: Optional[str] = None
+    status: Optional[str] = None

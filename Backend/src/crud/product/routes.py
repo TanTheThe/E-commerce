@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Query
 from src.crud.product.services import ProductService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -47,6 +47,39 @@ async def count_new_products(token_details: dict = Depends(access_token_bearer),
     )
 
 
+@product_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
+async def get_all_product_admin(search: Optional[str] = None,
+                                category_ids: Optional[List[str]] = Query(default=[]),
+                                min_price: Optional[int] = None,
+                                max_price: Optional[int] = None,
+                                sort_by: Optional[str] = None,
+                                colors: Optional[List[str]] = None,
+                                sizes: Optional[List[str]] = None,
+                                token_details: dict = Depends(access_token_bearer),
+                                skip: int = 0, limit: int = 10,
+                                session: AsyncSession = Depends(get_session)):
+    filter_data = ProductFilterModel(
+        search=search,
+        category_ids=category_ids,
+        min_price=min_price,
+        max_price=max_price,
+        sort_by=sort_by,
+        colors=colors,
+        sizes=sizes
+    )
+
+    product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit,
+                                                                            include_status=True)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": product_list_dict
+        }
+    )
+
+
 @product_customer_router.get('/{id}')
 async def get_detail_product_customer(id: str, session: AsyncSession = Depends(get_session)):
     product_dict = await product_service.get_detail_product_customer_service(id, session)
@@ -81,39 +114,6 @@ async def get_all_product_customer(filter_data: ProductFilterModel,
                                    session: AsyncSession = Depends(get_session)):
     product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit,
                                                                                include_status=False)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin của các sản phẩm",
-            "content": product_list_dict
-        }
-    )
-
-
-@product_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_product_admin(search: Optional[str] = None,
-                                category_ids: Optional[List[str]] = None,
-                                min_price: Optional[int] = None,
-                                max_price: Optional[int] = None,
-                                sort_by: Optional[str] = None,
-                                colors: Optional[List[str]] = None,
-                                sizes: Optional[List[str]] = None,
-                                token_details: dict = Depends(access_token_bearer),
-                                skip: int = 0, limit: int = 10,
-                                session: AsyncSession = Depends(get_session)):
-    filter_data = ProductFilterModel(
-        search=search,
-        category_ids=category_ids,
-        min_price=min_price,
-        max_price=max_price,
-        sort_by=sort_by,
-        colors=colors,
-        sizes=sizes
-    )
-
-    product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit,
-                                                                            include_status=True)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

@@ -14,6 +14,8 @@ import { MyContext } from "../../App";
 import AddCategory from "../../Pages/Category/addCategory";
 import AddSpecialOffer from "../../Pages/SpecialOffer/addSpecialOffer";
 import { MdOutlinePreview } from "react-icons/md";
+import { IoIosColorPalette } from "react-icons/io";
+
 
 const Sidebar = () => {
     const [submenuIndex, setSubmenuIndex] = useState(null)
@@ -151,6 +153,13 @@ const Sidebar = () => {
                         <Link to="/reviews/list">
                             <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
                                 <MdOutlinePreview className="text-[18px]" /> <span>Reviews</span>
+                            </Button>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link to="/colors/list">
+                            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
+                                <IoIosColorPalette className="text-[18px]" /> <span>Colors</span>
                             </Button>
                         </Link>
                     </li>

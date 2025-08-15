@@ -3,6 +3,7 @@ from sqlalchemy import ColumnElement
 from src.database.models import Special_Offer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, and_, func
+from sqlalchemy.orm import noload
 from datetime import datetime
 import time
 from src.errors.special_offer import SpecialOfferException
@@ -27,7 +28,8 @@ class SpecialOfferRepository:
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(Special_Offer).where(*conditions).offset(skip).limit(limit)
+        statement = select(Special_Offer).options(
+            noload(Special_Offer.products)).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)
         special_offers = result.all()
@@ -35,8 +37,8 @@ class SpecialOfferRepository:
         return special_offers, total
 
 
-    async def get_special_offer(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        statement = select(Special_Offer).where(conditions)
+    async def get_special_offer(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+        statement = select(Special_Offer).where(conditions).options(*joins if joins else [])
 
         result = await session.exec(statement)
 
