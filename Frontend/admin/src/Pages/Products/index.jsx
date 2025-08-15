@@ -19,6 +19,7 @@ import { deleteDataApi, getDataApi, postDataApi } from "../../utils/api";
 import ProductDetailOffcanvas from "./offcanvasProductDetail";
 import debounce from 'lodash/debounce';
 import { useCallback } from 'react';
+import HierarchicalCategorySelect from "./categoriesSelect";
 
 
 const label = { inputProps: { 'aria-label': 'Checkbox demo' } };
@@ -49,7 +50,7 @@ const columns = [
 ];
 
 const Products = () => {
-    const [categoryFilterVal, setCategoryFilterVal] = useState('');
+    const [categoryFilterIds, setCategoryFilterIds] = useState([]);
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [debouncedMinPrice, setDebouncedMinPrice] = useState('');
@@ -75,10 +76,12 @@ const Products = () => {
 
     const fetchCategories = async () => {
         try {
-            const filterData = {
-                search: ""
-            };
-            const res = await postDataApi(`/admin/categories/all?skip=${0}&limit=${1000}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: "0",
+                limit: "1000",
+            });
+
+            const res = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
             if (res.success === true) {
                 setCategories(res.data.data || []);
             } else {
@@ -98,8 +101,8 @@ const Products = () => {
             filterData.search = searchVal.trim();
         }
 
-        if (categoryFilterVal) {
-            filterData.category_ids = [categoryFilterVal];
+        if (categoryFilterIds && categoryFilterIds.length > 0) {
+            filterData.category_ids = categoryFilterIds;
         }
 
         if (debouncedMinPrice && !minPriceError && Number.isInteger(parseFloat(debouncedMinPrice)) && parseFloat(debouncedMinPrice) > 0) {
@@ -120,7 +123,28 @@ const Products = () => {
             const limit = rowsPerPage;
             const filterData = buildFilterData();
 
-            const response = await postDataApi(`/admin/product/all?skip=${skip}&limit=${limit}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+            });
+
+            if (filterData.search) queryParams.append('search', filterData.search);
+            if (filterData.category_ids?.length) {
+                filterData.category_ids.forEach(id => {
+                    queryParams.append('category_ids', id.toString());
+                });
+            }
+            if (filterData.min_price) queryParams.append('min_price', filterData.min_price);
+            if (filterData.max_price) queryParams.append('max_price', filterData.max_price);
+            if (filterData.sort_by) queryParams.append('sort_by', filterData.sort_by);
+            if (filterData.colors?.length) {
+                filterData.colors.forEach(c => queryParams.append('colors', c));
+            }
+            if (filterData.sizes?.length) {
+                filterData.sizes.forEach(s => queryParams.append('sizes', s));
+            }
+
+            const response = await getDataApi(`/admin/product/all?${queryParams.toString()}`);
 
             if (response.success === true) {
                 setProducts(response.data.data || []);
@@ -162,14 +186,14 @@ const Products = () => {
 
     useEffect(() => {
         fetchProducts();
-    }, [page, rowsPerPage, searchVal, categoryFilterVal, debouncedMinPrice, debouncedMaxPrice]);
+    }, [page, rowsPerPage, searchVal, categoryFilterIds, debouncedMinPrice, debouncedMaxPrice]);
 
     useEffect(() => {
         fetchCategories();
     }, []);
 
-    const handleChangeCateFilter = (event) => {
-        setCategoryFilterVal(event.target.value);
+    const handleCategorySelectionChange = (selectedIds) => {
+        setCategoryFilterIds(selectedIds);
         setPage(0);
     };
 
@@ -335,13 +359,12 @@ const Products = () => {
                 </h2>
 
                 <div className="col w-[18%] ml-auto flex items-center justify-end gap-3">
-                    <Button className="btn !bg-green-600 !text-white btn-sm flex items-center">Export</Button>
                     <Button className="btn-blue !text-white btn-sm"
                         onClick={() => context.setIsOpenFullScreenPanel({
                             open: true,
                             model: 'Add Product',
                             onUpdated: handleProductUpdated
-                        })}>Add Product</Button>
+                        })}>Thêm sản phẩm</Button>
                 </div>
             </div>
 
@@ -349,29 +372,17 @@ const Products = () => {
                 <div className="flex items-center w-full px-5 justify-between">
                     <div className="flex items-center gap-4 w-[60%]">
                         <div className="col w-[30%]">
-                            <h4 className="font-[600] text-[13px] mb-3">Sắp xếp theo danh mục</h4>
-                            <Select
-                                className="w-full mb-5"
-                                size="small"
-                                labelId="demo-simple-select-standard-label"
-                                id="demo-simple-select-standard"
-                                value={categoryFilterVal}
-                                onChange={handleChangeCateFilter}
-                                label="Category"
-                            >
-                                <MenuItem value="">
-                                    <em>All Categories</em>
-                                </MenuItem>
-                                {categories.map((category) => (
-                                    <MenuItem key={category.id} value={category.id}>
-                                        {category.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
+                            <HierarchicalCategorySelect
+                                categories={categories}
+                                selectedCategoryIds={categoryFilterIds}
+                                onSelectionChange={handleCategorySelectionChange}
+                                label="Sắp xếp theo danh mục"
+                                placeholder="Tất cả danh mục"
+                            />
                         </div>
 
                         <div className="col w-[30%]">
-                            <h4 className="font-[600] text-[13px] mb-3">Lọc theo giá</h4>
+                            <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo giá</h4>
                             <div className="flex flex-col gap-2 mb-5">
                                 <div className="flex gap-2 items-start">
                                     <div className="flex-1">

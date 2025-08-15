@@ -86,7 +86,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
                                                             <span className={`${variant.color ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                                                                {variant.color || 'None'}
+                                                                {variant.color_name || 'None'}
                                                             </span>
                                                         </div>
                                                     </div>

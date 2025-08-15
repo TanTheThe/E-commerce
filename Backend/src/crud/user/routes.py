@@ -8,6 +8,8 @@ from src.crud.user.services import UserService
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware, customer_role_middleware
 from fastapi.responses import RedirectResponse
+from typing import Optional
+from datetime import datetime
 
 user_service = UserService()
 access_token_bearer = AccessTokenBearer()
@@ -45,11 +47,23 @@ async def create_user_account(user_data: UserCreateModel, bg_tasks: BackgroundTa
     )
 
 
-@user_admin_router.post('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_customer(filter_data: FilterUserInputModel,
+@user_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
+async def get_all_customer(search: Optional[str] = None,
+                           email: Optional[str] = None,
+                           phone: Optional[str] = None,
+                           customer_status: Optional[str] = None,
+                           sort_by_created_at: Optional[str] = None,
                            token_details: dict = Depends(access_token_bearer),
                            skip: int = 0, limit: int = 10,
                            session: AsyncSession = Depends(get_session)):
+    filter_data = FilterUserInputModel(
+        search=search,
+        email=email,
+        phone=phone,
+        customer_status=customer_status,
+        sort_by_created_at=sort_by_created_at
+    )
+
     filtered_users = await user_service.get_all_customer_service(filter_data, session, skip, limit)
 
     return JSONResponse(
@@ -215,4 +229,3 @@ async def change_status_user(id: str, token_details: dict = Depends(access_token
             "content": user_block
         }
     )
-

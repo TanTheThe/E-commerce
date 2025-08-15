@@ -61,7 +61,6 @@ class RefreshTokenBearer(TokenBearer):
 
 def verify_token_and_get_role(request: Request):
     auth_header = request.headers.get("Authorization")
-    print(auth_header)
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -6,6 +6,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
+from typing import Optional
+import time
 
 categories_admin_router = APIRouter(prefix="/categories")
 categories_customer_router = APIRouter(prefix="/categories")
@@ -30,11 +32,17 @@ async def create_categories(categories_data: CategoriesCreateModel,
     )
 
 
-@categories_admin_router.post('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_categories_admin(filter_data: CategoriesFilterModel,
+@categories_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
+async def get_all_categories_admin(search: Optional[str] = None,
+                                   parent_id: Optional[str] = None,
                                    session: AsyncSession = Depends(get_session),
-                                   skip: int = 0, limit: int = 10,
+                                   skip: int = 0, limit: int = 5,
                                    token_details: dict = Depends(access_token_bearer)):
+    filter_data = CategoriesFilterModel(
+        search=search,
+        parent_id=parent_id
+    )
+
     categories = await categories_service.get_all_categories_service(filter_data, session, skip, limit)
 
     return JSONResponse(
@@ -46,15 +54,35 @@ async def get_all_categories_admin(filter_data: CategoriesFilterModel,
     )
 
 
-@categories_customer_router.get('/')
-async def get_all_categories_customer(session: AsyncSession = Depends(get_session)):
-    categories = await categories_service.get_all_categories_service(session)
+@categories_customer_router.get('/all')
+async def get_all_categories_customer(search: Optional[str] = None, session: AsyncSession = Depends(get_session),
+                                      skip: int = 0, limit: int = 10):
+    filter_data = CategoriesFilterModel(
+        search=search
+    )
+
+    categories = await categories_service.get_all_categories_service(filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin các danh mục",
             "content": categories
+        }
+    )
+
+
+@categories_admin_router.get('/{id}', dependencies=[Depends(admin_role_middleware)])
+async def get_detail_category(id: str,
+                                token_details: dict = Depends(access_token_bearer),
+                                session: AsyncSession = Depends(get_session)):
+    categories_dict = await categories_service.get_detail_category_service(id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Danh mục đang tìm kiếm",
+            "content": categories_dict
         }
     )
 

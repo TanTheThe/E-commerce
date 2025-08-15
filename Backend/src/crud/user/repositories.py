@@ -1,19 +1,18 @@
 from datetime import datetime
 from typing import Optional
-
+from sqlalchemy.orm import noload
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
 from src.database.models import User
 from src.crud.authentication.utils import generate_password_hash
-from sqlmodel import select, desc, update, func, or_
+from sqlmodel import select, desc, update, func, or_, distinct
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
-
 from src.schemas.user import UserDeleteModel, FilterUserInputModel
 
 
 class UserRepository:
-    async def get_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
+    async def get_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         base_condition = User.deleted_at.is_(None)
 
         if conditions is not None:
@@ -21,25 +20,31 @@ class UserRepository:
         else:
             combined_condition = base_condition
 
-        statement = select(User).where(combined_condition)
+        statement = select(User).options(
+            *joins if joins else []
+        ).where(combined_condition)
         result = await session.exec(statement)
 
         return result.first()
 
 
-    async def get_all_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, skip: int = 0, limit: int = 10):
-        base_condition = User.deleted_at.is_(None)
-
-        if conditions is not None:
-            combined_condition = and_(base_condition, conditions)
-        else:
-            combined_condition = base_condition
-
-        count_stmt = select(func.count()).where(combined_condition)
+    async def get_all_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, order_by: list = None, skip: int = 0, limit: int = 10):
+        count_stmt = select(func.count(User.id)).select_from(User).where(conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(User).where(combined_condition).offset(skip).limit(limit).order_by(desc(User.created_at))
+        statement = select(User).options(
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate)
+        ).where(conditions)
+
+        if order_by:
+            statement = statement.order_by(*order_by, User.id)
+        else:
+            statement = statement.order_by(User.id)
+
+        statement = statement.offset(skip).limit(limit)
         result = await session.exec(statement)
         users = result.all()
 

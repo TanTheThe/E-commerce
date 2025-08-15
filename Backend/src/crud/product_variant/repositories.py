@@ -1,5 +1,7 @@
 from typing import Optional
 from sqlalchemy import ColumnElement
+from sqlalchemy.orm import noload
+
 from src.database.models import Product_Variant
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, update
@@ -14,29 +16,48 @@ class ProductVariantRepository:
         if product_variant_data and isinstance(product_variant_data[0] if product_variant_data else None, dict):
             product_variant_data = [ProductVariantCreateModel(**item) for item in product_variant_data]
 
-        new_objects = [
-            Product_Variant(
-                product_id=product_id,
-                size=item.size,
-                color=item.color,
-                price=item.price,
-                quantity=item.quantity,
-                sku=item.sku,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            for item in product_variant_data
-        ]
+        new_objects = []
+        for item in product_variant_data:
+            if item.color_id:
+                new_variant = Product_Variant(
+                    product_id=product_id,
+                    size=item.size,
+                    color_id=item.color_id,
+                    price=item.price,
+                    quantity=item.quantity,
+                    sku=item.sku,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                new_objects.append(new_variant)
+
+            elif item.color_name and item.color_code:
+                new_variant = Product_Variant(
+                    product_id=product_id,
+                    size=item.size,
+                    color_name=item.color_name,
+                    color_code=item.color_code,
+                    price=item.price,
+                    quantity=item.quantity,
+                    sku=item.sku,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                new_objects.append(new_variant)
 
         session.add_all(new_objects)
 
 
     async def get_all_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Product_Variant).order_by(desc(Product_Variant.created_at))
+        statement = select(Product_Variant).options(
+            noload(Product_Variant.order_detail),
+            noload(Product_Variant.evaluate),
+            noload(Product_Variant.color),
+            *joins if joins else []
+        )
+
         if conditions is not None:
             statement = statement.where(conditions)
-        if joins is not None:
-            statement = statement.options(*joins)
 
         result = await session.exec(statement)
         return result.all()

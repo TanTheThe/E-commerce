@@ -20,3 +20,4 @@ class CategoriesUpdateModel(BaseModel):
 
 class CategoriesFilterModel(BaseModel):
     search: Optional[str] = None
+    parent_id: Optional[str] = None

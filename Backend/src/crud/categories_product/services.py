@@ -16,7 +16,7 @@ class CategoriesProductService:
         await categories_product_repository.delete_cate_product(condition, session)
 
         condition = Categories.id.in_(new_category_ids)
-        valid_categories = await categories_repository.get_all_categories(condition, session)
+        valid_categories, total = await categories_repository.get_all_categories([condition], session)
         valid_categories = [cat for cat in valid_categories if cat.deleted_at is None]
 
         await categories_product_repository.create_cate_product(valid_categories, product_id, session)

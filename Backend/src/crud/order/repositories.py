@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import ColumnElement
+from sqlalchemy.orm import noload, load_only
 from src.database.models import Order
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func
+from sqlmodel import select, desc, and_, func, distinct
 from datetime import datetime
 
 
@@ -24,39 +25,43 @@ class OrderRepository:
 
         return new_order
 
+
     async def get_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Order).where(conditions)
-        if joins:
-            statement = statement.options(*joins)
+        statement = select(Order).options(
+            *joins if joins else []
+        ).where(conditions)
 
         result = await session.exec(statement)
 
         return result.one_or_none()
 
-    async def get_all_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, skip: int = 0,
-                            limit: int = 10, joins: list = None, search: str = ''):
-        base_condition = Order.deleted_at.is_(None)
 
-        if search:
-            search_condition = Order.code.ilike(f"%{search}%")
-            base_condition = and_(base_condition, search_condition)
+    async def get_all_order(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, order_by: list = None, skip: int = 0,
+                            limit: int = 10, joins: list = None, join_user: bool = False):
+        count_stmt = select(func.count(distinct(Order.id))).select_from(Order).where(*conditions)
+        if join_user:
+            count_stmt = count_stmt.join(Order.user)
 
-        if conditions is not None:
-            base_condition = and_(base_condition, conditions)
+        total_result = await session.exec(count_stmt)
+        total = total_result.one()
 
-        statement = (
-            select(Order)
-            .where(base_condition)
-            .order_by(desc(Order.created_at))
-            .offset(skip)
-            .limit(limit)
-        )
+        statement = select(Order).distinct(Order.id).options(
+            noload(Order.order_detail),
+            *joins if joins else []
+        ).where(*conditions)
 
-        if joins:
-            statement = statement.options(*joins)
+        if order_by:
+            statement = statement.order_by(Order.id, *order_by)
+        else:
+            statement = statement.order_by(Order.id)
+
+        statement = statement.offset(skip).limit(limit)
 
         result = await session.exec(statement)
-        return result.all()
+        orders = result.all()
+
+        return orders, total
+
 
     async def count_orders(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
         base_condition = Order.deleted_at.is_(None)
@@ -66,6 +71,11 @@ class OrderRepository:
 
         statement = (
             select(Order)
+            .options(
+                load_only(Order.id),
+                noload(Order.user),
+                noload(Order.order_detail),
+            )
             .where(base_condition)
         )
 

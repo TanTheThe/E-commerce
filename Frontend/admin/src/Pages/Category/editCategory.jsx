@@ -24,11 +24,12 @@ const EditCategory = ({ open, onClose, category, onSuccess }) => {
 
     const fetchCategories = async (currentCategoryId) => {
         try {
-            const filterData = {
-                search: ""
-            };
-            const response = await postDataApi(`/admin/categories/all?skip=${0}&limit=${1000}`, filterData);
-            console.log(response);
+            const queryParams = new URLSearchParams({
+                skip: "0",
+                limit: "1000",
+            });
+
+            const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
             if (response.success) {
                 const parentCategories = response.data.data?.filter(cat => !cat.parent_id && cat.id !== currentCategoryId) || [];
                 setCategories(parentCategories);

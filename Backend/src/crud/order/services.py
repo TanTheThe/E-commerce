@@ -1,5 +1,5 @@
-from sqlalchemy.orm import selectinload
-from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant
+from sqlalchemy.orm import selectinload, joinedload, noload, load_only
+from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product
 from src.crud.address.repositories import AddressRepository
 from src.crud.order.repositories import OrderRepository
 from src.crud.special_offer.repositories import SpecialOfferRepository
@@ -8,11 +8,11 @@ from src.crud.product.repositories import ProductRepository
 from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, func
+from sqlmodel import and_, func, or_, asc, desc
 from src.errors.address import AddressException
 from src.errors.order import OrderException
 from src.errors.product import ProductException
-from src.schemas.order import OrderCreateModel
+from src.schemas.order import OrderCreateModel, OrderFilterModel
 import time
 import asyncio
 from src.errors.authentication import AuthException
@@ -29,14 +29,31 @@ product_variant_repository = ProductVariantRepository()
 class OrderService:
     async def validate_order_dependencies(self, customer_id, address_id, offer_id, session):
         # Mỗi phần tử là 1 lời gọi đến DB
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        conditions_user = and_(User.id == customer_id, User.deleted_at.is_(None))
+
+        joins_address = [
+            noload(Address.user),
+        ]
+        conditions_address = and_(Address.id == address_id, Address.deleted_at.is_(None))
+
         tasks = [
-            user_repository.get_user(User.id == customer_id, session),
-            address_repository.get_address(Address.id == address_id, session),
+            user_repository.get_user(conditions_user, session, joins_user),
+            address_repository.get_address(conditions_address, session, joins_address),
         ]
 
         # Nếu có offer_id, thì thêm một tác vụ nữa để truy vấn ưu đãi đó.
         if offer_id:
-            tasks.append(special_offer_repository.get_special_offer(Special_Offer.id == offer_id, session))
+            joins_special_offer = [
+                noload(Special_Offer.products),
+            ]
+            conditions_address = and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None))
+            tasks.append(special_offer_repository.get_special_offer(conditions_address, session, joins_special_offer))
+
         # Nếu không có ưu đãi, ta vẫn append() một cái gì đó để giữ thứ tự kết quả, vì gather() trả về theo đúng thứ tự các coroutine trong danh sách.
         else:
             tasks.append(asyncio.sleep(0))  # placeholder giữ thứ tự
@@ -56,10 +73,21 @@ class OrderService:
     async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
         variant_ids = {item.product_variant_id for item in order_data.order_detail}
         condition = Product_Variant.id.in_(variant_ids)
-        variants = await product_variant_repository.get_all_product_variant(
-            condition, session,
-            joins=[selectinload(Product_Variant.product)]
-        )
+        joins = [
+            selectinload(Product_Variant.product).options(
+                noload(Product.order_detail),
+                noload(Product.product_variant),
+                noload(Product.evaluate),
+                noload(Product.categories),
+                noload(Product.special_offer),
+                noload(Product.categories_product),
+            ).load_only(
+                Product.id,
+                Product.name,
+                Product.images,
+            )
+        ]
+        variants = await product_variant_repository.get_all_product_variant(condition, session, joins)
         variant_map = {}
         order_detail_objs = []
         sub_total = 0
@@ -88,8 +116,8 @@ class OrderService:
             order_detail_dict = {
                 "quantity": item.quantity,
                 "price": variant.price,
-                "product_id": str(variant.product_id),
-                "product_variant_id": str(variant.id),
+                "product_id": variant.product_id,
+                "product_variant_id": variant.id,
                 "Product": product_dict
             }
 
@@ -180,11 +208,29 @@ class OrderService:
 
     async def get_detail_order_admin(self, order_id: str, session: AsyncSession):
         joins = [
-            selectinload(Order.order_detail),
-            selectinload(Order.user),
+            selectinload(Order.order_detail).options(
+                noload(Order_Detail.product),
+                noload(Order_Detail.product_variant),
+                noload(Order_Detail.order),
+                noload(Order_Detail.evaluate),
+            ).load_only(
+                Order_Detail.id,
+                Order_Detail.Product
+            ),
+            selectinload(Order.user).options(
+                noload(User.address),
+                noload(User.order),
+                noload(User.evaluate),
+            ).load_only(
+                User.id,
+                User.first_name,
+                User.last_name,
+                User.email,
+                User.phone,
+            ),
         ]
 
-        condition = and_(Order.id == order_id)
+        condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         order = await order_repository.get_order(condition, session, joins)
 
         if not order:
@@ -314,9 +360,49 @@ class OrderService:
         return response
 
 
-    async def get_all_order_admin(self, session: AsyncSession, skip: int = 0, limit: int = 10, search: str = ''):
-        joins = [selectinload(Order.user)]
-        orders = await order_repository.get_all_order(None, session, skip=skip, limit=limit, joins=joins, search=search)
+    async def get_all_order_admin(self, session: AsyncSession, filter_data: OrderFilterModel, skip: int = 0, limit: int = 10):
+        conditions = [Order.deleted_at.is_(None), User.deleted_at.is_(None)]
+
+        if filter_data.search:
+            search_term = f"%{filter_data.search}%"
+            full_name_search = func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
+            conditions.append(or_(
+                Order.code.ilike(search_term),
+                User.first_name.ilike(search_term),
+                User.last_name.ilike(search_term),
+                full_name_search
+            ))
+            need_user_join = True
+        else:
+            need_user_join = False
+
+        if filter_data.status:
+            conditions.append(Order.status == filter_data.status)
+
+        order_by = []
+        if filter_data.sort_by_total_price:
+            if filter_data.sort_by_total_price == "cheapest":
+                order_by.append(asc(Order.total_price))
+            else:
+                order_by.append(desc(Order.total_price))
+
+        if filter_data.sort_by_created_at:
+            if filter_data.sort_by_created_at == "newest":
+                order_by.append(desc(Order.created_at))
+            else:
+                order_by.append(asc(Order.created_at))
+
+        joins = [joinedload(Order.user).options(
+                     noload(User.address),
+                     noload(User.order),
+                     noload(User.evaluate),
+                 ).load_only(
+                     User.id,
+                     User.first_name,
+                     User.last_name,
+                     User.deleted_at,
+                 )]
+        orders, total = await order_repository.get_all_order(conditions, session, order_by, skip=skip, limit=limit, joins=joins, join_user=need_user_join)
 
         response = []
         for order in orders:
@@ -336,7 +422,10 @@ class OrderService:
             }
             response.append(order_dict)
 
-        return response
+        return {
+            "data": response,
+            "total": total,
+        }
 
 
     async def get_all_order_customer(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
@@ -357,8 +446,13 @@ class OrderService:
 
 
     async def update_status(self, order_id, status, session: AsyncSession):
-        condition = and_(Order.id == order_id)
-        order_to_update = await order_repository.get_order(condition, session)
+        condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
+        joins = [
+            load_only(Order.status),
+            noload(Order.user),
+            noload(Order.order_detail),
+        ]
+        order_to_update = await order_repository.get_order(condition, session, joins)
 
         if order_to_update is None:
             OrderException.not_found()
@@ -369,6 +463,7 @@ class OrderService:
 
         return order_after_update
 
+
     async def count_new_orders(self, to_date, from_date, session: AsyncSession):
         condition = and_(Order.created_at >= from_date, Order.created_at <= to_date)
         orders = await order_repository.count_orders(condition, session)
@@ -377,6 +472,7 @@ class OrderService:
             OrderException.not_found()
 
         return len(orders)
+
 
     async def get_total_sales(self, today, seven_days_ago, session: AsyncSession):
         condition = and_(Order.created_at >= seven_days_ago, Order.status == "Delivered")

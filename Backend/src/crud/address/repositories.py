@@ -36,8 +36,8 @@ class AddressRepository:
         return result.all()
 
 
-    async def get_address(self, conditions: ColumnElement[bool], session: AsyncSession):
-        statement = select(Address).where(conditions)
+    async def get_address(self, conditions: ColumnElement[bool], session: AsyncSession, joins: list = None):
+        statement = select(Address).where(conditions).options(*joins if joins else [])
 
         result = await session.exec(statement)
 

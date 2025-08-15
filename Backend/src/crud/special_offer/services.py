@@ -1,8 +1,8 @@
 from src.database.models import Special_Offer
 from src.errors.special_offer import SpecialOfferException
-from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel
+from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_
+from sqlmodel import and_, or_, func
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from datetime import datetime
 from typing import Any
@@ -35,13 +35,41 @@ class SpecialOfferService:
 
         return {k: serialize(v) for k, v in create_data.items()}
 
-    async def get_all_special_offer_service(self, session: AsyncSession, skip: int = 0, limit: int = 10,
-                                            search: str = ''):
-        special_offers = await special_offer_repository.get_all_special_offer(None, session, skip=skip, limit=limit,
-                                                                              search=search)
 
-        if len(special_offers) == 0:
-            SpecialOfferException.empty_list()
+    async def get_all_special_offer_service(self, session: AsyncSession, filter_data: SpecialOfferFilterModel, skip: int = 0, limit: int = 10):
+        conditions = [Special_Offer.deleted_at.is_(None)]
+
+        if filter_data.search:
+            conditions.append(or_(
+                Special_Offer.code.ilike(f"%{filter_data.search}%"),
+                Special_Offer.name.ilike(f"%{filter_data.search}%")
+            ))
+
+        if filter_data.type in ["percent", "fixed"]:
+            conditions.append(Special_Offer.type == filter_data.type)
+
+        if filter_data.discount_min is not None:
+            conditions.append(Special_Offer.discount >= filter_data.discount_min)
+        if filter_data.discount_max is not None:
+            conditions.append(Special_Offer.discount <= filter_data.discount_max)
+
+        if filter_data.quantity_status == "remaining":
+            conditions.append(Special_Offer.total_quantity > Special_Offer.used_quantity)
+        elif filter_data.quantity_status == "out":
+            conditions.append(Special_Offer.total_quantity <= Special_Offer.used_quantity)
+
+        now = datetime.now().replace(microsecond=0)
+        if filter_data.time_status == "upcoming":
+            conditions.append(Special_Offer.start_time > now)
+        elif filter_data.time_status == "active":
+            conditions.append(and_(
+                Special_Offer.start_time <= now,
+                Special_Offer.end_time >= now
+            ))
+        elif filter_data.time_status == "expired":
+            conditions.append(Special_Offer.end_time < now)
+
+        special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit)
 
         response = []
         for offer in special_offers:
@@ -59,7 +87,10 @@ class SpecialOfferService:
             }
             response.append(offer_dict)
 
-        return response
+        return {
+            "data": response,
+            "total": total
+        }
 
     async def update_special_offer_service(self, id: str, special_offer_update: SpecialOfferUpdateModel,
                                            session: AsyncSession):

@@ -15,7 +15,9 @@ class ProductVariantModel(BaseModel):
 
 class ProductVariantCreateModel(BaseModel):
     size: Optional[str] = None
-    color: Optional[str] = None
+    color_id: Optional[str] = None
+    color_name: Optional[str] = None
+    color_code: Optional[str] = None
     price: int
     quantity: int
     sku: str
@@ -23,7 +25,9 @@ class ProductVariantCreateModel(BaseModel):
 class ProductVariantUpdateModel(BaseModel):
     id: Optional[str]
     size: Optional[str] = None
-    color: Optional[str] = None
+    color_id: Optional[str] = None
+    color_name: Optional[str] = None
+    color_code: Optional[str] = None
     price: int
     quantity: int
     sku: str

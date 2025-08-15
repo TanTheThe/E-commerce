@@ -139,18 +139,22 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
 
     const fetchCategories = async () => {
         try {
-            const filterData = {
-                search: ""
-            };
-            const response = await postDataApi(`/admin/categories/all?skip=${0}&limit=${1000}`, filterData);
+            const queryParams = new URLSearchParams({
+                skip: "0",
+                limit: "1000",
+            });
+
+            const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
             if (response.success) {
                 setCategories(response.data.data || []);
             } else {
-                context.openAlertBox("error", "Không thể tải danh mục cha");
+                context.openAlertBox("error", "Không thể tải danh mục");
+                setCategories([]);
             }
         } catch (error) {
             console.error("Error fetching categories:", error);
             context.openAlertBox("error", "Lỗi khi tải danh mục cha");
+            setCategories([]);
         }
     };
 

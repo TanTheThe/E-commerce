@@ -34,6 +34,7 @@ const Users = () => {
     const [users, setUsers] = useState([]);
     const [totalUsers, setTotalUsers] = useState(0);
     const [selectedUserIds, setSelectedUserIds] = useState([]);
+    const [sortByCreatedAt, setSortByCreatedAt] = useState('newest');
     const [loading, setLoading] = useState(false);
 
     const context = useContext(MyContext);
@@ -44,12 +45,16 @@ const Users = () => {
             const skip = page * rowsPerPage;
             const limit = rowsPerPage;
 
-            const body = {
-                search: searchVal,
-                customer_status: statusFilterVal,
-            };
+            const queryParams = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+            });
 
-            const response = await postDataApi(`/admin/user/all?skip=${skip}&limit=${limit}`, body);
+            if (searchVal) queryParams.append('search', searchVal);
+            if (statusFilterVal) queryParams.append('customer_status', statusFilterVal);
+            queryParams.append('sort_by_created_at', sortByCreatedAt);
+
+            const response = await getDataApi(`/admin/user/all?${queryParams.toString()}`);
             console.log(response);
 
             if (response.success === true) {
@@ -67,10 +72,11 @@ const Users = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, [page, rowsPerPage, statusFilterVal, searchVal]);
+    }, [page, rowsPerPage, statusFilterVal, searchVal, sortByCreatedAt]);
 
     const handleChangeStatusFilter = (event) => {
         setStatusFilterVal(event.target.value);
+        setPage(0);
     };
 
     const handleChangePage = (event, newPage) => {
@@ -79,6 +85,11 @@ const Users = () => {
 
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(+event.target.value);
+        setPage(0);
+    };
+
+    const handleSortByCreatedAtChange = (event) => {
+        setSortByCreatedAt(event.target.value);
         setPage(0);
     };
 
@@ -145,10 +156,6 @@ const Users = () => {
         []
     );
 
-    useEffect(() => {
-        setPage(0);  // reset page
-    }, [statusFilterVal, searchVal]);
-
     return (
         <>
             <div className="flex items-center justify-between px-2 py-0 mt-3">
@@ -169,6 +176,19 @@ const Users = () => {
                                 <MenuItem value="">Tất cả trạng thái</MenuItem>
                                 <MenuItem value="active">Hoạt động</MenuItem>
                                 <MenuItem value="inactive">Bị khóa</MenuItem>
+                            </Select>
+                        </div>
+
+                        <div className="col w-[30%]">
+                            <h4 className="font-[600] text-[13px] mb-3">Sắp xếp theo thời gian</h4>
+                            <Select
+                                size="small"
+                                value={sortByCreatedAt}
+                                onChange={handleSortByCreatedAtChange}
+                                className="w-full mb-5"
+                            >
+                                <MenuItem value="newest">Mới nhất</MenuItem>
+                                <MenuItem value="oldest">Cũ nhất</MenuItem>
                             </Select>
                         </div>
                     </div>
