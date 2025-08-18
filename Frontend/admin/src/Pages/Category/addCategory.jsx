@@ -13,11 +13,12 @@ import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import { Autocomplete, TextField } from "@mui/material";
 
-const AddCategory = ({ open, onClose, onSuccess }) => {
+const AddCategory = ({ open, onClose, onSuccess, availableSizes = [] }) => {
     const [formFields, setFormFields] = useState({
         name: "",
         image: "",
-        parent_id: ""
+        parent_id: "",
+        type_size: ""
     });
 
     const context = useContext(MyContext)
@@ -95,24 +96,30 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
             return;
         }
 
+        if (!formFields.type_size) {
+            context.openAlertBox("error", "Vui lòng chọn loại sản phẩm!")
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const categoryData = {
                 name: formFields.name.trim(),
                 image: formFields.image,
-                parent_id: selectedParent ? selectedParent.id : null
+                parent_id: selectedParent ? selectedParent.id : null,
+                type_size: formFields.type_size
             };
 
             const response = await postDataApi('/admin/categories', categoryData);
 
             if (response.success) {
                 context.openAlertBox(
-                    "success", response?.message
+                    "success", response?.message || "Tạo danh mục thành công!"
                 )
                 onSuccess && onSuccess();
                 handleClose();
             } else {
-                context.openAlertBox("error", response?.data?.detail?.message)
+                context.openAlertBox("error", response?.data?.detail?.message || "Có lỗi xảy ra khi tạo danh mục")
             }
         } catch (error) {
             console.error("Error submitting form:", error);
@@ -122,7 +129,12 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
     };
 
     const handleClose = () => {
-        setFormFields({ name: "", image: "", parent_id: "" });
+        setFormFields({
+            name: "",
+            image: "",
+            parent_id: "",
+            type_size: ""
+        });
         setSelectedParent(null);
         if (imagePreview) {
             URL.revokeObjectURL(imagePreview.url);
@@ -160,6 +172,19 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
 
     const parentCategoryOptions = categories.filter(cat => !cat.parent_id);
 
+    const typeSizeOptions = Array.from(new Set(availableSizes.map(size => size.type))).map(type => {
+        const typeConfig = {
+            clothing: 'Quần áo',
+            shoe: 'Giày dép',
+            hat: 'Nón mũ',
+            accessory: 'Phụ kiện'
+        };
+        return {
+            value: type,
+            label: typeConfig[type] || type
+        };
+    });
+
     useEffect(() => {
         return () => {
             if (imagePreview?.url) {
@@ -192,6 +217,24 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
                     </div>
 
                     <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Loại sản phẩm</label>
+                        <select
+                            name="type_size"
+                            value={formFields.type_size}
+                            onChange={onChangeInput}
+                            className="w-full border border-[rgba(0,0,0,0.2)] p-2 rounded"
+                            required
+                        >
+                            <option value="">Chọn loại sản phẩm</option>
+                            {typeSizeOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="mb-4">
                         <label className="block text-sm font-medium mb-1">Danh mục cha (tuỳ chọn)</label>
                         <Autocomplete
                             options={parentCategoryOptions}
@@ -211,8 +254,16 @@ const AddCategory = ({ open, onClose, onSuccess }) => {
                         <label className="block text-sm font-medium mb-2">Ảnh danh mục</label>
                         {imagePreview ? (
                             <div className="relative w-full h-[150px] border rounded overflow-hidden">
-                                <LazyLoadImage src={imagePreview.url} alt={imagePreview.name} className="object-cover w-full h-full" effect="blur" />
-                                <span onClick={removeImage} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer">
+                                <LazyLoadImage
+                                    src={imagePreview.url}
+                                    alt={imagePreview.name}
+                                    className="object-cover w-full h-full"
+                                    effect="blur"
+                                />
+                                <span
+                                    onClick={removeImage}
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer"
+                                >
                                     <IoMdClose />
                                 </span>
                             </div>

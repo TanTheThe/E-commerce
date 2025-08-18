@@ -6,8 +6,13 @@ import { LazyLoadImage } from "react-lazy-load-image-component";
 import { getDataApi, postDataApi, putDataApi } from "../../utils/api";
 import { MyContext } from "../../App";
 
-const EditCategory = ({ open, onClose, category, onSuccess }) => {
-    const [formFields, setFormFields] = useState({ name: "", image: "", parent_id: "" });
+const EditCategory = ({ open, onClose, category, onSuccess, availableSizes = [] }) => {
+    const [formFields, setFormFields] = useState({
+        name: "",
+        image: "",
+        parent_id: "",
+        type_size: ""
+    });
     const [imagePreview, setImagePreview] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [categories, setCategories] = useState([]);
@@ -16,7 +21,12 @@ const EditCategory = ({ open, onClose, category, onSuccess }) => {
 
     useEffect(() => {
         if (category) {
-            setFormFields({ name: category.name, image: category.image, parent_id: category.parent_id || "" });
+            setFormFields({
+                name: category.name,
+                image: category.image,
+                parent_id: category.parent_id || "",
+                type_size: category.type_size || ""
+            });
             setImagePreview(category.image ? { url: category.image, name: category.name } : null);
             fetchCategories(category.id);
         }
@@ -69,28 +79,53 @@ const EditCategory = ({ open, onClose, category, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!formFields.name.trim()) {
+            context.openAlertBox("error", "Vui lòng nhập tên danh mục!");
+            return;
+        }
+
+        if (!formFields.type_size) {
+            context.openAlertBox("error", "Vui lòng chọn loại sản phẩm!");
+            return;
+        }
+
         try {
             setIsSubmitting(true);
             const payload = {
-                name: formFields.name,
+                name: formFields.name.trim(),
                 image: formFields.image,
-                parent_id: selectedParent ? selectedParent.id : null
+                parent_id: selectedParent ? selectedParent.id : null,
+                type_size: formFields.type_size
             };
             const response = await putDataApi(`/admin/categories/${category.id}`, payload);
             if (response.success) {
-                context.openAlertBox("success", response.message);
+                context.openAlertBox("success", response.message || "Cập nhật danh mục thành công");
                 onSuccess?.();
                 onClose();
             } else {
-                context.openAlertBox("success", "Có lỗi xảy ra khi cập nhật danh mục");
+                context.openAlertBox("error", response.message || "Có lỗi xảy ra khi cập nhật danh mục");
             }
         } catch (err) {
             console.error(err);
-            context.openAlertBox("success", "Có lỗi xảy ra khi cập nhật danh mục");
+            context.openAlertBox("error", "Có lỗi xảy ra khi cập nhật danh mục");
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    const typeSizeOptions = Array.from(new Set(availableSizes.map(size => size.type))).map(type => {
+        const typeConfig = {
+            clothing: 'Quần áo',
+            shoe: 'Giày dép',
+            hat: 'Nón mũ',
+            accessory: 'Phụ kiện'
+        };
+        return {
+            value: type,
+            label: typeConfig[type] || type
+        };
+    });
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -116,6 +151,24 @@ const EditCategory = ({ open, onClose, category, onSuccess }) => {
                     </div>
 
                     <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Loại sản phẩm</label>
+                        <select
+                            name="type_size"
+                            value={formFields.type_size}
+                            onChange={onChangeInput}
+                            className="w-full border border-[rgba(0,0,0,0.2)] p-2 rounded"
+                            required
+                        >
+                            <option value="">Chọn loại sản phẩm</option>
+                            {typeSizeOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="mb-4">
                         <label className="block text-sm font-medium mb-1">Danh mục cha (tuỳ chọn)</label>
                         <Autocomplete
                             options={categories}
@@ -135,8 +188,16 @@ const EditCategory = ({ open, onClose, category, onSuccess }) => {
                         <label className="block text-sm font-medium mb-2">Ảnh danh mục</label>
                         {imagePreview ? (
                             <div className="relative w-full h-[150px] border rounded overflow-hidden">
-                                <LazyLoadImage src={imagePreview.url} alt={imagePreview.name} className="object-cover w-full h-full" effect="blur" />
-                                <span onClick={removeImage} className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer">
+                                <LazyLoadImage
+                                    src={imagePreview.url}
+                                    alt={imagePreview.name}
+                                    className="object-cover w-full h-full"
+                                    effect="blur"
+                                />
+                                <span
+                                    onClick={removeImage}
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer"
+                                >
                                     <IoMdClose />
                                 </span>
                             </div>

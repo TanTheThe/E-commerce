@@ -24,6 +24,20 @@ const CategoryTreeItem = ({
     const hasChildren = children && children.length > 0;
     const isExpanded = expandedItems.includes(category.id);
 
+    const getTypeSizeDisplay = (typeSize, availableSizes) => {
+        const typeConfig = {
+            clothing: { text: 'Quần áo', color: 'bg-blue-100 text-blue-700' },
+            shoe: { text: 'Giày dép', color: 'bg-green-100 text-green-700' },
+            hat: { text: 'Nón mũ', color: 'bg-purple-100 text-purple-700' },
+            accessory: { text: 'Phụ kiện', color: 'bg-orange-100 text-orange-700' },
+            default: { text: typeSize || 'Khác', color: 'bg-gray-100 text-gray-700' }
+        };
+
+        return typeConfig[typeSize] || typeConfig.default;
+    };
+
+    const typeSizeDisplay = getTypeSizeDisplay(category.type_size);
+
     return (
         <div className="category-tree-item">
             <div
@@ -68,11 +82,20 @@ const CategoryTreeItem = ({
                 </div>
 
                 <div className="flex-grow">
-                    <span className={`font-medium ${level === 0 ? 'text-gray-900 text-lg' : 'text-gray-700'}`}>
-                        {category.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className={`font-medium ${level === 0 ? 'text-gray-900 text-lg' : 'text-gray-700'}`}>
+                            {category.name}
+                        </span>
+
+                        {category.type_size && (
+                            <span className={`px-2 py-1 text-xs rounded-full ${typeSizeDisplay.color}`}>
+                                {typeSizeDisplay.text}
+                            </span>
+                        )}
+                    </div>
+
                     {level === 0 && hasChildren && (
-                        <span className="ml-2 text-sm text-gray-500">
+                        <span className="ml-0 text-sm text-gray-500 mt-1 block">
                             ({children.length} danh mục con)
                         </span>
                     )}
@@ -144,6 +167,10 @@ const CategoryList = () => {
     const [expandedItems, setExpandedItems] = useState([]);
     const [expandAll, setExpandAll] = useState(false);
 
+    // Filter states
+    const [typeSizeFilter, setTypeSizeFilter] = useState('');
+    const [availableSizes, setAvailableSizes] = useState([]);
+
     const context = useContext(MyContext);
 
     const buildFilterData = () => {
@@ -151,6 +178,10 @@ const CategoryList = () => {
 
         if (searchVal && searchVal.trim()) {
             filterData.search = searchVal.trim();
+        }
+
+        if (typeSizeFilter && typeSizeFilter !== '') {
+            filterData.type_size = typeSizeFilter;
         }
 
         return filterData;
@@ -170,12 +201,18 @@ const CategoryList = () => {
             });
 
             if (filterData.search) queryParams.append('search', filterData.search);
+            if (filterData.type_size) queryParams.append('type_size', filterData.type_size);
 
             const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
 
             if (response.success) {
                 setCategories(response.data.data || []);
                 setTotalCategories(response.data.total || 0);
+
+                // Set available sizes from API response
+                if (response.data.sizes) {
+                    setAvailableSizes(response.data.sizes);
+                }
             } else {
                 setCategories([]);
                 setTotalCategories(0);
@@ -192,7 +229,7 @@ const CategoryList = () => {
 
     useEffect(() => {
         fetchCategories();
-    }, [page, rowsPerPage, searchVal]);
+    }, [page, rowsPerPage, searchVal, typeSizeFilter]);
 
     const categoryTree = useMemo(() => {
         const buildTree = (parentId = null) => {
@@ -223,6 +260,11 @@ const CategoryList = () => {
 
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(+event.target.value);
+        setPage(0);
+    };
+
+    const handleTypeSizeFilterChange = (event) => {
+        setTypeSizeFilter(event.target.value);
         setPage(0);
     };
 
@@ -317,6 +359,7 @@ const CategoryList = () => {
                         onSuccess={() => {
                             fetchCategories();
                         }}
+                        availableSizes={availableSizes}
                     />
                 </div>
             </div>
@@ -331,6 +374,27 @@ const CategoryList = () => {
                         >
                             {expandAll ? 'Thu gọn tất cả' : 'Mở rộng tất cả'}
                         </Button>
+
+                        <select
+                            value={typeSizeFilter}
+                            onChange={handleTypeSizeFilterChange}
+                            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="">Tất cả loại</option>
+                            {Array.from(new Set(availableSizes.map(size => size.type))).map(type => {
+                                const typeConfig = {
+                                    clothing: 'Quần áo',
+                                    shoe: 'Giày dép',
+                                    hat: 'Nón mũ',
+                                    accessory: 'Phụ kiện'
+                                };
+                                return (
+                                    <option key={type} value={type}>
+                                        {typeConfig[type] || type}
+                                    </option>
+                                );
+                            })}
+                        </select>
 
                         <div className="text-sm text-gray-500">
                             Tổng: {totalCategories} danh mục
@@ -429,6 +493,7 @@ const CategoryList = () => {
                 onSuccess={() => {
                     fetchCategories();
                 }}
+                availableSizes={availableSizes}
             />
         </>
     )

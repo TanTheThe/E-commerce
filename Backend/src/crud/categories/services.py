@@ -1,4 +1,6 @@
-from src.database.models import Categories
+from src.crud.size.services import SizeService
+from src.database.models import Categories, Size
+from src.errors.size import SizeException
 from src.schemas.categories import CategoriesCreateModel, CategoriesUpdateModel, CategoriesFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, select, func, or_
@@ -8,10 +10,16 @@ from src.errors.categories import CategoriesException
 import time
 
 categories_repository = CategoriesRepository()
-
+size_service = SizeService()
 
 class CategoriesService:
     async def create_categories_service(self, categories_data: CategoriesCreateModel, session: AsyncSession):
+        sizes = await size_service.get_all_size(session)
+        valid_types = {s["type"] for s in sizes}
+
+        if categories_data.type_size not in valid_types:
+            SizeException.size_not_exists()
+
         new_categories = await categories_repository.create_categories(categories_data, session)
 
         new_categories_dict = {
@@ -19,15 +27,29 @@ class CategoriesService:
             "name": new_categories.name,
             "image": new_categories.image,
             "parent_id": str(new_categories.parent_id) if new_categories.parent_id else None,
+            "type_size": new_categories.type_size
         }
 
         return new_categories_dict
 
     async def get_all_categories_service(self, filter_data: CategoriesFilterModel, session: AsyncSession, skip: int = 0,
                                          limit: int = 5):
+        sizes = await size_service.get_all_size(session)
+        size_map = {s["type"]: {"id": str(s["id"]), "name": s["name"], "type": s["type"]} for s in sizes}
+
+        if filter_data.type_size and filter_data.type_size not in size_map:
+            return {
+                "data": [],
+                "total": 0,
+                "sizes": list(size_map.values())
+            }
+
         if filter_data.search:
-            search_filter = [Categories.deleted_at.is_(None), Categories.name.ilike(f"%{filter_data.search}%")]
-            matched_categories, _ = await categories_repository.get_all_categories(search_filter, session, 0, 1000)
+            filters = [Categories.deleted_at.is_(None), Categories.name.ilike(f"%{filter_data.search}%")]
+            if filter_data.type_size:
+                filters.append(Categories.type_size == filter_data.type_size)
+
+            matched_categories, _ = await categories_repository.get_all_categories(filters, session, 0, 1000)
 
             matched_parents = [cat for cat in matched_categories if cat.parent_id is None]
             matched_children = [cat for cat in matched_categories if cat.parent_id is not None]
@@ -55,15 +77,19 @@ class CategoriesService:
                         "id": str(cat.id),
                         "name": cat.name,
                         "image": cat.image,
-                        "parent_id": str(cat.parent_id) if cat.parent_id else None
+                        "parent_id": str(cat.parent_id) if cat.parent_id else None,
+                        "type_size": cat.type_size,
                     }
                     for cat in final_categories
                 ],
-                "total": len(final_categories)
+                "total": len(final_categories),
+                "sizes": list(size_map.values())
             }
         else:
-            parent_filters = [Categories.deleted_at.is_(None), Categories.parent_id.is_(None)]
-            parent_categories, parent_total = await categories_repository.get_all_categories(parent_filters, session, skip, limit)
+            filters = [Categories.deleted_at.is_(None), Categories.parent_id.is_(None)]
+            if filter_data.type_size:
+                filters.append(Categories.type_size.in_(filter_data.type_size))
+            parent_categories, parent_total = await categories_repository.get_all_categories(filters, session, skip, limit)
 
             parent_ids = [cat.id for cat in parent_categories]
             if parent_ids:
@@ -80,11 +106,13 @@ class CategoriesService:
                         "id": str(cat.id),
                         "name": cat.name,
                         "image": cat.image,
-                        "parent_id": str(cat.parent_id) if cat.parent_id else None
+                        "parent_id": str(cat.parent_id) if cat.parent_id else None,
+                        "type_size": cat.type_size,
                     }
                     for cat in all_categories
                 ],
-                "total": parent_total
+                "total": parent_total,
+                "sizes": list(size_map.values())
             }
 
     async def get_detail_category_service(self, id: str, session: AsyncSession):
@@ -98,7 +126,8 @@ class CategoriesService:
             "id": str(categories.id),
             "name": categories.name,
             "image": categories.image,
-            "parent_id": str(categories.parent_id) if categories.parent_id else None
+            "parent_id": str(categories.parent_id) if categories.parent_id else None,
+            "type_size": categories.type_size
         }
 
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):
@@ -127,7 +156,8 @@ class CategoriesService:
             "id": str(category.id),
             "name": category.name,
             "image": category.image,
-            "parent_id": str(category.parent_id) if category.parent_id else None
+            "parent_id": str(category.parent_id) if category.parent_id else None,
+            "type_size": category.type_size
         }
 
         return response_dict
