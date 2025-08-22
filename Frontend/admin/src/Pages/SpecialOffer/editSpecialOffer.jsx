@@ -8,7 +8,16 @@ import { putDataApi } from "../../utils/api";
 import { MyContext } from "../../App";
 
 const EditSpecialOffer = ({ open, onClose, offer, onSuccess }) => {
-    const [formFields, setFormFields] = useState({ name: "", total_quantity: "", discount: "", condition: "", type: "", start_time: "", end_time: "" });
+    const [formFields, setFormFields] = useState({
+        name: "",
+        total_quantity: "",
+        discount: "",
+        condition: "",
+        type: "",
+        scope: "",
+        start_time: "",
+        end_time: ""
+    });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const context = useContext(MyContext)
@@ -23,6 +32,7 @@ const EditSpecialOffer = ({ open, onClose, offer, onSuccess }) => {
                 discount: offer.discount,
                 condition: offer.condition,
                 type: offer.type,
+                scope: offer.scope,
                 start_time: formatTime(offer.start_time),
                 end_time: formatTime(offer.end_time)
             });
@@ -75,8 +85,31 @@ const EditSpecialOffer = ({ open, onClose, offer, onSuccess }) => {
                         }`}
                     placeholder={placeholder}
                     disabled={!isEditable}
-                    required
                 />
+            </div>
+        );
+    };
+
+    const renderSelect = (label, name, options, isEditable = true) => {
+        const canEdit = !isLocked || name === "name" || name === "end_time";
+        const finalEditable = isEditable && canEdit;
+
+        return (
+            <div className="mb-4">
+                <label className="block text-sm font-medium mb-1">{label}</label>
+                <select
+                    name={name}
+                    value={formFields[name]}
+                    onChange={onChangeInput}
+                    className={`w-full border p-2 rounded transition-all duration-200 ${finalEditable ? "" : "bg-gray-100 opacity-70 cursor-not-allowed"}`}
+                    disabled={!finalEditable}
+                >
+                    {options.map(option => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
             </div>
         );
     };
@@ -94,8 +127,19 @@ const EditSpecialOffer = ({ open, onClose, offer, onSuccess }) => {
                     {renderInput("Tên", "name", "Nhập tên khuyến mãi...")}
                     {renderInput("Tổng số lượng", "total_quantity", "Nhập tổng số lượng...")}
                     {renderInput("Mức giảm giá", "discount", "Nhập mức giảm giá...")}
-                    {renderInput("Loại", "type", "Nhập loại giảm giá...")}
-                    {renderInput("Điều kiện", "condition", "Nhập điều kiện giảm giá...")}
+
+                    {renderSelect("Loại", "type", [
+                        { value: "percent", label: "Phần trăm" },
+                        { value: "fixed", label: "Giảm tiền cố định" }
+                    ])}
+
+                    {renderSelect("Phạm vi áp dụng", "scope", [
+                        { value: "order", label: "Đơn hàng" },
+                        { value: "product", label: "Sản phẩm" }
+                    ])}
+
+                    {formFields.scope === 'order' && renderInput("Điều kiện", "condition", "Nhập điều kiện giảm giá...")}
+
                     {renderInput("Thời gian bắt đầu", "start_time", "Chọn thời gian bắt đầu...", "datetime-local")}
                     {renderInput("Thời gian kết thúc", "end_time", "Chọn thời gian kết thúc...", "datetime-local")}
 

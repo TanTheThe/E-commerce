@@ -4,6 +4,8 @@ from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
+
+from src.errors.categories import CategoriesException
 from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel
 from src.dependencies import admin_role_middleware
 from typing import Optional, List
@@ -29,6 +31,102 @@ async def create_product(product_data: ProductCreateModel,
         }
     )
 
+@product_customer_router.get('/category')
+async def get_all_products_customer(category_id: str,
+                                    search: Optional[str] = None,
+                                    category_ids: Optional[List[str]] = Query(default=[]),
+                                    min_price: Optional[int] = None,
+                                    max_price: Optional[int] = None,
+                                    sort_by: Optional[str] = None,
+                                    colors: Optional[List[str]] = None,
+                                    sizes: Optional[List[str]] = None,
+                                    rating: Optional[List[int]] = Query(None),
+                                    skip: int = 0, limit: int = 16,
+                                    session: AsyncSession = Depends(get_session)):
+    filter_data = ProductFilterModel(
+        search=search,
+        category_ids=category_ids,
+        min_price=min_price,
+        max_price=max_price,
+        sort_by=sort_by,
+        colors=colors,
+        sizes=sizes,
+        rating=rating
+    )
+
+    products = await product_service.get_all_products_customer_service(category_id, filter_data, session, skip, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
+@product_customer_router.get('/popular/{parent_category_id}')
+async def get_products_popular(parent_category_id: str, limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+    products = await product_service.get_products_popular_service(parent_category_id, session, limit_per_category)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
+@product_admin_router.get('/offer')
+async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
+    categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
+    if not categories_list:
+        CategoriesException.empty_list()
+
+    products = await product_service.get_all_product_for_offer(categories_list, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
+@product_customer_router.get('/latest')
+async def get_products_latest(limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+    products = await product_service.get_latest_products_service(session, limit_per_category)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
+@product_customer_router.get('/top-discount')
+async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
+    products = await product_service.get_top_discount_service(session, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
+@product_customer_router.get('/filter-info')
+async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
+    products = await product_service.get_top_discount_service(session, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
 
 @product_admin_router.get("/statistics/count-products", status_code=status.HTTP_200_OK,
                           dependencies=[Depends(admin_role_middleware)])
@@ -55,6 +153,7 @@ async def get_all_product_admin(search: Optional[str] = None,
                                 sort_by: Optional[str] = None,
                                 colors: Optional[List[str]] = None,
                                 sizes: Optional[List[str]] = None,
+                                rating: Optional[List[int]] = Query(None),
                                 token_details: dict = Depends(access_token_bearer),
                                 skip: int = 0, limit: int = 10,
                                 session: AsyncSession = Depends(get_session)):
@@ -65,7 +164,8 @@ async def get_all_product_admin(search: Optional[str] = None,
         max_price=max_price,
         sort_by=sort_by,
         colors=colors,
-        sizes=sizes
+        sizes=sizes,
+        rating=rating
     )
 
     product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit,
@@ -108,18 +208,35 @@ async def get_detail_product_admin(id: str,
     )
 
 
-@product_customer_router.get('/')
-async def get_all_product_customer(filter_data: ProductFilterModel,
-                                   skip: int = 0, limit: int = 10,
-                                   session: AsyncSession = Depends(get_session)):
-    product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit,
-                                                                               include_status=False)
+# @product_customer_router.get('/')
+# async def get_all_product_customer(filter_data: ProductFilterModel,
+#                                    skip: int = 0, limit: int = 16,
+#                                    session: AsyncSession = Depends(get_session)):
+#     product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit,
+#                                                                                include_status=False)
+#
+#     return JSONResponse(
+#         status_code=status.HTTP_200_OK,
+#         content={
+#             "message": "Thông tin của các sản phẩm",
+#             "content": product_list_dict
+#         }
+#     )
+
+
+@product_admin_router.get('/offer')
+async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
+    categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
+    if not categories_list:
+        CategoriesException.empty_list()
+
+    products = await product_service.get_all_product_for_offer(categories_list, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin của các sản phẩm",
-            "content": product_list_dict
+            "content": products
         }
     )
 
@@ -167,3 +284,5 @@ async def delete_multiple_product(data: DeleteMultipleProductModel, token_detail
             }
         }
     )
+
+

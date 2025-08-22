@@ -49,13 +49,13 @@ class SpecialOfferRepository:
         for k, v in update_data.items():
             if isinstance(v, datetime):
                 v = v.replace(tzinfo=None)
-            if v is not None:
-                setattr(data_need_update, k, v)
+
+            setattr(data_need_update, k, v)
 
         data_need_update.updated_at = datetime.now()
 
         await session.commit()
-
+        await session.refresh(data_need_update)
         return data_need_update
 
 

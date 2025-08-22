@@ -29,7 +29,7 @@ class CategoriesRepository:
         return new_categories
 
     async def get_all_categories(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                                 skip: int = 0, limit: int = 5):
+                                 skip: int = 0, limit: int = 5, joins: list = None):
         count_stmt = select(func.count()).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
@@ -38,7 +38,8 @@ class CategoriesRepository:
             noload(Categories.categories_product),
             noload(Categories.products),
             noload(Categories.children),
-            noload(Categories.parent)
+            noload(Categories.parent),
+            *joins if joins else []
         ).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)

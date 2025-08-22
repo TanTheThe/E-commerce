@@ -75,7 +75,6 @@ const Checkout = () => {
 
     const handleAddAddress = async () => {
         const res = await postDataApi("/customer/address", newAddress);
-        console.log(res);
         if (res.success) {
             setAddresses([...addresses, res.data]);
             resetForm();
@@ -111,7 +110,6 @@ const Checkout = () => {
     };
 
     const handleEditClick = (addr) => {
-        console.log(addr);
         setEditingId(addr.id);
         setNewAddress({ ...addr });
         setAddingNew(true);

@@ -16,6 +16,7 @@ from src.database.redis import add_jti_to_blocklist
 from src.mail import create_message, mail
 from src.schemas.user import LoginAdminModel, UserLoginModel, Setup2FA, VerifyLoginAdminModel
 from src.errors.authentication import AuthException
+from sqlalchemy.orm import noload
 
 REFRESH_TOKEN_EXPIRY = 2
 
@@ -25,7 +26,12 @@ class AuthenticationService:
         password = user_data.password
 
         condition = and_(User.email == email)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.invalid_account()
 
@@ -72,7 +78,12 @@ class AuthenticationService:
             AuthException.token_invalid()
 
         condition = and_(User.id == user_id)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.invalid_account()
 
@@ -108,7 +119,12 @@ class AuthenticationService:
             AuthException.token_invalid()
 
         condition = and_(User.id == user_id)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.invalid_account()
 
@@ -159,7 +175,12 @@ class AuthenticationService:
         password = user_data.password
 
         condition = and_(User.email == email)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.invalid_account()
 
@@ -230,7 +251,12 @@ class AuthenticationService:
             expires_at = datetime.utcnow() + timedelta(minutes=5)
 
             condition = and_(User.email == email)
-            user = await user_repository.get_user(condition, session)
+            joins_user = [
+                noload(User.address),
+                noload(User.order),
+                noload(User.evaluate),
+            ]
+            user = await user_repository.get_user(condition, session, joins_user)
 
             if not user:
                 AuthException.user_not_found()
@@ -265,7 +291,12 @@ class AuthenticationService:
             AuthException.token_invalid()
 
         condition = and_(User.email == user_email)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.user_not_found()
 
@@ -278,7 +309,12 @@ class AuthenticationService:
 
     async def verify_otp(self, data, role, session: AsyncSession):
         condition = and_(User.email == data.email)
-        user = await user_repository.get_user(condition, session)
+        joins_user = [
+            noload(User.address),
+            noload(User.order),
+            noload(User.evaluate),
+        ]
+        user = await user_repository.get_user(condition, session, joins_user)
         if not user:
             AuthException.user_not_found()
 

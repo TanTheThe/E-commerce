@@ -16,6 +16,9 @@ import HomeBannerV2 from "../../components/HomeSliderV2";
 import BannerBoxV2 from "../../components/BannerBoxV2";
 import AdsBannerSliderV2 from "../../components/AdsBannerSliderV2";
 import { MyContext } from "../../App";
+import BestSellerSection from "../../components/BestSeller";
+import LatestSection from "../../components/Latest";
+import TopDiscountSection from "../../components/TopDiscount";
 
 const Home = () => {
     const [value, setValue] = useState(0);
@@ -41,37 +44,11 @@ const Home = () => {
                     </div>
                 </div>
             </section>
-            <HomeCatSlider />
+            {/* <HomeCatSlider /> */}
 
-            <section className="bg-white py-8">
-                <div className="container">
-                    <div className="flex items-center justify-between">
-                        <div className="leftSec">
-                            <h2 className="text-[20px] font-[600]">Sản phẩm phổ biến</h2>
-                            <p className="text-[14px] font-[400]">Đừng bỏ lỡ các ưu đãi hiện tại cho đến cuối tháng 3.</p>
-                        </div>
-                        <div className="rightSec w-[65%]">
-                            <Tabs
-                                value={value}
-                                onChange={handleChange}
-                                variant="scrollable"
-                                scrollButtons="auto"
-                                aria-label="scrollable auto tabs example"
-                            >
-                                {
-                                    parentCategories.map(category => (
-                                        <Tab label={category.name} />
-                                    ))
-                                }
-                            </Tabs>
-                        </div>
-                    </div>
+            <BestSellerSection/>
 
-                    <ProductsSlider items={6} />
-                </div>
-            </section>
-
-            <section className="py-16 pt-2 bg-white">
+            <section className="py-8 pt-2 bg-white">
                 <div className="container">
                     <div className="freeShipping w-[80%] m-auto py-4 p-4 border-2 border-[#ff5252] flex items-center justify-between rounded-md mb-7">
                         <div className="col1 flex items-center gap-4">
@@ -90,24 +67,9 @@ const Home = () => {
                 </div>
             </section>
 
-            <section className="py-5 pt-0 bg-white">
-                <div className="container">
-                    <h2 className="text-[20px] font-[600]">Lastest Products</h2>
-                    <ProductsSlider items={6} />
+            <LatestSection/>
 
-                    <AdsBannerSlider items={3} />
-                </div>
-            </section>
-
-            <section className="py-5 pt-0 bg-white">
-                <div className="container">
-                    <h2 className="text-[20px] font-[600]">Featured Products</h2>
-                    <ProductsSlider items={6} />
-
-                    <AdsBannerSlider items={2} />
-                </div>
-            </section>
-
+            <TopDiscountSection/>
 
             <section className="py-5 pb-8 pt-0 bg-white blogSection">
                 <div className="container">

@@ -35,12 +35,14 @@ async def create_categories(categories_data: CategoriesCreateModel,
 @categories_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
 async def get_all_categories_admin(search: Optional[str] = None,
                                    parent_id: Optional[str] = None,
+                                   type_size: Optional[str] = None,
                                    session: AsyncSession = Depends(get_session),
                                    skip: int = 0, limit: int = 5,
                                    token_details: dict = Depends(access_token_bearer)):
     filter_data = CategoriesFilterModel(
         search=search,
-        parent_id=parent_id
+        parent_id=parent_id,
+        type_size=type_size
     )
 
     categories = await categories_service.get_all_categories_service(filter_data, session, skip, limit)

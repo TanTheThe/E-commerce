@@ -58,10 +58,8 @@ const Login = () => {
         }
 
         const response = await postDataApi("/customer/auth/login", formFields);
-        console.log(response)
 
         if (response?.success === true) {
-            console.log(response);
 
             localStorage.setItem("userEmail", formFields.email)
             localStorage.setItem("accesstoken", response?.data?.access_token)

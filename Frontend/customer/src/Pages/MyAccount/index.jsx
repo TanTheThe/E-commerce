@@ -57,7 +57,6 @@ const MyAccount = () => {
         setIsLoading(true)
 
         const response = await putDataApi("/customer/user", formFields);
-        console.log(response)
 
         if (response?.success === true) {
 
@@ -102,7 +101,6 @@ const MyAccount = () => {
             new_password: newPassword,
             confirm_new_password: confirmPassword
         });
-        console.log(response)
 
         if (response?.success === true) {
             context.openAlertBox(

@@ -44,9 +44,15 @@ const Header = () => {
 
     useEffect(() => {
         const fetchCategories = async () => {
-            const res = await getDataApi("/customer/categories");
-            if (res.success) {
-                context.setCategories(res.data);
+            try {
+                const res = await getDataApi("/customer/categories/all");
+                console.log(res);
+
+                if (res.success) {
+                    context.setCategories(res.data.data);
+                }
+            } catch (error) {
+                console.error("Error fetching categories:", error);
             }
         };
         fetchCategories();
@@ -205,7 +211,7 @@ const Header = () => {
                 </div>
             </div>
 
-            <Navigation categories={context.categories}/>
+            <Navigation categories={context.categories} />
 
         </header>
     )

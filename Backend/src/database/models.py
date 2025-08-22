@@ -167,6 +167,9 @@ class Product(SQLModel, table=True):
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     images: List[str] = Field(sa_column=Column(JSONB, nullable=False))
     description: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    popularity_score: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    total_sold: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"),default=0)
+    avg_rating: Optional[float] = Field(sa_column=Column(pg.FLOAT, nullable=False, server_default="0"), default=0.0)
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
     special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", default=None, nullable=True)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
@@ -232,6 +235,7 @@ class Categories(SQLModel, table=True):
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     image: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     parent_id: Optional[uuid.UUID] = Field(foreign_key="categories.id", nullable=True)
+    type_size: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -307,6 +311,7 @@ class Special_Offer(SQLModel, table=True):
     condition: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
     type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     total_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    scope: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="order"), default="order")
     used_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=True, server_default=text("0")), default=0)
     start_time: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     end_time: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False))
@@ -339,4 +344,17 @@ class Color(SQLModel, table=True):
                                                                 sa_relationship_kwargs={'lazy': 'selectin'})
 
 
+class Size(SQLModel, table=True):
+    __tablename__ = 'size'
 
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, index=True))

@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 import uuid
 from src.schemas.product_variant import ProductVariantModel, ProductVariantCreateModel, ProductVariantUpdateModel
 from datetime import datetime
+from enum import Enum
 
 
 class ProductModel(BaseModel):
@@ -34,11 +35,21 @@ class ProductUpdateModel(BaseModel):
 class DeleteMultipleProductModel(BaseModel):
     product_ids: List[str]
 
+class SortBy(str, Enum):
+    newest = "newest"
+    price_asc = "price_asc"
+    price_desc = "price_desc"
+    name_asc = "name_asc"
+    name_desc = "name_desc"
+    best_seller = "best_seller"
+    sale_desc = "sale_desc"
+
 class ProductFilterModel(BaseModel):
     search: Optional[str] = None
     category_ids: Optional[List[str]] = None
     min_price: Optional[int] = None
     max_price: Optional[int] = None
-    sort_by: Optional[str] = None
+    sort_by: Optional[SortBy] = None
     colors: Optional[List[str]] = None
     sizes: Optional[List[str]] = None
+    rating: Optional[List[int]] = None
