@@ -85,7 +85,7 @@ function App() {
           <Header />
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
-            <Route path={"/productListing"} exact={true} element={<ProductListing />} />
+            <Route path={"/category/:categoryId"} exact={true} element={<ProductListing />} />
             <Route path={"/product/:id"} exact={true} element={<ProductDetails />} />
             <Route path={"/login"} element={<Login />} />
             <Route path={"/signup"} exact={true} element={<Register />} />

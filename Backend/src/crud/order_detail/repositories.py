@@ -1,8 +1,8 @@
 from typing import Optional
 from sqlalchemy import ColumnElement
-from src.database.models import Product, Order_Detail
+from src.database.models import Product, Order_Detail, Order
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc
+from sqlmodel import select, desc, func, and_
 from datetime import datetime
 
 
@@ -23,8 +23,8 @@ class OrderDetailRepository:
         session.add_all(new_order_details)
         await session.flush()
 
-
-    async def get_order_detail(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+    async def get_order_detail(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession,
+                               joins: list = None):
         statement = select(Order_Detail).where(conditions)
         if joins:
             statement = statement.options(*joins)
@@ -32,8 +32,5 @@ class OrderDetailRepository:
         result = await session.exec(statement)
 
         return result.one_or_none()
-
-
-
 
 

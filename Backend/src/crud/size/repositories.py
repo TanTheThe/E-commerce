@@ -6,7 +6,9 @@ from sqlmodel import select
 
 class SizeRepository:
     async def get_all_size(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        statement = select(Size).where(condition)
+        statement = select(Size)
+        if condition is not None:
+            statement = statement.where(condition)
         result = await session.exec(statement)
         sizes = result.all()
         return sizes

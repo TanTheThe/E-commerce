@@ -3,6 +3,19 @@ import React from 'react';
 
 
 const ProductDetailOffcanvas = ({ open, onClose, product }) => {
+    const formatPrice = (price) => {
+        return price ? `${price.toLocaleString('vi-VN')}đ` : 'N/A';
+    };
+
+    const hasDiscount = (variant) => {
+        return variant.original_price && variant.discounted_price && variant.original_price > variant.discounted_price;
+    };
+
+    const calculateDiscountPercent = (original, discounted) => {
+        if (!original || !discounted) return 0;
+        return Math.round(((original - discounted) / original) * 100);
+    };
+
     return (
         <div className={`fixed inset-0 z-50 ${open ? 'visible' : 'invisible'}`}>
             <div
@@ -10,7 +23,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                 onClick={onClose}
             ></div>
 
-            <div className={`fixed right-0 top-0 h-full w-[600px] bg-white shadow-xl transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className={`fixed right-0 top-0 h-full w-[650px] bg-white shadow-xl transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="flex items-center justify-between p-4 border-b border-[rgba(0,0,0,0.2)]">
                     <h2 className="text-xl font-semibold">Product Details</h2>
                     <Button
@@ -47,7 +60,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                             <div className="mb-6">
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
                                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                                    <p className="text-gray-700 leading-relaxed">
+                                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
                                         {product.description || 'No description available'}
                                     </p>
                                 </div>
@@ -84,8 +97,14 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
                                                             Color
                                                         </label>
-                                                        <div className="p-2 bg-white border border-gray-200 rounded-md">
-                                                            <span className={`${variant.color ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                                                        <div className="p-2 bg-white border border-gray-200 rounded-md flex items-center gap-2">
+                                                            {variant.color_code && (
+                                                                <div
+                                                                    className="w-4 h-4 rounded-full border border-gray-300"
+                                                                    style={{ backgroundColor: variant.color_code }}
+                                                                ></div>
+                                                            )}
+                                                            <span className={`${variant.color_name ? 'text-gray-800' : 'text-gray-400 italic'}`}>
                                                                 {variant.color_name || 'None'}
                                                             </span>
                                                         </div>
@@ -93,10 +112,34 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
 
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            Price
+                                                            Original Price
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
-                                                            <span className="text-gray-800">{variant.price.toFixed(0)}</span>
+                                                            <span className={`${hasDiscount(variant) ? 'text-gray-400 line-through text-sm' : 'text-gray-800 font-semibold'}`}>
+                                                                {formatPrice(variant.original_price)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                                                            {hasDiscount(variant) ? 'Discounted Price' : 'Price'}
+                                                        </label>
+                                                        <div className="p-2 bg-white border border-gray-200 rounded-md flex items-center gap-2">
+                                                            {hasDiscount(variant) ? (
+                                                                <>
+                                                                    <span className="text-red-600 font-semibold">
+                                                                        {formatPrice(variant.discounted_price)}
+                                                                    </span>
+                                                                    <span className="bg-red-100 text-red-800 text-xs px-1.5 py-0.5 rounded">
+                                                                        -{calculateDiscountPercent(variant.original_price, variant.discounted_price)}%
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="text-gray-800">
+                                                                    {formatPrice(variant.discounted_price || variant.original_price)}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -105,11 +148,14 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                             Quantity
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
-                                                            <span className="text-gray-800">{variant.quantity}</span>
+                                                            <span className={`${variant.quantity > 0 ? 'text-gray-800' : 'text-red-500'}`}>
+                                                                {variant.quantity}
+                                                                {variant.quantity === 0 && ' (Out of stock)'}
+                                                            </span>
                                                         </div>
                                                     </div>
 
-                                                    <div className="col-span-2">
+                                                    <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
                                                             SKU
                                                         </label>
@@ -133,7 +179,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                     )}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)]">
+                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)] p-4">
                     <div className="flex justify-end">
                         <Button
                             className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"

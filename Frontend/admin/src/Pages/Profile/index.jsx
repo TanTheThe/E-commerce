@@ -55,7 +55,6 @@ const Profile = () => {
         setIsLoading(true)
 
         const response = await putDataApi("/admin/user", formFields);
-        console.log(response)
 
         if (response?.success === true) {
 
@@ -102,7 +101,6 @@ const Profile = () => {
             new_password: newPassword,
             confirm_new_password: confirmPassword
         });
-        console.log(response)
 
         if (response?.success === true) {
             context.openAlertBox(

@@ -54,11 +54,8 @@ const Login = () => {
         setIsLoading(true)
 
         const response = await postDataApi("/admin/auth/login", formFields);
-        console.log(response)
 
         if (response?.success === true) {
-            console.log(response);
-
             sessionStorage.setItem("loginToken", response?.data?.token)
             sessionStorage.setItem("isFirstLogin", response?.data?.isFirstLogin)
 

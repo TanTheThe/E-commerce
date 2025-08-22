@@ -55,7 +55,6 @@ const Users = () => {
             queryParams.append('sort_by_created_at', sortByCreatedAt);
 
             const response = await getDataApi(`/admin/user/all?${queryParams.toString()}`);
-            console.log(response);
 
             if (response.success === true) {
                 setUsers(response.data.data || []);

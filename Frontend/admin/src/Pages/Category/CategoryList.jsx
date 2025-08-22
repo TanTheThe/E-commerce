@@ -167,7 +167,6 @@ const CategoryList = () => {
     const [expandedItems, setExpandedItems] = useState([]);
     const [expandAll, setExpandAll] = useState(false);
 
-    // Filter states
     const [typeSizeFilter, setTypeSizeFilter] = useState('');
     const [availableSizes, setAvailableSizes] = useState([]);
 
@@ -205,11 +204,12 @@ const CategoryList = () => {
 
             const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
 
+            console.log(response);
+
             if (response.success) {
                 setCategories(response.data.data || []);
                 setTotalCategories(response.data.total || 0);
 
-                // Set available sizes from API response
                 if (response.data.sizes) {
                     setAvailableSizes(response.data.sizes);
                 }
@@ -247,7 +247,6 @@ const CategoryList = () => {
 
     const debouncedSearch = useCallback(
         debounce((searchTerm) => {
-            console.log('Category search value changed:', searchTerm);
             setSearchVal(searchTerm);
             setPage(0);
         }, 500),

@@ -32,6 +32,8 @@ import { deleteDataApi, getDataApi } from "../../utils/api";
 import AddSpecialOffer from "./addSpecialOffer";
 import EditSpecialOffer from "./editSpecialOffer";
 import { debounce } from "lodash";
+import AssignOfferToProducts from "./assignSpecialOffer";
+import { MdAssignment } from "react-icons/md";
 
 const columns = [
     { id: 'code', label: 'CODE', minWidth: 100, align: 'center' },
@@ -40,6 +42,7 @@ const columns = [
     { id: 'used_quantity', label: 'USED QUANTITY', minWidth: 200, align: 'center' },
     { id: 'discount', label: 'DISCOUNT', minWidth: 100, align: 'center' },
     { id: 'type', label: 'TYPE', minWidth: 100, align: 'center' },
+    { id: 'scope', label: 'SCOPE', minWidth: 120, align: 'center' },
     { id: 'condition', label: 'CONDITION', minWidth: 200, align: 'center' },
     { id: 'start_time', label: 'START', minWidth: 150, align: 'center' },
     { id: 'end_time', label: 'END', minWidth: 150, align: 'center' },
@@ -62,10 +65,14 @@ const SpecialOffer = () => {
     const [searchInput, setSearchInput] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
+    const [scopeFilter, setScopeFilter] = useState('');
     const [discountMin, setDiscountMin] = useState('');
     const [discountMax, setDiscountMax] = useState('');
     const [quantityStatus, setQuantityStatus] = useState('');
     const [timeStatus, setTimeStatus] = useState('');
+
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+    const [offerToAssign, setOfferToAssign] = useState(null);
 
     const context = useContext(MyContext);
 
@@ -76,6 +83,7 @@ const SpecialOffer = () => {
 
         if (customSearch) params.append('search', customSearch);
         if (typeFilter) params.append('type', typeFilter);
+        if (scopeFilter) params.append('scope', scopeFilter);
         if (discountMin && discountMin !== '') params.append('discount_min', discountMin.toString());
         if (discountMax && discountMax !== '') params.append('discount_max', discountMax.toString());
         if (quantityStatus) params.append('quantity_status', quantityStatus);
@@ -124,6 +132,10 @@ const SpecialOffer = () => {
         setTypeFilter(event.target.value);
     };
 
+    const handleScopeFilterChange = (event) => {
+        setScopeFilter(event.target.value);
+    };
+
     const handleDiscountMinChange = (event) => {
         setDiscountMin(event.target.value);
     };
@@ -153,6 +165,7 @@ const SpecialOffer = () => {
         setSearchInput('');
         setSearchTerm('');
         setTypeFilter('');
+        setScopeFilter('');
         setDiscountMin('');
         setDiscountMax('');
         setQuantityStatus('');
@@ -168,6 +181,16 @@ const SpecialOffer = () => {
     const closeDeleteDialog = () => {
         setDeleteDialogOpen(false);
         setOfferToDelete(null);
+    };
+
+    const openAssignDialog = (offer) => {
+        setOfferToAssign(offer);
+        setAssignDialogOpen(true);
+    };
+
+    const closeAssignDialog = () => {
+        setAssignDialogOpen(false);
+        setOfferToAssign(null);
     };
 
     const handleDeleteOffer = async () => {
@@ -216,7 +239,7 @@ const SpecialOffer = () => {
     useEffect(() => {
         setPage(0);
         fetchOffers(0, rowsPerPage, searchTerm);
-    }, [typeFilter, quantityStatus, timeStatus]);
+    }, [typeFilter, scopeFilter, quantityStatus, timeStatus]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -280,13 +303,22 @@ const SpecialOffer = () => {
                     <SearchBox searchTerm={searchInput} setSearchTerm={setSearchInput} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                     <div className="flex flex-col">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Loại khuyến mãi</label>
                         <Select value={typeFilter} onChange={handleTypeFilterChange} className="w-full h-11">
                             <MenuItem value="">-- Tất cả loại --</MenuItem>
                             <MenuItem value="percent">Phần trăm (%)</MenuItem>
                             <MenuItem value="fixed">Số tiền cố định</MenuItem>
+                        </Select>
+                    </div>
+
+                    <div className="flex flex-col">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Phạm vi áp dụng</label>
+                        <Select value={scopeFilter} onChange={handleScopeFilterChange} className="w-full h-11">
+                            <MenuItem value="">-- Tất cả phạm vi --</MenuItem>
+                            <MenuItem value="order">Đơn hàng</MenuItem>
+                            <MenuItem value="product">Sản phẩm</MenuItem>
                         </Select>
                     </div>
 
@@ -343,21 +375,21 @@ const SpecialOffer = () => {
                             </div>
                         </div>
                     </div>
-
-                    <div className="flex flex-col justify-end">
-                        <Button
-                            onClick={clearFilters}
-                            className="h-12 bg-gray-50 hover:bg-gray-100 text-gray-700 border-2 border-gray-300 hover:border-gray-400 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                            Xóa bộ lọc
-                        </Button>
-                    </div>
                 </div>
 
-                {(searchTerm || typeFilter || discountMin || discountMax || quantityStatus || timeStatus) && (
+                <div className="flex justify-end mt-6">
+                    <Button
+                        onClick={clearFilters}
+                        className="h-12 bg-gray-50 hover:bg-gray-100 text-gray-700 border-2 border-gray-300 hover:border-gray-400 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Xóa bộ lọc
+                    </Button>
+                </div>
+
+                {(searchTerm || typeFilter || scopeFilter || discountMin || discountMax || quantityStatus || timeStatus) && (
                     <div className="mt-6 pt-4 border-t border-gray-200">
                         <p className="text-sm text-gray-600 mb-2">Bộ lọc hiện tại:</p>
                         <div className="flex flex-wrap gap-2">
@@ -369,6 +401,11 @@ const SpecialOffer = () => {
                             {typeFilter && (
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     Loại: {typeFilter === 'percent' ? 'Phần trăm' : 'Số tiền cố định'}
+                                </span>
+                            )}
+                            {scopeFilter && (
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                    Phạm vi: {scopeFilter === 'order' ? 'Đơn hàng' : 'Sản phẩm'}
                                 </span>
                             )}
                             {discountMin && (
@@ -463,7 +500,20 @@ const SpecialOffer = () => {
                                                     </TableCell>
 
                                                     <TableCell align="center">
-                                                        <span className="font-medium">≥ {offer.condition}</span>
+                                                        <span className={`font-medium px-2 py-1 rounded-full text-xs ${offer.scope === 'order'
+                                                            ? 'bg-blue-100 text-blue-800'
+                                                            : 'bg-green-100 text-green-800'
+                                                            }`}>
+                                                            {offer.scope === 'order' ? 'Đơn hàng' : 'Sản phẩm'}
+                                                        </span>
+                                                    </TableCell>
+
+                                                    <TableCell align="center">
+                                                        <span className="font-medium">
+                                                            {offer.condition !== null && offer.condition !== undefined
+                                                                ? `≥ ${offer.condition}`
+                                                                : ""}
+                                                        </span>
                                                     </TableCell>
 
                                                     <TableCell align="center">
@@ -475,7 +525,17 @@ const SpecialOffer = () => {
                                                     </TableCell>
 
                                                     <TableCell align="center">
-                                                        <div className="flex items-center justify-center gap-4">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {offer.scope === 'product' && (
+                                                                <Button
+                                                                    className="!w-[35px] !h-[35px] bg-green-50 !border-green-200 !rounded-full hover:!bg-green-100 !min-w-[35px]"
+                                                                    onClick={() => openAssignDialog(offer)}
+                                                                    title="Gắn sản phẩm"
+                                                                >
+                                                                    <MdAssignment className="text-green-600 text-[18px]" />
+                                                                </Button>
+                                                            )}
+
                                                             <Button
                                                                 className="!w-[35px] !h-[35px] bg-[#f1f1f1] !border-[rgba(0,0,0,0.4)] !rounded-full hover:!bg-[#e1e1e1] !min-w-[35px]"
                                                                 onClick={() => {
@@ -558,6 +618,15 @@ const SpecialOffer = () => {
                     setOfferToEdit(null);
                 }}
                 offer={offerToEdit}
+                onSuccess={() => {
+                    fetchOffers(page, rowsPerPage, searchTerm);
+                }}
+            />
+
+            <AssignOfferToProducts
+                open={assignDialogOpen}
+                onClose={closeAssignDialog}
+                offer={offerToAssign}
                 onSuccess={() => {
                     fetchOffers(page, rowsPerPage, searchTerm);
                 }}

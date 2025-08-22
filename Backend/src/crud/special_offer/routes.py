@@ -1,7 +1,8 @@
 from fastapi import APIRouter, status, Depends
 from src.crud.special_offer.services import SpecialOfferService
 from src.dependencies import AccessTokenBearer
-from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel
+from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
+    SetOfferToProduct
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -36,6 +37,7 @@ async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
 async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
                                       search: Optional[str] = None,
                                       type: Optional[str] = None,
+                                      scope: Optional[str] = None,
                                       discount_min: Optional[int] = None,
                                       discount_max: Optional[int] = None,
                                       quantity_status: Optional[str] = None,
@@ -45,6 +47,7 @@ async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
     filter_data = SpecialOfferFilterModel(
         search=search,
         type=type,
+        scope=scope,
         discount_min=discount_min,
         discount_max=discount_max,
         quantity_status=quantity_status,
@@ -58,6 +61,21 @@ async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
         content={
             "message": "Thông tin các khuyến mãi",
             "content": special_offers
+        }
+    )
+
+
+@special_offer_admin_router.post('/set-offer', dependencies=[Depends(admin_role_middleware)])
+async def set_offer_to_product(data: SetOfferToProduct,
+                               session: AsyncSession = Depends(get_session),
+                               token_details: dict = Depends(access_token_bearer)):
+
+    await special_offer_service.set_offer_to_product_service(data, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Gắn offer thành công",
         }
     )
 

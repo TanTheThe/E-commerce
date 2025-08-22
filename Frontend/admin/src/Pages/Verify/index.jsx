@@ -44,7 +44,6 @@ const Verify = () => {
                 navigate("/login");
             } else {
                 const isFirstLogin = sessionStorage.getItem("isFirstLogin");
-                console.log(isFirstLogin);
                 if (isFirstLogin === 'true') {
                     const response = await postDataApi("/admin/auth/login/2fa", {
                         token: loginToken

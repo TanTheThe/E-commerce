@@ -61,4 +61,32 @@ class SpecialOfferException:
             }
         )
 
+    @staticmethod
+    def invalid_condition():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Điều kiện phải lớn hơn hoặc bằng 0",
+                "error_code": "voucher_007"
+            }
+        )
 
+    @staticmethod
+    def invalid_scope_for_product():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ cho phép gán offer product",
+                "error_code": "voucher_008"
+            }
+        )
+
+    @staticmethod
+    def expired_or_not_started():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Voucher đã hết hạn, không thể gắn cho sản phẩm",
+                "error_code": "voucher_009"
+            }
+        )

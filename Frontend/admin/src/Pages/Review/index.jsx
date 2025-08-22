@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Avatar, Button, DialogActions, DialogContent, DialogContentText, DialogTitle, Rating, TextField } from "@mui/material";
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -47,7 +47,7 @@ const Reviews = () => {
 
     const context = useContext(MyContext);
 
-    const buildQueryParams = (customPage = page, customRowsPerPage = rowsPerPage, customSearch = searchTerm) => {
+    const buildQueryParams = useCallback((customPage = page, customRowsPerPage = rowsPerPage, customSearch = searchTerm) => {
         const params = new URLSearchParams();
         params.append('skip', (customPage * customRowsPerPage).toString());
         params.append('limit', customRowsPerPage.toString());
@@ -58,9 +58,9 @@ const Reviews = () => {
         if (sortByRate) params.append('sort_by_rate', sortByRate);
 
         return params.toString();
-    };
+    }, [page, rowsPerPage, searchTerm, rateFilter, sortByCreatedAt, sortByRate]);
 
-    const fetchReviews = async (customPage = page, customRowsPerPage = rowsPerPage, customSearch = searchTerm) => {
+    const fetchReviews = useCallback(async (customPage = page, customRowsPerPage = rowsPerPage, customSearch = searchTerm) => {
         try {
             setLoading(true);
             const queryParams = buildQueryParams(customPage, customRowsPerPage, customSearch);
@@ -82,30 +82,39 @@ const Reviews = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [buildQueryParams, context, page, rowsPerPage, searchTerm]);
+
+    const debouncedSearch = useMemo(
+        () => debounce((value) => {
+            setSearchTerm(value);
+            setPage(0);
+        }, 500),
+        []
+    );
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
-        fetchReviews(newPage, rowsPerPage, searchTerm);
     };
 
     const handleChangeRowsPerPage = (event) => {
         const newRowsPerPage = +event.target.value;
         setRowsPerPage(newRowsPerPage);
         setPage(0);
-        fetchReviews(0, newRowsPerPage, searchTerm);
     };
 
     const handleRateFilterChange = (event) => {
         setRateFilter(event.target.value);
+        setPage(0);
     };
 
     const handleSortByCreatedAtChange = (event) => {
         setSortByCreatedAt(event.target.value);
+        setPage(0);
     };
 
     const handleSortByRateChange = (event) => {
         setSortByRate(event.target.value);
+        setPage(0);
     };
 
     const clearFilters = () => {
@@ -146,7 +155,7 @@ const Reviews = () => {
 
             if (response.success) {
                 context.openAlertBox("success", response.message || "Xóa đánh giá thành công");
-                fetchReviews(page, rowsPerPage, searchTerm);
+                fetchReviews();
                 closeDeleteDialog();
             } else {
                 context.openAlertBox("error", response.message || "Có lỗi trong quá trình xóa đánh giá");
@@ -174,27 +183,23 @@ const Reviews = () => {
         return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
     };
 
-    const debouncedSearch = useCallback(
-        debounce((value) => {
-            setSearchTerm(value);
-            setPage(0);
-            fetchReviews(0, rowsPerPage, value);
-        }, 500),
-        [rowsPerPage]
-    );
-
     useEffect(() => {
         debouncedSearch(searchInput);
+
+        return () => {
+            debouncedSearch.cancel();
+        };
     }, [searchInput, debouncedSearch]);
 
     useEffect(() => {
-        setPage(0);
-        fetchReviews(0, rowsPerPage, searchTerm);
-    }, [rateFilter, sortByCreatedAt, sortByRate]);
+        fetchReviews();
+    }, [fetchReviews]);
 
     useEffect(() => {
-        fetchReviews();
-    }, []);
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
 
     return (
         <>

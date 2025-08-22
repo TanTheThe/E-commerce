@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Button, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField } from "@mui/material";
+import { Button, DialogActions, DialogContent, DialogContentText, DialogTitle, Rating, TextField } from "@mui/material";
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -34,8 +34,18 @@ const columns = [
     },
     {
         id: 'priceRange',
-        label: 'PRICE RANGE',
+        label: 'BASE PRICE RANGE',
         minWidth: 150,
+    },
+    {
+        id: 'specialOffer',
+        label: 'SPECIAL OFFER',
+        minWidth: 150,
+    },
+    {
+        id: 'rating',
+        label: 'RATING',
+        minWidth: 120,
     },
     {
         id: 'createdAt',
@@ -73,6 +83,20 @@ const Products = () => {
     const [productToDelete, setProductToDelete] = useState(null);
 
     const context = useContext(MyContext);
+
+    const roundRating = (rating) => {
+        if (rating === null || rating === undefined) return 0;
+
+        const decimal = rating - Math.floor(rating);
+
+        if (decimal >= 0.75) {
+            return Math.ceil(rating);
+        } else if (decimal >= 0.25) {
+            return Math.floor(rating) + 0.5;
+        } else {
+            return Math.floor(rating);
+        }
+    };
 
     const fetchCategories = async () => {
         try {
@@ -275,7 +299,6 @@ const Products = () => {
 
     const handleDeleteMultipleProducts = async () => {
         try {
-            console.log(selectedProductIds);
             const response = await postDataApi(`/admin/product/delete`, {
                 product_ids: selectedProductIds
             });
@@ -327,7 +350,6 @@ const Products = () => {
 
     const debouncedSearch = useCallback(
         debounce((searchTerm) => {
-            console.log('Search value changed:', searchTerm); // Debug log
             setSearchVal(searchTerm);
             setPage(0);
         }, 500),
@@ -532,6 +554,42 @@ const Products = () => {
                                                         <span className="text-[14px] font-[500] font-[Montserrat] text-gray-600">
                                                             {formatPriceRange(product.price_range)}
                                                         </span>
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell style={{ minWidth: 150 }}>
+                                                    <div className="flex flex-col gap-1">
+                                                        {product.offer_name ? (
+                                                            <span className="text-[14px] font-[500] font-[Montserrat] text-gray-600">
+                                                                {product.offer_name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400 text-xs font-[Montserrat]">
+                                                                Không có ưu đãi
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell style={{ minWidth: 120 }}>
+                                                    <div className="flex flex-col gap-1">
+                                                        {product.avg_rating !== null ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Rating
+                                                                    value={roundRating(product.avg_rating)}
+                                                                    readOnly
+                                                                    precision={0.5}
+                                                                    size="small"
+                                                                />
+                                                                <span className="text-[12px] font-[500] font-[Montserrat] text-gray-500">
+                                                                    ({product.avg_rating?.toFixed(1)})
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[12px] font-[500] font-[Montserrat] text-gray-400">
+                                                                Chưa có đánh giá
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </TableCell>
 

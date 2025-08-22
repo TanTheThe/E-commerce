@@ -57,7 +57,6 @@ const Colors = () => {
             if (searchVal) queryParams.append('search', searchVal);
 
             const response = await getDataApi(`/admin/color?${queryParams.toString()}`);
-            console.log(response);
 
             if (response.success === true) {
                 setColors(response.data.data || []);

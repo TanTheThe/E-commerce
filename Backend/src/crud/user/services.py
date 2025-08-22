@@ -1,3 +1,4 @@
+from sqlalchemy.orm import noload
 from starlette.responses import JSONResponse
 from src.database.models import User
 from src.errors.authentication import AuthException
@@ -108,7 +109,8 @@ class UserService:
 
     async def get_profile_customer_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        user = await user_repository.get_user(condition, session=session)
+        joins = [noload(User.address), noload(User.order), noload(User.evaluate)]
+        user = await user_repository.get_user(condition, session, joins)
 
         if not user:
             AuthException.user_not_found()

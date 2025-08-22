@@ -1,5 +1,7 @@
+from datetime import datetime
 from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.evaluate.repositories import EvaluateRepository
+from src.crud.product.repositories import ProductRepository
 from src.database.models import Evaluate, Order_Detail, User, Order, Product, Product_Variant, Color
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, func, or_, asc, desc
@@ -10,12 +12,21 @@ from src.errors.evaluate import EvaluateException
 
 evaluate_repository = EvaluateRepository()
 order_detail_repository = OrderDetailRepository()
+product_repository = ProductRepository()
 
 
 class EvaluateService:
     async def create_evaluate_service(self, customer_id, evaluate_data: EvaluateInputModel, session: AsyncSession):
         condition = and_(Order_Detail.id == evaluate_data.order_detail_id, Order_Detail.deleted_at.is_(None))
-        joins = [selectinload(Order_Detail.order)]
+        joins = [
+            selectinload(Order_Detail.order).options(
+                noload(Order.user),
+                noload(Order.order_detail),
+            ).load_only(Order.user_id),
+            noload(Order_Detail.product),
+            noload(Order_Detail.product_variant),
+            noload(Order_Detail.evaluate),
+        ]
         order_detail = await order_detail_repository.get_order_detail(condition, session, joins)
 
         if not order_detail:
@@ -24,7 +35,8 @@ class EvaluateService:
         if str(customer_id) != str(order_detail.order.user_id):
             EvaluateException.user_not_allowed_to_review()
 
-        existing_eval = await evaluate_repository.get_by_order_detail_id(evaluate_data.order_detail_id, session)
+        joins_evaluate = [noload(Evaluate.order_detail), noload(Evaluate.product), noload(Evaluate.product_variant), noload(Evaluate.user)]
+        existing_eval = await evaluate_repository.get_by_order_detail_id(evaluate_data.order_detail_id, session, joins_evaluate)
         if existing_eval:
             EvaluateException.already_reviewed()
 
@@ -36,6 +48,18 @@ class EvaluateService:
         )
 
         new_evaluate = await evaluate_repository.create_evaluate(evaluate_create_data, session)
+
+        avg_rating = await evaluate_repository.get_average_rate(
+            Evaluate.product_id == order_detail.product_id,
+            session
+        )
+        avg_rating = avg_rating if avg_rating else 0.0
+
+        await product_repository.update_product_some_field(
+            Product.id == order_detail.product_id,
+            {"avg_rating": avg_rating, "updated_at": datetime.now()},
+            session
+        )
 
         new_evaluate_dict = {
             "id": str(new_evaluate.id),

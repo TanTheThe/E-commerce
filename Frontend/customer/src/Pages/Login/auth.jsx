@@ -12,7 +12,6 @@ const useAuth = () => {
 
         if (token) {
             const response = await fetchWithAutoRefresh("/customer/user", "GET");
-            console.log(response);
 
             if (response?.success) {
                 setIsLogin(true);

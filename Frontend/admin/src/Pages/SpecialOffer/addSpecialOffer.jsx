@@ -19,6 +19,7 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
         discount: "",
         condition: "",
         type: "percent",
+        scope: "order",
         start_time: "",
         end_time: ""
     });
@@ -38,7 +39,7 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            const { name, total_quantity, discount, condition, type, start_time, end_time } = formFields;
+            const { name, total_quantity, discount, condition, type, scope, start_time, end_time } = formFields;
 
             const offerData = {
                 name: name.trim(),
@@ -46,6 +47,7 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                 discount: parseFloat(discount),
                 condition: parseFloat(condition),
                 type: type,
+                scope: scope,
                 start_time: new Date(start_time).toISOString(),
                 end_time: new Date(end_time).toISOString()
             };
@@ -63,6 +65,7 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                     discount: "",
                     condition: "",
                     type: "percent",
+                    scope: "order",
                     start_time: "",
                     end_time: ""
                 });
@@ -97,7 +100,18 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                             required
                         />
                     </div>
-
+                    <div>
+                        <label className="block text-sm font-medium mb-1 mt-4">Phạm vi áp dụng</label>
+                        <select
+                            name="scope"
+                            value={formFields.scope}
+                            onChange={onChangeInput}
+                            className="w-full border p-2 rounded"
+                        >
+                            <option value="order">Đơn hàng</option>
+                            <option value="product">Sản phẩm</option>
+                        </select>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium mb-1 mt-4">Tổng số lượng</label>
                         <input
@@ -122,20 +136,19 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                             required
                         />
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-medium mb-1 mt-4">Điều kiện áp dụng (tổng đơn hàng tối thiểu)</label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            name="condition"
-                            value={formFields.condition}
-                            onChange={onChangeInput}
-                            className="w-full border p-2 rounded"
-                            required
-                        />
-                    </div>
-
+                    {formFields.scope === 'order' && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1 mt-4">Điều kiện áp dụng (tổng đơn hàng tối thiểu)</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                name="condition"
+                                value={formFields.condition}
+                                onChange={onChangeInput}
+                                className="w-full border p-2 rounded"
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium mb-1 mt-4">Loại ưu đãi</label>
                         <select
@@ -144,11 +157,10 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                             onChange={onChangeInput}
                             className="w-full border p-2 rounded"
                         >
-                            <option value="percentage">Phần trăm</option>
+                            <option value="percent">Phần trăm</option>
                             <option value="fixed">Giảm tiền cố định</option>
                         </select>
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium mb-1 mt-4">Thời gian bắt đầu</label>
                         <input
@@ -160,7 +172,6 @@ const AddSpecialOffer = ({ open, onClose, onSuccess }) => {
                             required
                         />
                     </div>
-
                     <div>
                         <label className="block text-sm font-medium mb-1 mt-4">Thời gian kết thúc</label>
                         <input

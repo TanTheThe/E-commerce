@@ -21,6 +21,12 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
     const [initialLoading, setInitialLoading] = useState(true);
     const [deletedVariantIds, setDeletedVariantIds] = useState([]);
 
+    const [availableSizes, setAvailableSizes] = useState({
+        hasMultipleTypes: false,
+        groups: [],
+        sizes: []
+    });
+
     const { isOpenFullScreenPanel, setIsOpenFullScreenPanel } = useContext(MyContext);
     const context = useContext(MyContext);
 
@@ -50,6 +56,91 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
     }, []);
 
     useEffect(() => {
+        const fetchSizes = async () => {
+            if (selectedCategories.length === 0) {
+                setAvailableSizes({
+                    hasMultipleTypes: false,
+                    groups: [],
+                    sizes: []
+                });
+                return;
+            }
+
+            const selectedCategoryObjects = categories.filter(cat =>
+                selectedCategories.includes(cat.id)
+            );
+
+            const typeSizes = selectedCategoryObjects.map(cat => cat.type_size);
+            const uniqueTypes = [...new Set(typeSizes)];
+
+            try {
+                const queryParams = new URLSearchParams();
+                uniqueTypes.forEach(type => {
+                    queryParams.append('type_sizes', type);
+                });
+
+                const res = await getDataApi(`/admin/size/?${queryParams.toString()}`);
+
+                if (res.success === true) {
+                    const sizesArray = res.data || [];
+
+                    if (uniqueTypes.length === 1) {
+                        const singleType = uniqueTypes[0];
+                        const sizes = sizesArray.filter(size => size.type === singleType);
+
+                        setAvailableSizes({
+                            hasMultipleTypes: false,
+                            groups: [],
+                            sizes: sizes
+                        });
+                    } else {
+                        const groups = uniqueTypes.map(type => {
+                            const sizesOfType = sizesArray.filter(size => size.type === type);
+                            return {
+                                type: type,
+                                label: getTypeLabel(type),
+                                sizes: sizesOfType
+                            };
+                        });
+
+                        setAvailableSizes({
+                            hasMultipleTypes: true,
+                            groups: groups,
+                            sizes: []
+                        });
+                    }
+                } else {
+                    console.error("Failed to fetch sizes:", res.message);
+                    setAvailableSizes({
+                        hasMultipleTypes: false,
+                        groups: [],
+                        sizes: []
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching sizes:", error);
+                setAvailableSizes({
+                    hasMultipleTypes: false,
+                    groups: [],
+                    sizes: []
+                });
+            }
+        };
+
+        fetchSizes();
+    }, [selectedCategories, categories]);
+
+    const getTypeLabel = (type) => {
+        const typeLabels = {
+            'clothing': 'Quần áo',
+            'shoe': 'Giày dép',
+            'hat': 'Mũ nón',
+            'accessory': 'Phụ kiện'
+        };
+        return typeLabels[type] || type;
+    };
+
+    useEffect(() => {
         const fetchColors = async () => {
             try {
                 const queryParams = new URLSearchParams({
@@ -58,7 +149,6 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                 });
 
                 const res = await getDataApi(`/admin/color?${queryParams.toString()}`);
-                console.log(res);
                 if (res.success === true) {
                     setColors(res.data.data || []);
                 } else {
@@ -228,6 +318,72 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
         setSelectedCategories(selectedIds);
     };
 
+    const renderSizeSelection = (variant) => {
+        console.log('Available Sizes in render:', availableSizes);
+
+        if (availableSizes.sizes.length === 0 && availableSizes.groups.length === 0) {
+            return (
+                <Select
+                    size="small"
+                    className="w-full"
+                    value={variant.size}
+                    onChange={(e) =>
+                        handleVariantChange(variant.id, 'size', e.target.value)
+                    }
+                >
+                    <MenuItem value="">Chọn danh mục trước</MenuItem>
+                    {variant.size && (
+                        <MenuItem value={variant.size}>{variant.size} (hiện tại)</MenuItem>
+                    )}
+                </Select>
+            );
+        }
+
+        if (!availableSizes.hasMultipleTypes) {
+            return (
+                <Select
+                    size="small"
+                    className="w-full"
+                    value={variant.size}
+                    onChange={(e) =>
+                        handleVariantChange(variant.id, 'size', e.target.value)
+                    }
+                >
+                    <MenuItem value="">None</MenuItem>
+                    {availableSizes.sizes.map((size) => (
+                        <MenuItem key={size.id} value={size.name}>
+                            {size.name}
+                        </MenuItem>
+                    ))}
+                </Select>
+            );
+        } else {
+            return (
+                <div className="w-full">
+                    <Select
+                        size="small"
+                        className="w-full"
+                        value={variant.size}
+                        onChange={(e) =>
+                            handleVariantChange(variant.id, 'size', e.target.value)
+                        }
+                    >
+                        <MenuItem value="">None</MenuItem>
+                        {availableSizes.groups.map((group) => (
+                            <optgroup key={group.type} label={group.label}>
+                                {group.sizes.map((size) => (
+                                    <MenuItem key={size.id} value={size.name}>
+                                        {size.name}
+                                    </MenuItem>
+                                ))}
+                            </optgroup>
+                        ))}
+                    </Select>
+                </div>
+            );
+        }
+    };
+
     const validateForm = () => {
         if (!formData.name.trim()) {
             context.openAlertBox("error", 'Tên sản phẩm không được để trống');
@@ -375,6 +531,18 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                             label=""
                             placeholder="Chọn danh mục sản phẩm"
                         />
+
+                        {availableSizes.hasMultipleTypes && (
+                            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                                <div className="flex items-center">
+                                    <span className="text-yellow-600 mr-2">⚠️</span>
+                                    <span className="text-sm text-yellow-800">
+                                        Bạn đã chọn các danh mục với hệ thống kích cỡ khác nhau ({availableSizes.groups.map(g => g.label).join(', ')}).
+                                        Kích cỡ được nhóm theo loại để dễ phân biệt.
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mb-4">
@@ -428,19 +596,7 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                             <div className="grid grid-cols-6 gap-4 mb-3">
                                 <div className="col-span-1">
                                     <h3 className="text-sm font-medium mb-1">Kích cỡ</h3>
-                                    <Select
-                                        size="small"
-                                        className="w-full"
-                                        value={variant.size}
-                                        onChange={(e) =>
-                                            handleVariantChange(variant.id, 'size', e.target.value)
-                                        }
-                                    >
-                                        <MenuItem value="">None</MenuItem>
-                                        <MenuItem value="S">S</MenuItem>
-                                        <MenuItem value="M">M</MenuItem>
-                                        <MenuItem value="L">L</MenuItem>
-                                    </Select>
+                                    {renderSizeSelection(variant)}
                                 </div>
                                 <div className="col-span-1">
                                     <h3 className="text-sm font-medium mb-1">Số lượng</h3>

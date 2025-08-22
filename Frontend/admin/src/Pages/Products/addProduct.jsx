@@ -80,11 +80,11 @@ const AddProduct = () => {
                 const res = await getDataApi(`/admin/size/?${queryParams.toString()}`);
 
                 if (res.success === true) {
-                    const sizesData = res.content || {};
+                    const sizesArray = res.data || [];
 
                     if (uniqueTypes.length === 1) {
                         const singleType = uniqueTypes[0];
-                        const sizes = sizesData[singleType] || [];
+                        const sizes = sizesArray.filter(size => size.type === singleType);
 
                         setAvailableSizes({
                             hasMultipleTypes: false,
@@ -93,7 +93,7 @@ const AddProduct = () => {
                         });
                     } else {
                         const groups = uniqueTypes.map(type => {
-                            const sizesOfType = sizesData[type] || [];
+                            const sizesOfType = sizesArray.filter(size => size.type === type);
                             return {
                                 type: type,
                                 label: getTypeLabel(type),
@@ -147,7 +147,7 @@ const AddProduct = () => {
                 });
 
                 const res = await getDataApi(`/admin/color?${queryParams.toString()}`);
-                console.log(res);
+  
                 if (res.success === true) {
                     setColors(res.data.data || []);
                 } else {
@@ -376,7 +376,6 @@ const AddProduct = () => {
             };
 
             const result = await postDataApi('/admin/product/', submitData);
-            console.log(result);
 
             if (!result.success) {
                 context.openAlertBox("error", result?.data?.detail.message || 'Có lỗi xảy ra khi tạo sản phẩm');

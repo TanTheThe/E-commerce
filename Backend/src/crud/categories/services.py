@@ -130,6 +130,8 @@ class CategoriesService:
             "type_size": categories.type_size
         }
 
+
+
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):
         condition = and_(Categories.id == id)
         category = await categories_repository.get_category(condition, session)

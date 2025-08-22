@@ -60,8 +60,10 @@ class EvaluateRepository:
 
         return result.one_or_none()
 
-    async def get_by_order_detail_id(self, order_detail_id: str, session: AsyncSession):
-        statement = select(Evaluate).where(Evaluate.order_detail_id == order_detail_id)
+    async def get_by_order_detail_id(self, order_detail_id: str, session: AsyncSession, joins: list = None):
+        statement = select(Evaluate).options(
+            *joins if joins else []
+        ).where(Evaluate.order_detail_id == order_detail_id)
         result = await session.exec(statement)
         return result.one_or_none()
 

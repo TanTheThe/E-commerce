@@ -8,10 +8,12 @@ from src.crud.product.repositories import ProductRepository
 from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, func, or_, asc, desc
+from sqlmodel import and_, func, or_, asc, desc, update
+from sqlalchemy import update
 from src.errors.address import AddressException
 from src.errors.order import OrderException
 from src.errors.product import ProductException
+from src.errors.special_offer import SpecialOfferException
 from src.schemas.order import OrderCreateModel, OrderFilterModel
 import time
 import asyncio
@@ -28,7 +30,6 @@ product_variant_repository = ProductVariantRepository()
 
 class OrderService:
     async def validate_order_dependencies(self, customer_id, address_id, offer_id, session):
-        # Mỗi phần tử là 1 lời gọi đến DB
         joins_user = [
             noload(User.address),
             noload(User.order),
@@ -46,20 +47,20 @@ class OrderService:
             address_repository.get_address(conditions_address, session, joins_address),
         ]
 
-        # Nếu có offer_id, thì thêm một tác vụ nữa để truy vấn ưu đãi đó.
         if offer_id:
             joins_special_offer = [
                 noload(Special_Offer.products),
             ]
-            conditions_address = and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None))
-            tasks.append(special_offer_repository.get_special_offer(conditions_address, session, joins_special_offer))
-
-        # Nếu không có ưu đãi, ta vẫn append() một cái gì đó để giữ thứ tự kết quả, vì gather() trả về theo đúng thứ tự các coroutine trong danh sách.
+            conditions_offer = and_(
+                Special_Offer.id == offer_id,
+                Special_Offer.deleted_at.is_(None),
+                Special_Offer.scope == "order"
+            )
+            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session, joins_special_offer))
         else:
-            tasks.append(asyncio.sleep(0))  # placeholder giữ thứ tự
+            tasks.append(asyncio.sleep(0))
 
-        # Chạy tất cả coroutine trong tasks cùng lúc, và trả về kết quả sau khi tất cả xong.
-        customer, address, special_offer = await asyncio.gather(*tasks)
+        customer, address, order_offer = await asyncio.gather(*tasks)
 
         if not customer:
             AuthException.user_not_found()
@@ -67,32 +68,44 @@ class OrderService:
         if not address:
             AddressException.not_found()
 
-        return customer, address, special_offer
+        if offer_id and not order_offer:
+            SpecialOfferException.not_found()
+
+        return customer, address, order_offer
 
 
-    async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
-        variant_ids = {item.product_variant_id for item in order_data.order_detail}
+    async def get_variants_with_product_offers(self, variant_ids, session):
         condition = Product_Variant.id.in_(variant_ids)
         joins = [
             selectinload(Product_Variant.product).options(
+                selectinload(Product.special_offer).options(
+                    noload(Special_Offer.products)
+                ),
                 noload(Product.order_detail),
                 noload(Product.product_variant),
                 noload(Product.evaluate),
                 noload(Product.categories),
-                noload(Product.special_offer),
                 noload(Product.categories_product),
             ).load_only(
                 Product.id,
                 Product.name,
                 Product.images,
+                Product.special_offer_id
             )
         ]
+
         variants = await product_variant_repository.get_all_product_variant(condition, session, joins)
-        variant_map = {}
-        order_detail_objs = []
+        return {str(v.id): v for v in variants}
+
+
+    async def calculate_order_totals(self, order_items, variant_map):
         sub_total = 0
-        for item in order_data.order_detail:
-            variant = next((v for v in variants if str(v.id) == item.product_variant_id), None)
+        total_discount = 0
+        order_detail_objs = []
+        product_offers_to_update = {}
+
+        for item in order_items:
+            variant = variant_map.get(item.product_variant_id)
             if not variant:
                 ProductException.not_found_variant()
 
@@ -103,11 +116,37 @@ class OrderService:
             if item.quantity > variant.quantity:
                 ProductException.out_of_stock(str(variant.id))
 
-            sub_total += item.quantity * variant.price
+            discounted_price = variant.price
+            product_discount_per_item = 0
+
+            if product.special_offer_id and product.special_offer:
+                product_offer = product.special_offer
+                if product_offer.scope != "product":
+                    continue
+
+                remaining_quantity = product_offer.total_quantity - product_offer.used_quantity
+                if remaining_quantity < item.quantity:
+                    raise Exception(f"Product offer {product_offer.code} không đủ số lượng")
+
+                if product_offer.type == "percent":
+                    product_discount_per_item = int(variant.price * product_offer.discount / 100)
+                    discounted_price = variant.price - product_discount_per_item
+
+                    if str(product_offer.id) not in product_offers_to_update:
+                        product_offers_to_update[str(product_offer.id)] = 0
+                    product_offers_to_update[str(product_offer.id)] += item.quantity
+
+            item_sub_total = discounted_price * item.quantity
+            item_total_discount = product_discount_per_item * item.quantity
+
+            sub_total += item_sub_total
+            total_discount += item_total_discount
+
             product_dict = {
                 "name": product.name,
                 "images": product.images,
-                "price": variant.price,
+                "price": discounted_price,
+                "original_price": variant.price,
                 "quantity": variant.quantity,
                 "size": variant.size,
                 "color": variant.color
@@ -115,27 +154,70 @@ class OrderService:
 
             order_detail_dict = {
                 "quantity": item.quantity,
-                "price": variant.price,
+                "price": discounted_price,
                 "product_id": variant.product_id,
                 "product_variant_id": variant.id,
                 "Product": product_dict
             }
 
             order_detail_objs.append(Order_Detail(**order_detail_dict))
-            variant_map[str(variant.id)] = (variant, item.quantity)
 
-        customer, address, special_offer = await self.validate_order_dependencies(
+        return sub_total, total_discount, order_detail_objs, product_offers_to_update
+
+
+    async def apply_order_offer(self, order_offer, sub_total):
+        if not order_offer:
+            return 0
+
+        if order_offer.condition and sub_total < order_offer.condition:
+            return 0
+
+        remaining_quantity = order_offer.total_quantity - order_offer.used_quantity
+        if remaining_quantity < 1:
+            raise Exception(f"Order offer {order_offer.code} đã hết lượt sử dụng")
+
+        order_discount = 0
+        if order_offer.type == "percent":
+            order_discount = int(sub_total * order_offer.discount / 100)
+        elif order_offer.type == "fixed":
+            order_discount = order_offer.discount
+
+        return order_discount
+
+    async def update_offers_usage(self, product_offers_to_update, order_offer, session):
+        for offer_id, quantity_used in product_offers_to_update.items():
+            product_offer = await special_offer_repository.get_special_offer(
+                and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None)),
+                session,
+                []
+            )
+            if product_offer:
+                product_offer.used_quantity += quantity_used
+                product_offer.total_quantity -= quantity_used
+                session.add(product_offer)
+
+        if order_offer:
+            order_offer.used_quantity += 1
+            order_offer.total_quantity -= 1
+            session.add(order_offer)
+
+
+    async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
+        customer, address, order_offer = await self.validate_order_dependencies(
             customer_id, order_data.address_id, order_data.special_offer_id, session
         )
 
-        discount = 0
-        if special_offer and (special_offer.condition is None or sub_total >= special_offer.condition):
-            if special_offer.type == "percent":
-                discount = int(sub_total * special_offer.discount / 100)
-            elif special_offer.type == "fixed":
-                discount = special_offer.discount
+        variant_ids = {item.product_variant_id for item in order_data.order_detail}
+        variant_map = await self.get_variants_with_product_offers(variant_ids, session)
 
-        total_price = sub_total - discount
+        sub_total, product_discount, order_detail_objs, product_offers_to_update = await self.calculate_order_totals(
+            order_data.order_detail, variant_map
+        )
+
+        order_discount = await self.apply_order_offer(order_offer, sub_total)
+
+        total_discount = product_discount + order_discount
+        total_price = sub_total - total_discount
 
         address_dict = {
             "line": address.line,
@@ -150,7 +232,7 @@ class OrderService:
             "code": str(int(time.time() * 1000)),
             "sub_total": sub_total,
             "total_price": total_price,
-            "discount": discount,
+            "discount": total_discount,  # Tổng discount từ cả product + order offers
             "note": order_data.note,
             "payment_method": "vnpay",
             "transaction_no": "",
@@ -159,30 +241,35 @@ class OrderService:
         }
 
         new_order = await order_repository.create_order(new_order_dict, session)
+
         for od in order_detail_objs:
             od.order_id = new_order.id
-
         await order_detail_repository.create_order_detail(order_detail_objs, session)
 
-        for variant, ordered_quantity in variant_map.values():
-            variant.quantity -= ordered_quantity
+        for item in order_data.order_detail:
+            variant = variant_map[item.product_variant_id]
+            variant.quantity -= item.quantity
             session.add(variant)
 
+        await self.update_offers_usage(product_offers_to_update, order_offer, session)
         await session.commit()
 
         response = {
             "order_id": str(new_order.id),
             "sub_total": sub_total,
             "total_price": total_price,
+            "product_discount": product_discount,
+            "order_discount": order_discount,
+            "total_discount": total_discount,
             "note": new_order.note,
-            "special_offer": {
-                "id": str(special_offer.id),
-                "code": special_offer.code,
-                "name": special_offer.name,
-                "discount": special_offer.discount,
-                "condition": special_offer.condition,
-                "type": special_offer.type,
-            } if special_offer else None,
+            "order_offer": {
+                "id": str(order_offer.id),
+                "code": order_offer.code,
+                "name": order_offer.name,
+                "discount": order_offer.discount,
+                "condition": order_offer.condition,
+                "type": order_offer.type,
+            } if order_offer else None,
             "address": {
                 "id": str(address.id),
                 "line": address.line,
@@ -195,7 +282,7 @@ class OrderService:
             "order_detail": [
                 {
                     "quantity": od.quantity,
-                    "price": str(od.price),
+                    "price": str(od.price),  # Giá sau discount
                     "product_id": str(od.product_id),
                     "product_variant_id": str(od.product_variant_id)
                 }
@@ -450,16 +537,25 @@ class OrderService:
         joins = [
             load_only(Order.status),
             noload(Order.user),
-            noload(Order.order_detail),
+            selectinload(Order.order_detail).options(
+                noload(Order_Detail.product),
+                noload(Order_Detail.product_variant),
+                noload(Order_Detail.order),
+                noload(Order_Detail.evaluate),
+            ).load_only(Order_Detail.product_id),
         ]
         order_to_update = await order_repository.get_order(condition, session, joins)
 
         if order_to_update is None:
             OrderException.not_found()
 
+        old_status = order_to_update.status
         status_dict = status.model_dump()
-
         order_after_update = await order_repository.update_order(order_to_update, status_dict, session)
+
+        if order_after_update.status in ["completed", "delivered"] and old_status not in ["completed", "delivered"]:
+            for od in order_after_update.order_detail:
+                await product_repository.update_product_some_field(Product.id == od.product_id, {"popularity_score": Product.popularity_score + 1}, session)
 
         return order_after_update
 

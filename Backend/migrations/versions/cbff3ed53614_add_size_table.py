@@ -27,7 +27,7 @@ def upgrade() -> None:
                     sa.Column('type', sa.VARCHAR(), nullable=False),
                     sa.PrimaryKeyConstraint('id')
                     )
-    op.add_column('categories', sa.Column('type_size', sa.VARCHAR(), nullable=False))
+    op.add_column('categories', sa.Column('type_size', sa.VARCHAR(), nullable=True))
     # ### end Alembic commands ###
     op.execute("""
             INSERT INTO size (id, name, type) VALUES
