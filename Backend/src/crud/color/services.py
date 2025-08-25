@@ -1,3 +1,5 @@
+from sqlalchemy.orm import noload
+
 from src.crud.color.repositories import ColorRepository
 from src.database.models import Color
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -32,8 +34,8 @@ class ColorService:
             ))
 
 
-
-        colors, total = await color_repository.get_all_color(conditions, session, skip, limit)
+        joins = [noload(Color.product_variant)]
+        colors, total = await color_repository.get_all_color(conditions, session, skip, limit, joins)
 
         response = []
         for color in colors:

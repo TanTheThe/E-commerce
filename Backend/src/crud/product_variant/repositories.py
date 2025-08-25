@@ -50,10 +50,6 @@ class ProductVariantRepository:
 
     async def get_all_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         statement = select(Product_Variant).options(
-            noload(Product_Variant.order_detail),
-            noload(Product_Variant.product),
-            noload(Product_Variant.evaluate),
-            noload(Product_Variant.color),
             *joins if joins else []
         )
 

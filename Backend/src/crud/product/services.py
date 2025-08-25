@@ -3,8 +3,9 @@ from collections import defaultdict
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
+from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Order_Detail, Evaluate, \
-    Special_Offer
+    Special_Offer, Size
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc, asc, or_, func, select
 from datetime import datetime
@@ -23,6 +24,7 @@ categories_repository = CategoriesRepository()
 cate_product_repository = CategoriesProductRepository()
 product_variant_repository = ProductVariantRepository()
 color_repository = ColorRepository()
+size_repository = SizeRepository()
 
 product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()
@@ -46,7 +48,13 @@ class ProductService:
         try:
             category_ids = product_data.categories_id
             condition = [Categories.id.in_(category_ids), Categories.deleted_at.is_(None)]
-            existing_categories, total = await categories_repository.get_all_categories(condition, session, 0, 1000)
+            joins = [
+                noload(Categories.categories_product),
+                noload(Categories.products),
+                noload(Categories.children),
+                noload(Categories.parent),
+            ]
+            existing_categories, total = await categories_repository.get_all_categories(condition, session, 0, 1000, joins)
 
             existing_ids = {c.id for c in existing_categories}
             missing_ids = set(category_ids) - existing_ids
@@ -66,7 +74,8 @@ class ProductService:
 
             if color_ids:
                 condition = [Color.id.in_(color_ids), Color.deleted_at.is_(None)]
-                existing_colors, _ = await color_repository.get_all_color(condition, session)
+                joins = [noload(Color.product_variant)]
+                existing_colors, _ = await color_repository.get_all_color(condition, session, 0, 1000, joins)
                 existing_color_ids = {str(c.id) for c in existing_colors}
                 missing_color_ids = set(color_ids) - existing_color_ids
                 if missing_color_ids:
@@ -322,31 +331,49 @@ class ProductService:
 
         return categories_dict
 
-    async def get_top_discount_service(self, session: AsyncSession, limit: int = 12):
-        products = await product_repository.get_top_discount(session, limit)
 
-        product_list = []
-        for product in products:
-            offer_discount = product.discount if product.discount else None
+    async def get_filters_info_service(self, category_id: str, session: AsyncSession):
+        condition_parent_category = and_(Categories.id == category_id, Categories.deleted_at.is_(None))
+        joins_parent_category = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        parent_category = await categories_repository.get_category(condition_parent_category, session, joins_parent_category)
+        if not parent_category:
+            CategoriesException.not_found()
 
-            original_price = product.min_price
-            discounted_price = original_price
+        condition_child_categories = and_(Categories.parent_id == category_id, Categories.deleted_at.is_(None))
+        joins_child_categories = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        child_categories, _ = await categories_repository.get_all_categories(condition_child_categories, session, 0, 1000,
+                                                                          joins_child_categories)
 
-            if offer_discount is not None:
-                raw_discounted_price = original_price * (1 - offer_discount / 100)
-                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+        type_size = parent_category.type_size
+        sizes = await size_repository.get_all_size(Size.type == type_size, session)
 
-            product_list.append({
-                "id": str(product.product_id),
-                "name": product.product_name,
-                "images": product.images,
-                "avg_rating": product.avg_rating,
-                "original_price": original_price,
-                "discounted_price": discounted_price,
-                "categories": product.categories
-            })
+        join_colors = [noload(Color.product_variant)]
+        colors, _ = await color_repository.get_all_color([Color.deleted_at.is_(None)], session, 0, 1000, join_colors)
 
-        return product_list
+        return {
+            "categories": [
+                {"id": str(category.id), "name": category.name}
+                for category in child_categories
+            ],
+            "sizes": [
+                {"id": str(size.id), "name": size.name}
+                for size in sizes
+            ],
+            "colors": [
+                {"id": str(color.id), "name": color.name}
+                for color in colors
+            ]
+        }
 
     async def get_latest_products_service(self, session: AsyncSession, limit_per_category: int = 12):
         condition = [Product.deleted_at.is_(None), Product.status == "active"]
@@ -446,10 +473,41 @@ class ProductService:
 
         return product_list
 
+    async def get_top_discount_service(self, session: AsyncSession, limit: int = 12):
+        products = await product_repository.get_top_discount(session, limit)
+
+        product_list = []
+        for product in products:
+            offer_discount = product.discount if product.discount else None
+
+            original_price = product.min_price
+            discounted_price = original_price
+
+            if offer_discount is not None:
+                raw_discounted_price = original_price * (1 - offer_discount / 100)
+                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+
+            product_list.append({
+                "id": str(product.product_id),
+                "name": product.product_name,
+                "images": product.images,
+                "avg_rating": product.avg_rating,
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "categories": product.categories
+            })
+
+        return product_list
 
     async def get_all_products_customer_service(self, category_id: str, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0, limit: int = 16):
         condition_cate = and_(Categories.id == category_id,Categories.deleted_at.is_(None))
-        category = await categories_repository.get_category(condition_cate, session)
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        category = await categories_repository.get_category(condition_cate, session, joins)
 
         if not category:
             CategoriesException.not_found()

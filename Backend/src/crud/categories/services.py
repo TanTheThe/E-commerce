@@ -4,7 +4,7 @@ from src.errors.size import SizeException
 from src.schemas.categories import CategoriesCreateModel, CategoriesUpdateModel, CategoriesFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, select, func, or_
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, noload
 from src.crud.categories.repositories import CategoriesRepository
 from src.errors.categories import CategoriesException
 import time
@@ -44,12 +44,19 @@ class CategoriesService:
                 "sizes": list(size_map.values())
             }
 
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+
         if filter_data.search:
             filters = [Categories.deleted_at.is_(None), Categories.name.ilike(f"%{filter_data.search}%")]
             if filter_data.type_size:
                 filters.append(Categories.type_size == filter_data.type_size)
 
-            matched_categories, _ = await categories_repository.get_all_categories(filters, session, 0, 1000)
+            matched_categories, _ = await categories_repository.get_all_categories(filters, session, 0, 1000, joins)
 
             matched_parents = [cat for cat in matched_categories if cat.parent_id is None]
             matched_children = [cat for cat in matched_categories if cat.parent_id is not None]
@@ -58,7 +65,8 @@ class CategoriesService:
             additional_parents = []
             if additional_parent_ids:
                 parent_filters = [Categories.deleted_at.is_(None), Categories.id.in_(additional_parent_ids)]
-                additional_parents, _ = await categories_repository.get_all_categories(parent_filters, session, 0, 1000)
+
+                additional_parents, _ = await categories_repository.get_all_categories(parent_filters, session, 0, 1000, joins)
 
             all_relevant_parents = matched_parents + additional_parents
 
@@ -89,12 +97,12 @@ class CategoriesService:
             filters = [Categories.deleted_at.is_(None), Categories.parent_id.is_(None)]
             if filter_data.type_size:
                 filters.append(Categories.type_size.in_(filter_data.type_size))
-            parent_categories, parent_total = await categories_repository.get_all_categories(filters, session, skip, limit)
+            parent_categories, parent_total = await categories_repository.get_all_categories(filters, session, skip, limit, joins)
 
             parent_ids = [cat.id for cat in parent_categories]
             if parent_ids:
                 child_filters = [Categories.deleted_at.is_(None), Categories.parent_id.in_(parent_ids)]
-                child_categories, _ = await categories_repository.get_all_categories(child_filters, session, 0, 1000)
+                child_categories, _ = await categories_repository.get_all_categories(child_filters, session, 0, 1000, joins)
             else:
                 child_categories = []
 
@@ -117,7 +125,13 @@ class CategoriesService:
 
     async def get_detail_category_service(self, id: str, session: AsyncSession):
         condition = and_(Categories.id == id)
-        categories = await categories_repository.get_category(condition, session)
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        categories = await categories_repository.get_category(condition, session, joins)
 
         if categories is None:
             CategoriesException.not_found()
@@ -131,10 +145,15 @@ class CategoriesService:
         }
 
 
-
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):
         condition = and_(Categories.id == id)
-        category = await categories_repository.get_category(condition, session)
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        category = await categories_repository.get_category(condition, session, joins)
 
         if not category:
             CategoriesException.not_found()
@@ -146,7 +165,7 @@ class CategoriesService:
             if str(parent_id) == id:
                 CategoriesException.invalid_parent()
 
-            parent = await categories_repository.get_category(Categories.id == parent_id, session)
+            parent = await categories_repository.get_category(Categories.id == parent_id, session, joins)
             if not parent:
                 CategoriesException.parent_not_found()
 

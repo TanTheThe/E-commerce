@@ -23,13 +23,14 @@ class SpecialOfferRepository:
 
 
     async def get_all_special_offer(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0,
-                            limit: int = 10):
+                            limit: int = 10, joins: list = None):
         count_stmt = select(func.count()).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
         statement = select(Special_Offer).options(
-            noload(Special_Offer.products)).where(*conditions).offset(skip).limit(limit)
+            *joins if joins else []
+        ).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)
         special_offers = result.all()
@@ -60,7 +61,10 @@ class SpecialOfferRepository:
 
 
     async def delete_special_offer(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        special_offer_to_delete = await self.get_special_offer(condition, session)
+        joins = [
+            noload(Special_Offer.products)
+        ]
+        special_offer_to_delete = await self.get_special_offer(condition, session, joins)
 
         if special_offer_to_delete is None:
             SpecialOfferException.not_found_to_delete()

@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from sqlalchemy.orm import noload
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, case
 from sqlalchemy import literal, text
@@ -14,7 +16,13 @@ product_variant_repository = ProductVariantRepository()
 class ProductVariantService:
     async def update_product_variant(self, product_id: str, new_variants: list, session: AsyncSession):
         condition = and_(Product_Variant.product_id == product_id)
-        existing_variants = await product_variant_repository.get_all_product_variant(condition, session)
+        joins_variant = [
+            noload(Product_Variant.order_detail),
+            noload(Product_Variant.product),
+            noload(Product_Variant.evaluate),
+            noload(Product_Variant.color),
+        ]
+        existing_variants = await product_variant_repository.get_all_product_variant(condition, session, joins_variant)
 
         existing_dict = {str(v.id): v for v in existing_variants}
         new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}

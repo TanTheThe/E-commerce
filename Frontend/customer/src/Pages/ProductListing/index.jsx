@@ -1,4 +1,4 @@
-import React, { useState, useEffect  } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../../components/Sidebar";
 import Typography from '@mui/material/Typography';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
@@ -33,16 +33,16 @@ const ProductListing = () => {
     const [categoryName, setCategoryName] = useState('');
 
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage] = useState(16); 
+    const [rowsPerPage] = useState(16);
     const [sortBy, setSortBy] = useState('Newest First');
 
     const [searchVal, setSearchVal] = useState('');
-    const [categoryFilterIds, setCategoryFilterIds] = useState([]);
+    const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
     const [minPrice, setMinPrice] = useState(null);
     const [maxPrice, setMaxPrice] = useState(null);
-    const [colors, setColors] = useState([]);
-    const [sizes, setSizes] = useState([]);
-    const [rating, setRating] = useState([]);
+    const [selectedColors, setSelectedColors] = useState([]);
+    const [selectedSizes, setSelectedSizes] = useState([]);
+    const [selectedRatings, setSelectedRatings] = useState([]);
 
     const open = Boolean(anchorEl);
 
@@ -60,13 +60,13 @@ const ProductListing = () => {
         const filterData = {};
 
         if (searchVal?.trim()) filterData.search = searchVal.trim();
-        if (categoryFilterIds?.length) filterData.category_ids = categoryFilterIds;
-        if (minPrice) filterData.min_price = minPrice;
-        if (maxPrice) filterData.max_price = maxPrice;
+        if (selectedCategoryIds?.length) filterData.category_ids = selectedCategoryIds;
+        if (minPrice !== null && minPrice !== undefined) filterData.min_price = minPrice;
+        if (maxPrice !== null && maxPrice !== undefined) filterData.max_price = maxPrice;
         if (sortBy && sortMapping[sortBy]) filterData.sort_by = sortMapping[sortBy];
-        if (colors?.length) filterData.colors = colors;
-        if (sizes?.length) filterData.sizes = sizes;
-        if (rating?.length) filterData.rating = rating;
+        if (selectedColors?.length) filterData.colors = selectedColors;
+        if (selectedSizes?.length) filterData.sizes = selectedSizes;
+        if (selectedRatings?.length) filterData.rating = selectedRatings;
 
         return filterData;
     };
@@ -82,29 +82,61 @@ const ProductListing = () => {
                 limit: rowsPerPage.toString(),
             });
 
-            if (categoryId) queryParams.append('category_id', categoryId);
-            if (filterData.search) queryParams.append('search', filterData.search);
+            if (categoryId) {
+                queryParams.append('category_id', categoryId);
+            }
+
+            if (filterData.search) {
+                queryParams.append('search', filterData.search);
+            }
+
             if (filterData.category_ids?.length) {
-                filterData.category_ids.forEach(id => queryParams.append('category_ids', id.toString()));
+                filterData.category_ids.forEach(id => {
+                    queryParams.append('category_ids', id.toString());
+                });
             }
-            if (filterData.min_price) queryParams.append('min_price', filterData.min_price.toString());
-            if (filterData.max_price) queryParams.append('max_price', filterData.max_price.toString());
-            if (filterData.sort_by) queryParams.append('sort_by', filterData.sort_by);
+
+            if (filterData.min_price !== null && filterData.min_price !== undefined) {
+                queryParams.append('min_price', filterData.min_price.toString());
+            }
+            if (filterData.max_price !== null && filterData.max_price !== undefined) {
+                queryParams.append('max_price', filterData.max_price.toString());
+            }
+
+            if (filterData.sort_by) {
+                queryParams.append('sort_by', filterData.sort_by);
+            }
+
             if (filterData.colors?.length) {
-                filterData.colors.forEach(c => queryParams.append('colors', c));
+                filterData.colors.forEach(c => {
+                    queryParams.append('colors', c);
+                });
             }
+
             if (filterData.sizes?.length) {
-                filterData.sizes.forEach(s => queryParams.append('sizes', s));
+                filterData.sizes.forEach(s => {
+                    queryParams.append('sizes', s);
+                });
             }
+
             if (filterData.rating?.length) {
-                filterData.rating.forEach(r => queryParams.append('rating', r.toString()));
+                filterData.rating.forEach(r => {
+                    queryParams.append('rating', r.toString());
+                });
             }
+
+            console.log('Query params:', queryParams.toString());
 
             const response = await getDataApi(`/customer/product/category?${queryParams.toString()}`);
 
             if (response.success === true) {
-                setProducts(response.data?.data || []);
-                setTotalProducts(response.data?.data?.length || 0);
+                const products = response.data?.data || [];
+                const total = response.data?.total || 0;
+
+                console.log('Fetched products:', products.length, 'Total:', total);
+
+                setProducts(products);
+                setTotalProducts(total);
             } else {
                 console.error('Failed to fetch products:', response.message);
                 setProducts([]);
@@ -123,7 +155,7 @@ const ProductListing = () => {
         if (categoryId) {
             fetchProducts();
         }
-    }, [categoryId, currentPage, sortBy, searchVal, categoryFilterIds, minPrice, maxPrice, colors, sizes, rating]);
+    }, [categoryId, currentPage, sortBy, searchVal, selectedCategoryIds, minPrice, maxPrice, selectedColors, selectedSizes, selectedRatings]);
 
     const handleSortChange = (option) => {
         setSortBy(option);
@@ -135,16 +167,32 @@ const ProductListing = () => {
         setCurrentPage(page);
     };
 
-    const updateFilters = (newFilters) => {
-        if (newFilters.search !== undefined) setSearchVal(newFilters.search);
-        if (newFilters.category_ids !== undefined) setCategoryFilterIds(newFilters.category_ids);
-        if (newFilters.min_price !== undefined) setMinPrice(newFilters.min_price);
-        if (newFilters.max_price !== undefined) setMaxPrice(newFilters.max_price);
-        if (newFilters.colors !== undefined) setColors(newFilters.colors);
-        if (newFilters.sizes !== undefined) setSizes(newFilters.sizes);
-        if (newFilters.rating !== undefined) setRating(newFilters.rating);
-
+    const handleFilterChange = (filterType, value) => {
         setCurrentPage(1);
+
+        switch (filterType) {
+            case 'categories':
+                setSelectedCategoryIds(value);
+                break;
+            case 'sizes':
+                setSelectedSizes(value);
+                break;
+            case 'colors':
+                setSelectedColors(value);
+                break;
+            case 'price':
+                setMinPrice(value.min);
+                setMaxPrice(value.max);
+                break;
+            case 'rating':
+                setSelectedRatings(value);
+                break;
+            case 'search':
+                setSearchVal(value);
+                break;
+            default:
+                break;
+        }
     };
 
     const totalPages = Math.ceil(totalProducts / rowsPerPage);
@@ -166,17 +214,14 @@ const ProductListing = () => {
                 <div className="container flex gap-3">
                     <div className="sidebarWrapper w-[20%] h-full bg-white">
                         <Sidebar
-                            filters={{
-                                search: searchVal,
-                                category_ids: categoryFilterIds,
-                                min_price: minPrice,
-                                max_price: maxPrice,
-                                colors,
-                                sizes,
-                                rating
-                            }}
-                            onFiltersChange={updateFilters}
-                            loading={loading}
+                            categoryId={categoryId}
+                            onFilterChange={handleFilterChange}
+                            selectedCategoryIds={selectedCategoryIds}
+                            selectedSizes={selectedSizes}
+                            selectedColors={selectedColors}
+                            selectedRatings={selectedRatings}
+                            minPrice={minPrice}
+                            maxPrice={maxPrice}
                         />
                     </div>
 

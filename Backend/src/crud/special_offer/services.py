@@ -85,7 +85,10 @@ class SpecialOfferService:
         elif filter_data.time_status == "expired":
             conditions.append(Special_Offer.end_time < now)
 
-        special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit)
+        joins = [
+            noload(Special_Offer.products)
+        ]
+        special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit, joins=joins)
 
         response = []
         for offer in special_offers:

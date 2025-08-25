@@ -35,10 +35,6 @@ class CategoriesRepository:
         total = total_result.one()
 
         statement = select(Categories).options(
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent),
             *joins if joins else []
         ).where(*conditions).offset(skip).limit(limit)
 
@@ -48,7 +44,7 @@ class CategoriesRepository:
 
         return categories, total
 
-    async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
+    async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         base_condition = Categories.deleted_at.is_(None)
         if conditions is not None:
             combined_condition = and_(base_condition, conditions)
@@ -56,10 +52,7 @@ class CategoriesRepository:
             combined_condition = base_condition
 
         statement = select(Categories).options(
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent)
+            *joins if joins else []
         ).where(combined_condition)
         result = await session.exec(statement)
 
@@ -75,7 +68,13 @@ class CategoriesRepository:
         return data_need_update
 
     async def delete_categories(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        categories_to_delete = await self.get_category(condition, session)
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        categories_to_delete = await self.get_category(condition, session, joins)
 
         if categories_to_delete is None:
             CategoriesException.not_found_to_delete()
@@ -83,7 +82,13 @@ class CategoriesRepository:
         categories_to_delete.deleted_at = datetime.now()
 
     async def delete_sub_categories(self, condition: List[Optional[ColumnElement[bool]]], session: AsyncSession):
-        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000)
+        joins = [
+            noload(Categories.categories_product),
+            noload(Categories.products),
+            noload(Categories.children),
+            noload(Categories.parent),
+        ]
+        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000, joins)
 
         if sub_categories is None:
             CategoriesException.not_found_to_delete()
