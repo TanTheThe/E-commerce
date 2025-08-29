@@ -50,3 +50,7 @@ class SpecialOfferFilterModel(BaseModel):
 class SetOfferToProduct(BaseModel):
     product_id: List[uuid.UUID]
     special_offer_id: uuid.UUID
+
+class AssignOfferToUsers(BaseModel):
+    special_offer_id: uuid.UUID
+    user_ids: List[uuid.UUID]

@@ -73,8 +73,8 @@ const Navigation = ({ categories }) => {
                                         {hasChildren && (
                                             <div
                                                 className={`absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-2 min-w-[200px] z-50 transition-all duration-200 ${activeDropdown === category.id
-                                                        ? 'opacity-100 visible transform translate-y-0'
-                                                        : 'opacity-0 invisible transform -translate-y-2'
+                                                    ? 'opacity-100 visible transform translate-y-0'
+                                                    : 'opacity-0 invisible transform -translate-y-2'
                                                     }`}
                                                 onMouseEnter={() => handleMouseEnter(category.id)}
                                                 onMouseLeave={handleMouseLeave}
@@ -86,7 +86,7 @@ const Navigation = ({ categories }) => {
                                                     {childCategories.map((childCategory) => (
                                                         <Link
                                                             key={childCategory.id}
-                                                            to={`/category/${childCategory.id}`}
+                                                            to={`/category/${category.id}?selected_categories=${childCategory.id}`}
                                                             className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:text-blue-600 hover:bg-blue-50 transition-colors duration-150"
                                                         >
                                                             {childCategory.image && (

@@ -1,13 +1,15 @@
-from sqlalchemy.orm import noload
+from typing import Optional
+
+from sqlalchemy.orm import noload, selectinload
 from starlette.responses import JSONResponse
-from src.database.models import User
+from src.database.models import User, Address, UserSpecialOffer
 from src.errors.authentication import AuthException
 from src.errors.user import UserException
 from src.schemas.user import UserCreateModel, UserReadModel, UserDeleteModel, \
     FilterUserInputModel
 from src.crud.authentication.utils import generate_password_hash, create_url_safe_token, decode_url_safe_token, \
     verify_password
-from sqlmodel import and_, or_, func, desc, asc
+from sqlmodel import and_, or_, func, desc, asc, select
 from src.mail import create_message, mail
 from fastapi import HTTPException, BackgroundTasks
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,10 +19,14 @@ from fastapi import status
 
 user_repository = UserRepository()
 
+
 class UserService:
     async def get_detail_admin_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        user = await user_repository.get_user(condition, session=session)
+        joins = [
+            selectinload(User.address)
+        ]
+        user = await user_repository.get_user(condition, session, joins)
 
         if not user:
             AuthException.user_not_found()
@@ -39,8 +45,8 @@ class UserService:
 
         return filtered_user
 
-
-    async def get_all_customer_service(self, filter_data: FilterUserInputModel, session: AsyncSession, skip: int = 0, limit: int = 10):
+    async def get_all_customer_service(self, filter_data: FilterUserInputModel, session: AsyncSession, skip: int = 0,
+                                       limit: int = 10):
         filters = [User.deleted_at.is_(None)]
 
         if filter_data.search:
@@ -72,7 +78,51 @@ class UserService:
             order_by = [desc(User.created_at)]
 
         condition = and_(*filters) if filters else None
+        users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit)
 
+        filtered_users = [
+            {
+                "id": str(user.id),
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "phone": user.phone,
+                "customer_status": user.customer_status,
+                "created_at": str(user.created_at)
+            }
+            for user in users
+        ]
+
+        return {
+            "data": filtered_users,
+            "total": total
+        }
+
+
+    async def get_all_customer_for_offer_service(self, offer_id: str, search: Optional[str], session: AsyncSession, skip: int = 0,
+                                       limit: int = 10):
+        filters = [User.deleted_at.is_(None)]
+
+        if search:
+            search_term = f"%{search}%"
+            full_name_search = func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
+            filters.append(or_(
+                User.first_name.ilike(search_term),
+                User.last_name.ilike(search_term),
+                User.email.ilike(search_term),
+                full_name_search
+            ))
+
+        subquery = (
+            select(UserSpecialOffer.user_id)
+            .where(UserSpecialOffer.special_offer_id == offer_id)
+            .where(UserSpecialOffer.deleted_at.is_(None))
+        )
+        filters.append(User.id.notin_(subquery))
+
+        order_by = [desc(User.created_at)]
+
+        condition = and_(*filters) if filters else None
         users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit)
 
         filtered_users = [
@@ -109,8 +159,7 @@ class UserService:
 
     async def get_profile_customer_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        joins = [noload(User.address), noload(User.order), noload(User.evaluate)]
-        user = await user_repository.get_user(condition, session, joins)
+        user = await user_repository.get_user(condition, session)
 
         if not user:
             AuthException.user_not_found()
@@ -123,11 +172,10 @@ class UserService:
         }
 
         return filtered_user
-
 
     async def get_profile_admin_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        user = await user_repository.get_user(condition, session=session)
+        user = await user_repository.get_user(condition, session)
 
         if not user:
             AuthException.user_not_found()
@@ -140,7 +188,6 @@ class UserService:
         }
 
         return filtered_user
-
 
     async def update_profile_service(self, user_id: str, update_data, session: AsyncSession):
         condition = and_(User.id == user_id)
@@ -153,7 +200,6 @@ class UserService:
         await session.commit()
 
         return user_after_update
-
 
     async def create_user_account_service(self, user_data: UserCreateModel,
                                           bg_tasks: BackgroundTasks, session: AsyncSession):
@@ -179,10 +225,10 @@ class UserService:
         )
         bg_tasks.add_task(mail.send_message, message)
 
-        user_data_to_return = UserReadModel(id=str(new_user.id), email=new_user.email, first_name=new_user.first_name, last_name=new_user.last_name)
+        user_data_to_return = UserReadModel(id=str(new_user.id), email=new_user.email, first_name=new_user.first_name,
+                                            last_name=new_user.last_name)
 
         return user_data_to_return
-
 
     async def verify_user_account_service(self, token: str, session: AsyncSession):
         token_data = decode_url_safe_token(token, role="customer", purpose="create_account")
@@ -204,10 +250,12 @@ class UserService:
 
         AuthException.authentication_error()
 
-
     async def change_password_service(self, id: str, password_data, session: AsyncSession):
         condition = and_(User.id == id)
         user = await user_repository.get_user(condition, session)
+        if not user:
+            AuthException.user_not_found()
+
         password_valid = verify_password(password_data.old_password, user.password)
 
         if not password_valid:
@@ -218,12 +266,6 @@ class UserService:
 
         if new_password != confirm_password:
             AuthException.password_mismatch()
-
-        condition = and_(User.id == id)
-        user = await user_repository.get_user(condition, session)
-
-        if not user:
-            AuthException.user_not_found()
 
         password_hash = generate_password_hash(new_password)
         await user_repository.update_user(user, {'password': password_hash}, session)

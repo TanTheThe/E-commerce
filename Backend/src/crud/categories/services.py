@@ -4,10 +4,8 @@ from src.errors.size import SizeException
 from src.schemas.categories import CategoriesCreateModel, CategoriesUpdateModel, CategoriesFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, select, func, or_
-from sqlalchemy.orm import aliased
 from src.crud.categories.repositories import CategoriesRepository
 from src.errors.categories import CategoriesException
-import time
 
 categories_repository = CategoriesRepository()
 size_service = SizeService()
@@ -58,6 +56,7 @@ class CategoriesService:
             additional_parents = []
             if additional_parent_ids:
                 parent_filters = [Categories.deleted_at.is_(None), Categories.id.in_(additional_parent_ids)]
+
                 additional_parents, _ = await categories_repository.get_all_categories(parent_filters, session, 0, 1000)
 
             all_relevant_parents = matched_parents + additional_parents
@@ -129,7 +128,6 @@ class CategoriesService:
             "parent_id": str(categories.parent_id) if categories.parent_id else None,
             "type_size": categories.type_size
         }
-
 
 
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):

@@ -180,7 +180,7 @@ const Header = () => {
 
                             <li>
                                 <Tooltip title="Compare" placement="top">
-                                    <IconButton aria-label="cart">
+                                    <IconButton aria-label="compare">
                                         <Badge badgeContent={4} color="secondary">
                                             <IoIosGitCompare />
                                         </Badge>
@@ -190,7 +190,7 @@ const Header = () => {
 
                             <li>
                                 <Tooltip title="Wishlist">
-                                    <IconButton aria-label="cart">
+                                    <IconButton aria-label="wishlist">
                                         <Badge badgeContent={4} color="secondary">
                                             <FaRegHeart />
                                         </Badge>

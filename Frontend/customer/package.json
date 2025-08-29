@@ -17,7 +17,7 @@
     "@mui/styled-engine-sc": "^7.1.1",
     "@tailwindcss/vite": "^4.1.8",
     "axios": "^1.9.0",
-    "lucide-react": "^0.539.0",
+    "lucide-react": "^0.541.0",
     "react": "^19.1.0",
     "react-collapse": "^5.1.1",
     "react-dom": "^19.1.0",

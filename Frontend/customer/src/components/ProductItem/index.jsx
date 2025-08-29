@@ -124,8 +124,8 @@ const ProductItem = ({ product = null }) => {
                 </div>
             </div>
 
-            <div className="info p-3 py-5">
-                <h6 className="text-[13px] !font-[400]">
+            <div className="info p-3 py-6">
+                <h6 className="text-[14px] !font-[400]">
                     <span
                         className="text-gray-600"
                         title={getCategoryNames(product.categories)}
@@ -133,18 +133,24 @@ const ProductItem = ({ product = null }) => {
                         {formatCategories(product.categories)}
                     </span>
                 </h6>
-                <h3 className="text-[13px] title mt-1 font-[500] mb-1 text-[#000]">
+                <h3 className="text-[14px] title mt-1 font-[500] mb-1 text-[#000]">
                     <Link to={`/product/${product.id}`} className="link transition-all hover:text-[#ff5252]">
                         {product.name}
                     </Link>
                 </h3>
-                <Rating
-                    name="product-rating"
-                    value={product.avg_rating || 0}
-                    size="small"
-                    readOnly
-                    precision={0.1}
-                />
+                <div className="flex items-center gap-2 mt-1">
+                    <Rating
+                        name="product-rating"
+                        value={product.avg_rating || 0}
+                        size="small"
+                        readOnly
+                        precision={0.1}
+                    />
+                    <span className="text-gray-400 text-[12px]">|</span>
+                    <span className="text-[13px] text-gray-500">
+                        Đã bán: {product.total_sold || 0}
+                    </span>
+                </div>
 
                 <div className="flex items-center gap-2 mt-2">
                     {product.discounted_price || product.original_price ? (

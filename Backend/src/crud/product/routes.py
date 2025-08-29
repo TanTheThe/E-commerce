@@ -38,9 +38,9 @@ async def get_all_products_customer(category_id: str,
                                     min_price: Optional[int] = None,
                                     max_price: Optional[int] = None,
                                     sort_by: Optional[str] = None,
-                                    colors: Optional[List[str]] = None,
-                                    sizes: Optional[List[str]] = None,
-                                    rating: Optional[List[int]] = Query(None),
+                                    colors: Optional[List[str]] = Query(default=[]),
+                                    sizes: Optional[List[str]] = Query(default=[]),
+                                    rating: Optional[List[int]] = Query(default=[]),
                                     skip: int = 0, limit: int = 16,
                                     session: AsyncSession = Depends(get_session)):
     filter_data = ProductFilterModel(
@@ -117,14 +117,14 @@ async def get_products_top_discount(limit: int = 12, session: AsyncSession = Dep
     )
 
 @product_customer_router.get('/filter-info')
-async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
-    products = await product_service.get_top_discount_service(session, limit)
+async def get_filters_info(category_id: str, session: AsyncSession = Depends(get_session)):
+    filters = await product_service.get_filters_info_service(category_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin của các sản phẩm",
-            "content": products
+            "message": "Thông tin của các bộ lọc",
+            "content": filters
         }
     )
 
@@ -206,22 +206,6 @@ async def get_detail_product_admin(id: str,
             "content": product_dict
         }
     )
-
-
-# @product_customer_router.get('/')
-# async def get_all_product_customer(filter_data: ProductFilterModel,
-#                                    skip: int = 0, limit: int = 16,
-#                                    session: AsyncSession = Depends(get_session)):
-#     product_list_dict = await product_service.get_all_product_customer_service(filter_data, session, skip, limit,
-#                                                                                include_status=False)
-#
-#     return JSONResponse(
-#         status_code=status.HTTP_200_OK,
-#         content={
-#             "message": "Thông tin của các sản phẩm",
-#             "content": product_list_dict
-#         }
-#     )
 
 
 @product_admin_router.get('/offer')

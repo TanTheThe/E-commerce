@@ -94,15 +94,7 @@ class ProductRepository:
 
 
     async def delete_product(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        joins = [
-            noload(Product.order_detail),
-            noload(Product.categories),
-            noload(Product.evaluate),
-            noload(Product.special_offer),
-            noload(Product.categories_product),
-            noload(Product.product_variant),
-        ]
-        product_to_delete = await self.get_product(condition, session, joins)
+        product_to_delete = await self.get_product(condition, session)
 
         if product_to_delete is None:
             raise HTTPException(
@@ -119,15 +111,7 @@ class ProductRepository:
 
     async def delete_multiple_product(self, data: DeleteMultipleProductModel, session: AsyncSession):
         conditions = [Product.id.in_(data.product_ids), Product.deleted_at.is_(None)]
-        joins = [
-            noload(Product.order_detail),
-            noload(Product.categories),
-            noload(Product.evaluate),
-            noload(Product.special_offer),
-            noload(Product.categories_product),
-            noload(Product.product_variant)
-        ]
-        products = await self.get_all_product(conditions, session, joins, 0, 1000)
+        products = await self.get_all_product(conditions, session, None, 0, 1000)
         existing_ids = {str(row.id) for row in products}
         missing_ids = set(data.product_ids) - existing_ids
         if missing_ids:

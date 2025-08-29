@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy import ColumnElement
-from src.database.models import Special_Offer
+from src.database.models import Special_Offer, UserSpecialOffer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, and_, func
 from sqlalchemy.orm import noload
@@ -21,15 +21,30 @@ class SpecialOfferRepository:
 
         return new_special_offer
 
+    async def create_user_special_offer(self, user_special_offer_data, session: AsyncSession):
+        new_special_offer = UserSpecialOffer(
+            **user_special_offer_data
+        )
+        new_special_offer.created_at = datetime.now()
+        session.add(new_special_offer)
+        await session.commit()
+
+        return new_special_offer
+
+    async def bulk_create_user_special_offer(self, user_offers: list[UserSpecialOffer], session: AsyncSession):
+        session.add_all(user_offers)
+        await session.commit()
+        return user_offers
 
     async def get_all_special_offer(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0,
-                            limit: int = 10):
+                            limit: int = 10, joins: list = None):
         count_stmt = select(func.count()).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
         statement = select(Special_Offer).options(
-            noload(Special_Offer.products)).where(*conditions).offset(skip).limit(limit)
+            *joins if joins else []
+        ).where(*conditions).offset(skip).limit(limit)
 
         result = await session.exec(statement)
         special_offers = result.all()
@@ -43,6 +58,17 @@ class SpecialOfferRepository:
         result = await session.exec(statement)
 
         return result.one_or_none()
+
+
+    async def get_all_user_special_offer(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, joins: list = None):
+        statement = select(UserSpecialOffer).options(
+            *joins if joins else []
+        ).where(*conditions)
+
+        result = await session.exec(statement)
+        special_offers = result.all()
+
+        return special_offers
 
 
     async def update_special_offer(self, data_need_update, update_data: dict, session: AsyncSession):

@@ -43,6 +43,9 @@ function App() {
   const [openCartPanel, setOpenCartPanel] = useState(false);
   const [categories, setCategories] = useState([]);
 
+  const [checkoutItems, setCheckoutItems] = useState([]);
+  const [checkoutTotal, setCheckoutTotal] = useState(0);
+
   const { isLogin, setIsLogin, userData, setUserData, isLoading, checkLogin } = useAuth();
 
   const handleCloseProductDetailsModal = () => {
@@ -62,6 +65,40 @@ function App() {
     }
   }
 
+  const addItemsToCheckout = (items, total) => {
+    setCheckoutItems(items);
+    setCheckoutTotal(total);
+  };
+
+  const clearCheckout = () => {
+    setCheckoutItems([]);
+    setCheckoutTotal(0);
+  };
+
+  const updateCheckoutItemQuantity = (cartItemId, newQuantity) => {
+    setCheckoutItems(prev =>
+      prev.map(item =>
+        item.cart_item_id === cartItemId
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    );
+
+    const newTotal = checkoutItems.reduce((total, item) => {
+      const qty = item.cart_item_id === cartItemId ? newQuantity : item.quantity;
+      return total + (item.unit_price * qty);
+    }, 0);
+    setCheckoutTotal(newTotal);
+  };
+
+  const removeCheckoutItem = (cartItemId) => {
+    setCheckoutItems(prev => prev.filter(item => item.cart_item_id !== cartItemId));
+
+    const newItems = checkoutItems.filter(item => item.cart_item_id !== cartItemId);
+    const newTotal = newItems.reduce((total, item) => total + (item.unit_price * item.quantity), 0);
+    setCheckoutTotal(newTotal);
+  };
+
   const values = {
     setOpenProductDetailsModal,
     setOpenCartPanel,
@@ -76,6 +113,12 @@ function App() {
     isLoading,
     categories,
     setCategories,
+    checkoutItems,
+    checkoutTotal,
+    addItemsToCheckout,
+    clearCheckout,
+    updateCheckoutItemQuantity,
+    removeCheckoutItem
   }
 
   return (

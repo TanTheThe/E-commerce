@@ -30,33 +30,21 @@ product_variant_repository = ProductVariantRepository()
 
 class OrderService:
     async def validate_order_dependencies(self, customer_id, address_id, offer_id, session):
-        joins_user = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate),
-        ]
         conditions_user = and_(User.id == customer_id, User.deleted_at.is_(None))
-
-        joins_address = [
-            noload(Address.user),
-        ]
         conditions_address = and_(Address.id == address_id, Address.deleted_at.is_(None))
 
         tasks = [
-            user_repository.get_user(conditions_user, session, joins_user),
-            address_repository.get_address(conditions_address, session, joins_address),
+            user_repository.get_user(conditions_user, session),
+            address_repository.get_address(conditions_address, session),
         ]
 
         if offer_id:
-            joins_special_offer = [
-                noload(Special_Offer.products),
-            ]
             conditions_offer = and_(
                 Special_Offer.id == offer_id,
                 Special_Offer.deleted_at.is_(None),
                 Special_Offer.scope == "order"
             )
-            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session, joins_special_offer))
+            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session))
         else:
             tasks.append(asyncio.sleep(0))
 
@@ -73,30 +61,21 @@ class OrderService:
 
         return customer, address, order_offer
 
-
     async def get_variants_with_product_offers(self, variant_ids, session):
         condition = Product_Variant.id.in_(variant_ids)
         joins = [
             selectinload(Product_Variant.product).options(
-                selectinload(Product.special_offer).options(
-                    noload(Special_Offer.products)
-                ),
-                noload(Product.order_detail),
-                noload(Product.product_variant),
-                noload(Product.evaluate),
-                noload(Product.categories),
-                noload(Product.categories_product),
+                selectinload(Product.special_offer),
             ).load_only(
                 Product.id,
                 Product.name,
                 Product.images,
                 Product.special_offer_id
-            )
+            ),
         ]
 
         variants = await product_variant_repository.get_all_product_variant(condition, session, joins)
         return {str(v.id): v for v in variants}
-
 
     async def calculate_order_totals(self, order_items, variant_map):
         sub_total = 0
@@ -164,7 +143,6 @@ class OrderService:
 
         return sub_total, total_discount, order_detail_objs, product_offers_to_update
 
-
     async def apply_order_offer(self, order_offer, sub_total):
         if not order_offer:
             return 0
@@ -188,8 +166,7 @@ class OrderService:
         for offer_id, quantity_used in product_offers_to_update.items():
             product_offer = await special_offer_repository.get_special_offer(
                 and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None)),
-                session,
-                []
+                session
             )
             if product_offer:
                 product_offer.used_quantity += quantity_used
@@ -200,7 +177,6 @@ class OrderService:
             order_offer.used_quantity += 1
             order_offer.total_quantity -= 1
             session.add(order_offer)
-
 
     async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
         customer, address, order_offer = await self.validate_order_dependencies(
@@ -292,23 +268,13 @@ class OrderService:
 
         return response
 
-
     async def get_detail_order_admin(self, order_id: str, session: AsyncSession):
         joins = [
-            selectinload(Order.order_detail).options(
-                noload(Order_Detail.product),
-                noload(Order_Detail.product_variant),
-                noload(Order_Detail.order),
-                noload(Order_Detail.evaluate),
-            ).load_only(
+            selectinload(Order.order_detail).load_only(
                 Order_Detail.id,
                 Order_Detail.Product
             ),
-            selectinload(Order.user).options(
-                noload(User.address),
-                noload(User.order),
-                noload(User.evaluate),
-            ).load_only(
+            selectinload(Order.user).load_only(
                 User.id,
                 User.first_name,
                 User.last_name,
@@ -374,7 +340,6 @@ class OrderService:
         }
 
         return response
-
 
     async def get_detail_order_customer(self, order_id: str, customer_id: str, session: AsyncSession):
         joins = [
@@ -446,8 +411,8 @@ class OrderService:
 
         return response
 
-
-    async def get_all_order_admin(self, session: AsyncSession, filter_data: OrderFilterModel, skip: int = 0, limit: int = 10):
+    async def get_all_order_admin(self, session: AsyncSession, filter_data: OrderFilterModel, skip: int = 0,
+                                  limit: int = 10):
         conditions = [Order.deleted_at.is_(None), User.deleted_at.is_(None)]
 
         if filter_data.search:
@@ -479,17 +444,16 @@ class OrderService:
             else:
                 order_by.append(asc(Order.created_at))
 
-        joins = [joinedload(Order.user).options(
-                     noload(User.address),
-                     noload(User.order),
-                     noload(User.evaluate),
-                 ).load_only(
-                     User.id,
-                     User.first_name,
-                     User.last_name,
-                     User.deleted_at,
-                 )]
-        orders, total = await order_repository.get_all_order(conditions, session, order_by, skip=skip, limit=limit, joins=joins, join_user=need_user_join)
+        joins = [
+            joinedload(Order.user).load_only(
+                User.id,
+                User.first_name,
+                User.last_name,
+                User.deleted_at,
+            ),
+        ]
+        orders, total = await order_repository.get_all_order(conditions, session, order_by, skip=skip, limit=limit,
+                                                             joins=joins, join_user=need_user_join)
 
         response = []
         for order in orders:
@@ -514,10 +478,9 @@ class OrderService:
             "total": total,
         }
 
-
     async def get_all_order_customer(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
         condition = and_(Order.user_id == user_id)
-        orders = await order_repository.get_all_order(condition, session, skip=skip, limit=limit)
+        orders = await order_repository.get_all_order([condition], session, skip=skip, limit=limit)
 
         response = []
         for order in orders:
@@ -531,18 +494,11 @@ class OrderService:
 
         return response
 
-
     async def update_status(self, order_id, status, session: AsyncSession):
         condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         joins = [
             load_only(Order.status),
-            noload(Order.user),
-            selectinload(Order.order_detail).options(
-                noload(Order_Detail.product),
-                noload(Order_Detail.product_variant),
-                noload(Order_Detail.order),
-                noload(Order_Detail.evaluate),
-            ).load_only(Order_Detail.product_id),
+            selectinload(Order.order_detail).load_only(Order_Detail.product_id),
         ]
         order_to_update = await order_repository.get_order(condition, session, joins)
 
@@ -555,10 +511,11 @@ class OrderService:
 
         if order_after_update.status in ["completed", "delivered"] and old_status not in ["completed", "delivered"]:
             for od in order_after_update.order_detail:
-                await product_repository.update_product_some_field(Product.id == od.product_id, {"popularity_score": Product.popularity_score + 1}, session)
+                await product_repository.update_product_some_field(Product.id == od.product_id,
+                                                                   {"popularity_score": Product.popularity_score + 1},
+                                                                   session)
 
         return order_after_update
-
 
     async def count_new_orders(self, to_date, from_date, session: AsyncSession):
         condition = and_(Order.created_at >= from_date, Order.created_at <= to_date)
@@ -568,7 +525,6 @@ class OrderService:
             OrderException.not_found()
 
         return len(orders)
-
 
     async def get_total_sales(self, today, seven_days_ago, session: AsyncSession):
         condition = and_(Order.created_at >= seven_days_ago, Order.status == "Delivered")
@@ -589,14 +545,3 @@ class OrderService:
             OrderException.fail_get_total_revenue()
 
         return total_revenue
-
-
-
-
-
-
-
-
-
-
-

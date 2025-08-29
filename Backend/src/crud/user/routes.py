@@ -75,6 +75,22 @@ async def get_all_customer(search: Optional[str] = None,
     )
 
 
+@user_admin_router.get('/available-for-offer/{offer_id}', dependencies=[Depends(admin_role_middleware)])
+async def get_all_customer_for_offer(offer_id: str,
+                                     search: Optional[str] = None,
+                                     token_details: dict = Depends(access_token_bearer),
+                                     skip: int = 0, limit: int = 10,
+                                     session: AsyncSession = Depends(get_session)):
+    filtered_users = await user_service.get_all_customer_for_offer_service(offer_id, search, session, skip, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin người dùng",
+            "content": filtered_users
+        }
+    )
+
 @user_customer_router.get('/verify/{token}')
 async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
     try:

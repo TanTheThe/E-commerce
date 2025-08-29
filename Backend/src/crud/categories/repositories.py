@@ -3,7 +3,6 @@ from sqlalchemy import ColumnElement
 from src.database.models import Categories
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, func, and_
-from sqlalchemy.orm import noload
 from datetime import datetime
 from src.errors.categories import CategoriesException
 
@@ -35,10 +34,6 @@ class CategoriesRepository:
         total = total_result.one()
 
         statement = select(Categories).options(
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent),
             *joins if joins else []
         ).where(*conditions).offset(skip).limit(limit)
 
@@ -48,7 +43,7 @@ class CategoriesRepository:
 
         return categories, total
 
-    async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
+    async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         base_condition = Categories.deleted_at.is_(None)
         if conditions is not None:
             combined_condition = and_(base_condition, conditions)
@@ -56,10 +51,7 @@ class CategoriesRepository:
             combined_condition = base_condition
 
         statement = select(Categories).options(
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent)
+            *joins if joins else []
         ).where(combined_condition)
         result = await session.exec(statement)
 

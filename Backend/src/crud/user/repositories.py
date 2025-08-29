@@ -28,15 +28,14 @@ class UserRepository:
         return result.first()
 
 
-    async def get_all_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, order_by: list = None, skip: int = 0, limit: int = 10):
+    async def get_all_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, order_by: list = None, skip: int = 0, limit: int = 10,
+                           joins: list = None):
         count_stmt = select(func.count(User.id)).select_from(User).where(conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
         statement = select(User).options(
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
+            *joins if joins else []
         ).where(conditions)
 
         if order_by:
@@ -91,9 +90,9 @@ class UserRepository:
         return str(user_to_delete.id)
 
     async def delete_multiple_user(self, data: UserDeleteModel, session: AsyncSession):
-        statement = select(User.id).where(User.id.in_(data.user_ids), User.deleted_at.is_(None))
-        result = await session.exec(statement)
-        existing_ids = {str(row) for row in result.all()}
+        condition = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None))
+        users = await self.get_all_user(condition, session, None, 0, 1000)
+        existing_ids = {str(row.id) for row in users}
         missing_ids = set(data.user_ids) - existing_ids
         if missing_ids:
             raise HTTPException(

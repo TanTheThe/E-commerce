@@ -18,6 +18,10 @@ class EvaluateInputModel(BaseModel):
     image: Optional[str] = None
     order_detail_id: str
 
+class EvaluateAdditionalModel(BaseModel):
+    id: str
+    additional_comment: str
+    additional_image: str
 
 class EvaluateCreateModel(BaseModel):
     comment: Optional[str] = None
@@ -37,6 +41,9 @@ class EvaluateReadModel(BaseModel):
 class SupplementEvaluateModel(BaseModel):
     additional_comment: str = None
     additional_image: Optional[str] = None
+
+class ReplyEvaluateModel(BaseModel):
+    seller_reply: str = None
 
 class GetEvaluateByProduct(BaseModel):
     product_variant_id: Optional[str] = None

@@ -1,12 +1,14 @@
+from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, load_only, joinedload, noload
 from collections import defaultdict
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
+from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Order_Detail, Evaluate, \
-    Special_Offer
+    Special_Offer, Size
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, desc, asc, or_, func, select
+from sqlmodel import and_, desc, asc, or_, func, select, case
 from datetime import datetime
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
@@ -23,6 +25,7 @@ categories_repository = CategoriesRepository()
 cate_product_repository = CategoriesProductRepository()
 product_variant_repository = ProductVariantRepository()
 color_repository = ColorRepository()
+size_repository = SizeRepository()
 
 product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()
@@ -66,7 +69,7 @@ class ProductService:
 
             if color_ids:
                 condition = [Color.id.in_(color_ids), Color.deleted_at.is_(None)]
-                existing_colors, _ = await color_repository.get_all_color(condition, session)
+                existing_colors, _ = await color_repository.get_all_color(condition, session, 0, 1000)
                 existing_color_ids = {str(c.id) for c in existing_colors}
                 missing_color_ids = set(color_ids) - existing_color_ids
                 if missing_color_ids:
@@ -87,6 +90,7 @@ class ProductService:
                 "name": new_product.name,
                 "images": new_product.images,
                 "description": new_product.description,
+                "short_description": new_product.short_description,
                 "created_at": str(new_product.created_at),
                 "categories": [
                     {
@@ -108,13 +112,7 @@ class ProductService:
         condition = and_(Product.id == product_id, Product.deleted_at.is_(None))
         joins = [
             selectinload(Product.categories_product).options(
-                noload(Categories_Product.product),
-                joinedload(Categories_Product.categories).options(
-                    noload(Categories.categories_product),
-                    noload(Categories.products),
-                    noload(Categories.children),
-                    noload(Categories.parent)
-                ).load_only(
+                joinedload(Categories_Product.categories).load_only(
                     Categories.id,
                     Categories.name,
                     Categories.parent_id,
@@ -123,12 +121,7 @@ class ProductService:
             ),
 
             selectinload(Product.product_variant).options(
-                noload(Product_Variant.order_detail),
-                noload(Product_Variant.evaluate),
-                noload(Product_Variant.product),
-                joinedload(Product_Variant.color).options(
-                    noload(Color.product_variant)
-                ).load_only(
+                joinedload(Product_Variant.color).load_only(
                     Color.id,
                     Color.name,
                     Color.code,
@@ -138,23 +131,19 @@ class ProductService:
                 Product_Variant.size,
                 Product_Variant.price,
                 Product_Variant.quantity,
+                Product_Variant.image,
                 Product_Variant.sku,
                 Product_Variant.color_name,
                 Product_Variant.color_code,
                 Product_Variant.deleted_at
             ),
 
-            selectinload(Product.special_offer).options(
-                noload(Special_Offer.products)
-            ).load_only(
+            selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.discount,
-                Special_Offer.type
+                Special_Offer.type,
+                Special_Offer.name
             ),
-
-            noload(Product.order_detail),
-            noload(Product.categories),
-            noload(Product.evaluate),
         ]
 
         product_obj = await product_repository.get_product(condition, session, joins)
@@ -179,6 +168,14 @@ class ProductService:
         offer_type = offer.type if offer else None
         offer_discount = offer.discount if offer else None
 
+        offer = product.special_offer
+        product_dict["offer"] = {
+            "id": str(offer.id) if offer else None,
+            "type": offer.type if offer else None,
+            "discount": offer.discount if offer else None,
+            "name": offer.name if offer else None
+        }
+
         product_dict["product_variant"] = []
         for variant in product.product_variant:
             if variant.deleted_at is None:
@@ -196,6 +193,7 @@ class ProductService:
                 variant_data = {
                     "id": str(variant.id),
                     "size": variant.size,
+                    "image": variant.image,
                     "original_price": original_price,
                     "discounted_price": discounted_price,
                     "quantity": variant.quantity,
@@ -232,6 +230,7 @@ class ProductService:
                 "color_id": item.get("color_id"),
                 "color_name": item.get("color_name"),
                 "color_code": item.get("color_code"),
+                "image": item["image"],
                 "original_price": item["original_price"],
                 "discounted_price": item["discounted_price"],
                 "quantity": item["quantity"],
@@ -245,7 +244,9 @@ class ProductService:
             "name": product["name"],
             "images": product["images"],
             "description": product["description"],
+            "short_description": product["short_description"],
             "categories": product["categories"],
+            "offer": product["offer"],
             "status": product["status"],
             "product_variant": product_variant
         }
@@ -262,8 +263,12 @@ class ProductService:
             {
                 "id": str(item["id"]),
                 "size": item["size"],
-                "color": item["color"],
-                "price": item["price"],
+                "image": item["image"],
+                "color_id": item.get("color_id"),
+                "color_name": item.get("color_name"),
+                "color_code": item.get("color_code"),
+                "original_price": item["original_price"],
+                "discounted_price": item["discounted_price"],
                 "quantity": item["quantity"],
             }
             for item in product["product_variant"]
@@ -274,7 +279,12 @@ class ProductService:
             "name": product["name"],
             "images": product["images"],
             "description": product["description"],
+            "short_description": product["short_description"],
             "categories": product["categories"],
+            "total_sold": product["total_sold"],
+            "review_count": product["review_count"],
+            "avg_rating": product["avg_rating"],
+            "offer": product["offer"],
             "product_variant": product_variant
         }
 
@@ -322,31 +332,35 @@ class ProductService:
 
         return categories_dict
 
-    async def get_top_discount_service(self, session: AsyncSession, limit: int = 12):
-        products = await product_repository.get_top_discount(session, limit)
 
-        product_list = []
-        for product in products:
-            offer_discount = product.discount if product.discount else None
+    async def get_filters_info_service(self, category_id: str, session: AsyncSession):
+        condition_parent_category = and_(Categories.id == category_id, Categories.deleted_at.is_(None))
+        parent_category = await categories_repository.get_category(condition_parent_category, session)
+        if not parent_category:
+            CategoriesException.not_found()
 
-            original_price = product.min_price
-            discounted_price = original_price
+        condition_child_categories = [Categories.parent_id == category_id, Categories.deleted_at.is_(None)]
+        child_categories, _ = await categories_repository.get_all_categories(condition_child_categories, session, 0, 1000,)
 
-            if offer_discount is not None:
-                raw_discounted_price = original_price * (1 - offer_discount / 100)
-                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+        type_size = parent_category.type_size
+        sizes = await size_repository.get_all_size(Size.type == type_size, session)
 
-            product_list.append({
-                "id": str(product.product_id),
-                "name": product.product_name,
-                "images": product.images,
-                "avg_rating": product.avg_rating,
-                "original_price": original_price,
-                "discounted_price": discounted_price,
-                "categories": product.categories
-            })
+        colors, _ = await color_repository.get_all_color([Color.deleted_at.is_(None)], session, 0, 1000)
 
-        return product_list
+        return {
+            "categories": [
+                {"id": str(category.id), "name": category.name}
+                for category in child_categories
+            ],
+            "sizes": [
+                {"id": str(size.id), "name": size.name}
+                for size in sizes
+            ],
+            "colors": [
+                {"id": str(color.id), "name": color.name}
+                for color in colors
+            ]
+        }
 
     async def get_latest_products_service(self, session: AsyncSession, limit_per_category: int = 12):
         condition = [Product.deleted_at.is_(None), Product.status == "active"]
@@ -354,15 +368,7 @@ class ProductService:
 
         joins = [
             selectinload(Product.categories).options(
-                noload(Categories.categories_product),
-                noload(Categories.products),
-                noload(Categories.children),
-                joinedload(Categories.parent).options(
-                    noload(Categories.categories_product),
-                    noload(Categories.products),
-                    noload(Categories.children),
-                    noload(Categories.parent)
-                )
+                joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
@@ -370,28 +376,17 @@ class ProductService:
                 Categories.deleted_at
             ),
 
-            selectinload(Product.product_variant).options(
-                noload(Product_Variant.order_detail),
-                noload(Product_Variant.evaluate),
-                noload(Product_Variant.product),
-                noload(Product_Variant.color)
-            ).load_only(
+            selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.deleted_at
             ),
 
-            selectinload(Product.special_offer).options(
-                noload(Special_Offer.products)
-            ).load_only(
+            selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.discount,
                 Special_Offer.type
             ),
-
-            noload(Product.order_detail),
-            noload(Product.categories_product),
-            noload(Product.evaluate),
         ]
 
         products, _ = await product_repository.get_all_product(condition, session, joins, skip=0,
@@ -446,6 +441,31 @@ class ProductService:
 
         return product_list
 
+    async def get_top_discount_service(self, session: AsyncSession, limit: int = 12):
+        products = await product_repository.get_top_discount(session, limit)
+
+        product_list = []
+        for product in products:
+            offer_discount = product.discount if product.discount else None
+
+            original_price = product.min_price
+            discounted_price = original_price
+
+            if offer_discount is not None:
+                raw_discounted_price = original_price * (1 - offer_discount / 100)
+                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+
+            product_list.append({
+                "id": str(product.product_id),
+                "name": product.product_name,
+                "images": product.images,
+                "avg_rating": product.avg_rating,
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "categories": product.categories
+            })
+
+        return product_list
 
     async def get_all_products_customer_service(self, category_id: str, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0, limit: int = 16):
         condition_cate = and_(Categories.id == category_id,Categories.deleted_at.is_(None))
@@ -469,15 +489,7 @@ class ProductService:
 
         joins = [
             selectinload(Product.categories).options(
-                noload(Categories.categories_product),
-                noload(Categories.products),
-                noload(Categories.children),
-                joinedload(Categories.parent).options(
-                    noload(Categories.categories_product),
-                    noload(Categories.products),
-                    noload(Categories.children),
-                    noload(Categories.parent)
-                )
+                joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
@@ -485,28 +497,17 @@ class ProductService:
                 Categories.deleted_at
             ),
 
-            selectinload(Product.product_variant).options(
-                noload(Product_Variant.order_detail),
-                noload(Product_Variant.evaluate),
-                noload(Product_Variant.product),
-                noload(Product_Variant.color)
-            ).load_only(
+            selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.deleted_at
             ),
 
-            selectinload(Product.special_offer).options(
-                noload(Special_Offer.products)
-            ).load_only(
+            selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.discount,
                 Special_Offer.type
             ),
-
-            noload(Product.order_detail),
-            noload(Product.categories_product),
-            noload(Product.evaluate),
         ]
 
         filters, order_by_clause = await self.filter_product(filter_data, session)
@@ -541,6 +542,9 @@ class ProductService:
                 "id": str(product[0].id),
                 "name": product[0].name,
                 "images": product[0].images,
+                "description": product[0].description,
+                "short_description": product[0].short_description,
+                "total_sold": product[0].total_sold,
                 "categories": [
                     {
                         "id": str(category.id),
@@ -563,8 +567,7 @@ class ProductService:
     async def get_category_ids_for_filter(self, category: Categories, session: AsyncSession):
         if category.parent_id is None:
             condition = [Categories.parent_id == category.id, Categories.deleted_at.is_(None)]
-            joins = [noload(Categories.products), noload(Categories.categories_product), noload(Categories.children), noload(Categories.parent)]
-            child_categories, _ = await categories_repository.get_all_categories(condition, session, 0, 1000, joins)
+            child_categories, _ = await categories_repository.get_all_categories(condition, session, 0, 1000)
 
             child_category_ids = [str(row.id) for row in child_categories]
 
@@ -579,15 +582,7 @@ class ProductService:
 
         joins = [
             selectinload(Product.categories).options(
-                noload(Categories.categories_product),
-                noload(Categories.products),
-                noload(Categories.children),
-                joinedload(Categories.parent).options(
-                    noload(Categories.categories_product),
-                    noload(Categories.products),
-                    noload(Categories.children),
-                    noload(Categories.parent)
-                )
+                joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
@@ -595,27 +590,16 @@ class ProductService:
                 Categories.deleted_at
             ),
 
-            selectinload(Product.product_variant).options(
-                noload(Product_Variant.order_detail),
-                noload(Product_Variant.evaluate),
-                noload(Product_Variant.product),
-                noload(Product_Variant.color)
-            ).load_only(
+            selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.deleted_at
             ),
 
-            selectinload(Product.special_offer).options(
-                noload(Special_Offer.products)
-            ).load_only(
+            selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.name,
             ),
-
-            noload(Product.order_detail),
-            noload(Product.evaluate),
-            noload(Product.categories_product),
         ]
 
         filters, order_by_clause = await self.filter_product(filter_data, session)
@@ -685,26 +669,53 @@ class ProductService:
             )
 
         if filter_data.min_price is not None or filter_data.max_price is not None:
+            min_variant_price = (
+                select(func.min(Product_Variant.price))
+                .where(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None)
+                )
+                .correlate(Product)
+                .scalar_subquery()
+            )
+
+            final_price = case(
+                (
+                    and_(
+                        Product.special_offer_id.isnot(None),
+                        exists().where(
+                            and_(
+                                Special_Offer.id == Product.special_offer_id,
+                                Special_Offer.scope == "product",
+                                Special_Offer.start_time <= func.now(),
+                                Special_Offer.end_time >= func.now(),
+                                Special_Offer.deleted_at.is_(None)
+                            )
+                        )
+                    ),
+                    min_variant_price * (1 - (
+                            select(Special_Offer.discount)
+                            .where(Special_Offer.id == Product.special_offer_id)
+                            .scalar_subquery() / 100.0
+                    ))
+                ),
+                else_=min_variant_price
+            )
+
             price_conditions = []
             if filter_data.min_price is not None:
-                price_conditions.append(Product_Variant.price >= filter_data.min_price)
+                price_conditions.append(final_price >= filter_data.min_price)
             if filter_data.max_price is not None:
-                price_conditions.append(Product_Variant.price <= filter_data.max_price)
+                price_conditions.append(final_price <= filter_data.max_price)
 
-            filters.append(
-                Product.product_variant.any(
-                    and_(
-                        *price_conditions,
-                        Product_Variant.deleted_at.is_(None)
-                    )
-                )
-            )
+            if price_conditions:
+                filters.extend(price_conditions)
 
         if filter_data.colors:
             filters.append(
                 Product.product_variant.any(
                     and_(
-                        Product_Variant.color_name.in_(filter_data.colors),
+                        Product_Variant.color_id.in_(filter_data.colors),
                         Product_Variant.deleted_at.is_(None)
                     )
                 )
@@ -784,19 +795,39 @@ class ProductService:
         try:
             condition = and_(Product.id == product_id)
             joins = [
-                noload(Product.order_detail),
-                noload(Product.categories),
-                noload(Product.evaluate),
-                noload(Product.special_offer),
-                noload(Product.categories_product),
-                noload(Product.product_variant),
+                selectinload(Product.categories_product).options(
+                    joinedload(Categories_Product.categories).load_only(
+                        Categories.id,
+                        Categories.name,
+                        Categories.parent_id,
+                        Categories.deleted_at
+                    )
+                ),
+
+                selectinload(Product.product_variant).options(
+                    joinedload(Product_Variant.color).load_only(
+                        Color.id,
+                        Color.name,
+                        Color.code,
+                    )
+                ).load_only(
+                    Product_Variant.id,
+                    Product_Variant.size,
+                    Product_Variant.price,
+                    Product_Variant.quantity,
+                    Product_Variant.image,
+                    Product_Variant.sku,
+                    Product_Variant.color_name,
+                    Product_Variant.color_code,
+                    Product_Variant.deleted_at
+                ),
             ]
             product_to_update = await product_repository.get_product(condition, session, joins)
 
             if not product_to_update:
                 ProductException.not_found()
 
-            product_data_dict = product_data.model_dump(exclude_none=True)
+            product_data_dict = product_data.model_dump()
 
             deleted_ids = product_data_dict.pop("deleted_variant_ids", [])
             if deleted_ids:
@@ -837,10 +868,11 @@ class ProductService:
             {
                 "id": str(item["id"]),
                 "size": item["size"],
+                "image": item["image"],
                 "color_id": str(item.get("color_id")),
                 "color_name": item.get("color_name"),
                 "color_code": item.get("color_code"),
-                "price": item["price"],
+                "price": item["original_price"],
                 "quantity": item["quantity"],
                 "sku": item["sku"]
             }
@@ -852,6 +884,7 @@ class ProductService:
             "name": response["name"],
             "images": response["images"],
             "description": response["description"],
+            "short_description": response["short_description"],
             "categories": response["categories"],
             "product_variant": product_variant
         }
@@ -878,26 +911,13 @@ class ProductService:
     async def get_all_product_for_offer(self, categories_id: list, session: AsyncSession):
         joins = [
             selectinload(Product.categories).options(
-                noload(Categories.categories_product),
-                noload(Categories.products),
-                noload(Categories.children),
-                joinedload(Categories.parent).options(
-                    noload(Categories.categories_product),
-                    noload(Categories.products),
-                    noload(Categories.children),
-                    noload(Categories.parent)
-                )
+                joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
                 Categories.parent_id,
                 Categories.deleted_at
             ),
-            noload(Product.product_variant),
-            noload(Product.order_detail),
-            noload(Product.evaluate),
-            noload(Product.categories_product),
-            noload(Product.special_offer)
         ]
 
         conditions = [

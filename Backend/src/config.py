@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     JWT_VERIFY_OTP_LOGIN_SECRET_ADMIN: str
 
     JWT_ALGORITHM: str
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
+    # REDIS_HOST: str = "localhost"
+    # REDIS_PORT: int = 6379
     DOMAIN: str
     DOMAIN_CLIENT: str
 

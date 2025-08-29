@@ -46,7 +46,6 @@ class OrderRepository:
         total = total_result.one()
 
         statement = select(Order).distinct(Order.id).options(
-            noload(Order.order_detail),
             *joins if joins else []
         ).where(*conditions)
 
@@ -73,8 +72,6 @@ class OrderRepository:
             select(Order)
             .options(
                 load_only(Order.id),
-                noload(Order.user),
-                noload(Order.order_detail),
             )
             .where(base_condition)
         )

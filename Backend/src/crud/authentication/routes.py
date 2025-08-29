@@ -40,28 +40,28 @@ async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSes
     return await auth_service.verify_login_admin_service(user_data, session)
 
 
-@auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
-async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
-    await auth_service.revoke_token_service(token_details, request)
-
-    return JSONResponse(
-        content={
-            "message": "Đăng xuất thành công"
-        },
-        status_code=status.HTTP_200_OK
-    )
-
-
-@auth_customer_router.get("/logout", dependencies=[Depends(customer_role_middleware)])
-async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
-    await auth_service.revoke_token_service(token_details, request)
-
-    return JSONResponse(
-        content={
-            "message": "Đăng xuất thành công"
-        },
-        status_code=status.HTTP_200_OK
-    )
+# @auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
+# async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
+#     await auth_service.revoke_token_service(token_details, request)
+#
+#     return JSONResponse(
+#         content={
+#             "message": "Đăng xuất thành công"
+#         },
+#         status_code=status.HTTP_200_OK
+#     )
+#
+#
+# @auth_customer_router.get("/logout", dependencies=[Depends(customer_role_middleware)])
+# async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
+#     await auth_service.revoke_token_service(token_details, request)
+#
+#     return JSONResponse(
+#         content={
+#             "message": "Đăng xuất thành công"
+#         },
+#         status_code=status.HTTP_200_OK
+#     )
 
 
 @auth_customer_router.post('/forgot-password')

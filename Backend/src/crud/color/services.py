@@ -1,3 +1,5 @@
+from sqlalchemy.orm import noload
+
 from src.crud.color.repositories import ColorRepository
 from src.database.models import Color
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -30,8 +32,6 @@ class ColorService:
                 Color.name.ilike(search_term),
                 Color.code.ilike(search_term),
             ))
-
-
 
         colors, total = await color_repository.get_all_color(conditions, session, skip, limit)
 

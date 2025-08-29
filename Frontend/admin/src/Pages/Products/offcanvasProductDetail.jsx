@@ -58,6 +58,15 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                             </div>
 
                             <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Short Description</h4>
+                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                                        {product.short_description || 'No short description available'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
                                 <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
                                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                     <p className="text-gray-700 leading-relaxed whitespace-pre-line">

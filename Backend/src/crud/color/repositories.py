@@ -22,13 +22,14 @@ class ColorRepository:
         return new_color
 
 
-    async def get_all_color(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0, limit: int = 10):
+    async def get_all_color(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0, limit: int = 10
+                            , joins: list = None):
         count_stmt = select(func.count(Color.id)).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
         statement = select(Color).where(*conditions).options(
-            noload(Color.product_variant)
+            *joins if joins else []
         ).offset(skip).limit(limit)
 
         result = await session.exec(statement)
@@ -46,7 +47,6 @@ class ColorRepository:
             combined_condition = base_condition
 
         statement = select(Color).options(
-            noload(Color.product_variant),
             load_only(Color.name, Color.code, Color.id)
         ).where(combined_condition)
 

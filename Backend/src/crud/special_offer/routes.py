@@ -2,7 +2,7 @@ from fastapi import APIRouter, status, Depends
 from src.crud.special_offer.services import SpecialOfferService
 from src.dependencies import AccessTokenBearer
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
-    SetOfferToProduct
+    SetOfferToProduct, AssignOfferToUsers
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -122,6 +122,20 @@ async def update_special_offer(id: str,
         }
     )
 
+@special_offer_admin_router.post('/assign', dependencies=[Depends(admin_role_middleware)])
+async def assign_offer_to_users(special_offer: AssignOfferToUsers,
+                                token_details: dict = Depends(access_token_bearer),
+                                session: AsyncSession = Depends(get_session)):
+    result = await special_offer_service.assign_offer_to_users_service(special_offer, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Gắn khuyến mãi cho khách hàng thành công",
+            "content": result
+        }
+    )
+
 
 @special_offer_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def delete_categories(id: str, token_details: dict = Depends(access_token_bearer),
@@ -135,3 +149,6 @@ async def delete_categories(id: str, token_details: dict = Depends(access_token_
             "content": special_offer_delete
         }
     )
+
+
+

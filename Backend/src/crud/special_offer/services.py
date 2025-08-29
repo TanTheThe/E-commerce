@@ -1,8 +1,11 @@
 from src.crud.product.repositories import ProductRepository
-from src.database.models import Special_Offer, Product
+from src.crud.user.repositories import UserRepository
+from src.database.models import Special_Offer, Product, User, UserSpecialOffer
+from src.errors.authentication import AuthException
 from src.errors.special_offer import SpecialOfferException
+from src.errors.user import UserException
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
-    SetOfferToProduct
+    SetOfferToProduct, AssignOfferToUsers
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, or_
 from src.crud.special_offer.repositories import SpecialOfferRepository
@@ -12,6 +15,7 @@ from sqlalchemy.orm import noload
 
 special_offer_repository = SpecialOfferRepository()
 product_repository = ProductRepository()
+user_repository = UserRepository()
 
 
 class SpecialOfferService:
@@ -112,8 +116,7 @@ class SpecialOfferService:
     async def update_special_offer_service(self, id: str, special_offer_update: SpecialOfferUpdateModel,
                                            session: AsyncSession):
         condition = and_(Special_Offer.id == id)
-        joins = [noload(Special_Offer.products)]
-        special_offer = await special_offer_repository.get_special_offer(condition, session, joins)
+        special_offer = await special_offer_repository.get_special_offer(condition, session)
 
         if not special_offer:
             SpecialOfferException.not_found()
@@ -174,8 +177,7 @@ class SpecialOfferService:
 
     async def set_offer_to_product_service(self, data: SetOfferToProduct, session: AsyncSession):
         condition_offer = and_(Special_Offer.id == data.special_offer_id, Special_Offer.deleted_at.is_(None))
-        joins_offer = [noload(Special_Offer.products)]
-        special_offer = await special_offer_repository.get_special_offer(condition_offer, session, joins_offer)
+        special_offer = await special_offer_repository.get_special_offer(condition_offer, session)
         if not special_offer:
             SpecialOfferException.not_found()
 
@@ -192,3 +194,56 @@ class SpecialOfferService:
             {"special_offer_id": data.special_offer_id},
             session
         )
+
+    async def assign_offer_to_users_service(self, data: AssignOfferToUsers, session: AsyncSession):
+        condition_offer = and_(Special_Offer.id == data.special_offer_id, Special_Offer.deleted_at.is_(None))
+        special_offer = await special_offer_repository.get_special_offer(condition_offer, session)
+        if not special_offer:
+            SpecialOfferException.not_found()
+
+        if special_offer.scope != "order":
+            SpecialOfferException.invalid_scope_for_product()
+
+        now = datetime.utcnow()
+        if not (special_offer.start_time <= now <= special_offer.end_time):
+            SpecialOfferException.expired_or_not_started()
+
+        condition_user = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None), User.customer_status == 'active')
+        existing_users, _ = await user_repository.get_all_user(condition_user, session=session)
+        existing_user_ids = {user.id for user in existing_users}
+
+        missing_user_ids = set(data.user_ids) - existing_user_ids
+        if missing_user_ids:
+            AuthException.user_not_found()
+
+        condition = [
+            UserSpecialOffer.special_offer_id == data.special_offer_id,
+            UserSpecialOffer.user_id.in_(list(existing_user_ids))
+        ]
+        existing_assignments = await special_offer_repository.get_all_user_special_offer(condition, session=session)
+        already_assigned_user_ids = {assignment.user_id for assignment in existing_assignments}
+        if already_assigned_user_ids:
+            SpecialOfferException.exists_user_special_offer()
+
+        user_offers = [
+            UserSpecialOffer(
+                special_offer_id=data.special_offer_id,
+                user_id=user_id,
+                created_at=datetime.now()
+            )
+            for user_id in existing_user_ids
+        ]
+        await special_offer_repository.bulk_create_user_special_offer(user_offers, session=session)
+
+        return {
+            "special_offer_id": str(data.special_offer_id),
+            "user_ids": list(str(existing_user_ids))
+        }
+
+
+
+
+
+
+
+
