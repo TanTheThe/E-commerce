@@ -33,7 +33,8 @@ import AddSpecialOffer from "./addSpecialOffer";
 import EditSpecialOffer from "./editSpecialOffer";
 import { debounce } from "lodash";
 import AssignOfferToProducts from "./assignSpecialOffer";
-import { MdAssignment } from "react-icons/md";
+import { MdAssignment, MdPersonAdd } from "react-icons/md";
+import AssignOfferToUsers from "./assignSpecialOfferUsers";
 
 const columns = [
     { id: 'code', label: 'CODE', minWidth: 100, align: 'center' },
@@ -73,6 +74,8 @@ const SpecialOffer = () => {
 
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [offerToAssign, setOfferToAssign] = useState(null);
+    const [assignUserDialogOpen, setAssignUserDialogOpen] = useState(false);
+    const [offerToAssignUser, setOfferToAssignUser] = useState(null);
 
     const context = useContext(MyContext);
 
@@ -191,6 +194,16 @@ const SpecialOffer = () => {
     const closeAssignDialog = () => {
         setAssignDialogOpen(false);
         setOfferToAssign(null);
+    };
+
+    const openAssignUserDialog = (offer) => {
+        setOfferToAssignUser(offer);
+        setAssignUserDialogOpen(true);
+    };
+
+    const closeAssignUserDialog = () => {
+        setAssignUserDialogOpen(false);
+        setOfferToAssignUser(null);
     };
 
     const handleDeleteOffer = async () => {
@@ -536,6 +549,16 @@ const SpecialOffer = () => {
                                                                 </Button>
                                                             )}
 
+                                                            {offer.scope === 'order' && (
+                                                                <Button
+                                                                    className="!w-[35px] !h-[35px] bg-blue-50 !border-blue-200 !rounded-full hover:!bg-blue-100 !min-w-[35px]"
+                                                                    onClick={() => openAssignUserDialog(offer)}
+                                                                    title="Gắn người dùng"
+                                                                >
+                                                                    <MdPersonAdd className="text-blue-600 text-[18px]" />
+                                                                </Button>
+                                                            )}
+
                                                             <Button
                                                                 className="!w-[35px] !h-[35px] bg-[#f1f1f1] !border-[rgba(0,0,0,0.4)] !rounded-full hover:!bg-[#e1e1e1] !min-w-[35px]"
                                                                 onClick={() => {
@@ -627,6 +650,15 @@ const SpecialOffer = () => {
                 open={assignDialogOpen}
                 onClose={closeAssignDialog}
                 offer={offerToAssign}
+                onSuccess={() => {
+                    fetchOffers(page, rowsPerPage, searchTerm);
+                }}
+            />
+
+            <AssignOfferToUsers
+                open={assignUserDialogOpen}
+                onClose={closeAssignUserDialog}
+                offer={offerToAssignUser}
                 onSuccess={() => {
                     fetchOffers(page, rowsPerPage, searchTerm);
                 }}

@@ -30,33 +30,21 @@ product_variant_repository = ProductVariantRepository()
 
 class OrderService:
     async def validate_order_dependencies(self, customer_id, address_id, offer_id, session):
-        joins_user = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate),
-        ]
         conditions_user = and_(User.id == customer_id, User.deleted_at.is_(None))
-
-        joins_address = [
-            noload(Address.user),
-        ]
         conditions_address = and_(Address.id == address_id, Address.deleted_at.is_(None))
 
         tasks = [
-            user_repository.get_user(conditions_user, session, joins_user),
-            address_repository.get_address(conditions_address, session, joins_address),
+            user_repository.get_user(conditions_user, session),
+            address_repository.get_address(conditions_address, session),
         ]
 
         if offer_id:
-            joins_special_offer = [
-                noload(Special_Offer.products),
-            ]
             conditions_offer = and_(
                 Special_Offer.id == offer_id,
                 Special_Offer.deleted_at.is_(None),
                 Special_Offer.scope == "order"
             )
-            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session, joins_special_offer))
+            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session))
         else:
             tasks.append(asyncio.sleep(0))
 
@@ -77,23 +65,13 @@ class OrderService:
         condition = Product_Variant.id.in_(variant_ids)
         joins = [
             selectinload(Product_Variant.product).options(
-                selectinload(Product.special_offer).options(
-                    noload(Special_Offer.products)
-                ),
-                noload(Product.order_detail),
-                noload(Product.product_variant),
-                noload(Product.evaluate),
-                noload(Product.categories),
-                noload(Product.categories_product),
+                selectinload(Product.special_offer),
             ).load_only(
                 Product.id,
                 Product.name,
                 Product.images,
                 Product.special_offer_id
             ),
-            noload(Product_Variant.evaluate),
-            noload(Product_Variant.color),
-            noload(Product_Variant.order_detail),
         ]
 
         variants = await product_variant_repository.get_all_product_variant(condition, session, joins)
@@ -185,12 +163,10 @@ class OrderService:
         return order_discount
 
     async def update_offers_usage(self, product_offers_to_update, order_offer, session):
-        joins = [noload(Special_Offer.products)]
         for offer_id, quantity_used in product_offers_to_update.items():
             product_offer = await special_offer_repository.get_special_offer(
                 and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None)),
-                session,
-                joins
+                session
             )
             if product_offer:
                 product_offer.used_quantity += quantity_used
@@ -294,20 +270,11 @@ class OrderService:
 
     async def get_detail_order_admin(self, order_id: str, session: AsyncSession):
         joins = [
-            selectinload(Order.order_detail).options(
-                noload(Order_Detail.product),
-                noload(Order_Detail.product_variant),
-                noload(Order_Detail.order),
-                noload(Order_Detail.evaluate),
-            ).load_only(
+            selectinload(Order.order_detail).load_only(
                 Order_Detail.id,
                 Order_Detail.Product
             ),
-            selectinload(Order.user).options(
-                noload(User.address),
-                noload(User.order),
-                noload(User.evaluate),
-            ).load_only(
+            selectinload(Order.user).load_only(
                 User.id,
                 User.first_name,
                 User.last_name,
@@ -478,17 +445,12 @@ class OrderService:
                 order_by.append(asc(Order.created_at))
 
         joins = [
-            joinedload(Order.user).options(
-                noload(User.address),
-                noload(User.order),
-                noload(User.evaluate),
-            ).load_only(
+            joinedload(Order.user).load_only(
                 User.id,
                 User.first_name,
                 User.last_name,
                 User.deleted_at,
             ),
-            noload(Order.order_detail)
         ]
         orders, total = await order_repository.get_all_order(conditions, session, order_by, skip=skip, limit=limit,
                                                              joins=joins, join_user=need_user_join)
@@ -518,11 +480,7 @@ class OrderService:
 
     async def get_all_order_customer(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
         condition = and_(Order.user_id == user_id)
-        joins = [
-            noload(Order.user),
-            noload(Order.order_detail)
-        ]
-        orders = await order_repository.get_all_order([condition], session, skip=skip, limit=limit, joins=joins)
+        orders = await order_repository.get_all_order([condition], session, skip=skip, limit=limit)
 
         response = []
         for order in orders:
@@ -540,13 +498,7 @@ class OrderService:
         condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         joins = [
             load_only(Order.status),
-            noload(Order.user),
-            selectinload(Order.order_detail).options(
-                noload(Order_Detail.product),
-                noload(Order_Detail.product_variant),
-                noload(Order_Detail.order),
-                noload(Order_Detail.evaluate),
-            ).load_only(Order_Detail.product_id),
+            selectinload(Order.order_detail).load_only(Order_Detail.product_id),
         ]
         order_to_update = await order_repository.get_order(condition, session, joins)
 

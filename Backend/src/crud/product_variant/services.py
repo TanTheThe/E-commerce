@@ -1,5 +1,5 @@
 from datetime import datetime
-
+import uuid
 from sqlalchemy.orm import noload
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, case
@@ -16,13 +16,7 @@ product_variant_repository = ProductVariantRepository()
 class ProductVariantService:
     async def update_product_variant(self, product_id: str, new_variants: list, session: AsyncSession):
         condition = and_(Product_Variant.product_id == product_id)
-        joins_variant = [
-            noload(Product_Variant.order_detail),
-            noload(Product_Variant.product),
-            noload(Product_Variant.evaluate),
-            noload(Product_Variant.color),
-        ]
-        existing_variants = await product_variant_repository.get_all_product_variant(condition, session, joins_variant)
+        existing_variants = await product_variant_repository.get_all_product_variant(condition, session)
 
         existing_dict = {str(v.id): v for v in existing_variants}
         new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}
@@ -51,24 +45,28 @@ class ProductVariantService:
                 ColorException.invalid_color_format()
 
             if data.get("color_id") and (not data.get("color_name") and not data.get("color_code")):
+                sku = data["sku"] or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
                 to_update_data[UUID(variant_id)] = {
                     "size": data.get("size"),
+                    "image": data.get("image"),
                     "color_id": UUID(data.get("color_id")),
                     "price": data["price"],
                     "quantity": data["quantity"],
-                    "sku": data["sku"],
+                    "sku": sku,
                     "deleted_at": None,
                     "updated_at": datetime.now()
                 }
 
             if not data.get("color_id") and (data.get("color_name") and data.get("color_code")):
+                sku = data["sku"] or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
                 to_update_data[UUID(variant_id)] = {
                     "size": data.get("size"),
+                    "image": data.get("image"),
                     "color_name": data.get("color_name"),
                     "color_code": data.get("color_code"),
                     "price": data["price"],
                     "quantity": data["quantity"],
-                    "sku": data["sku"],
+                    "sku": sku,
                     "deleted_at": None,
                     "updated_at": datetime.now()
                 }
@@ -101,6 +99,7 @@ class ProductVariantService:
         condition = Product_Variant.id.in_(ids)
         values_dict = {
             "size": build_case("size"),
+            "image": build_case("image"),
             "color_id": build_case("color_id"),
             "color_name": build_case("color_name"),
             "color_code": build_case("color_code"),

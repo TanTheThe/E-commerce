@@ -38,9 +38,13 @@ class User(SQLModel, table=True):
     expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
 
-    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'selectin'})
-    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'selectin'})
-    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'selectin'})
+    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    user_special_offer: List["UserSpecialOffer"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={'lazy': 'noload'}
+    )
 
 
 class Address(SQLModel, table=True):
@@ -66,7 +70,7 @@ class Address(SQLModel, table=True):
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     user_id: uuid.UUID = Field(foreign_key="user.id")
 
-    user: Optional["User"] = Relationship(back_populates="address", sa_relationship_kwargs={'lazy': 'selectin'})
+    user: Optional["User"] = Relationship(back_populates="address", sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Order(SQLModel, table=True):
@@ -95,9 +99,9 @@ class Order(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
     Address: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
 
-    user: Optional["User"] = Relationship(back_populates="order", sa_relationship_kwargs={'lazy': 'joined'})
+    user: Optional["User"] = Relationship(back_populates="order", sa_relationship_kwargs={'lazy': 'noload'})
     order_detail: List["Order_Detail"] = Relationship(back_populates="order",
-                                                      sa_relationship_kwargs={'lazy': 'selectin'})
+                                                      sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Order_Detail(SQLModel, table=True):
@@ -122,10 +126,10 @@ class Order_Detail(SQLModel, table=True):
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
-    product: Optional["Product"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'joined'})
-    product_variant: Optional["Product_Variant"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'joined'})
-    order: Optional["Order"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'joined'})
-    evaluate: Optional["Evaluate"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'joined', "uselist": False})
+    product: Optional["Product"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'noload'})
+    order: Optional["Order"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'noload'})
+    evaluate: Optional["Evaluate"] = Relationship(back_populates="order_detail", sa_relationship_kwargs={'lazy': 'noload', "uselist": False})
 
 
 class Categories_Product(SQLModel, table=True):
@@ -147,9 +151,9 @@ class Categories_Product(SQLModel, table=True):
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     categories: Optional["Categories"] = Relationship(back_populates="categories_product",
-                                                                  sa_relationship_kwargs={'lazy': 'joined'})
+                                                                  sa_relationship_kwargs={'lazy': 'noload'})
     product: Optional["Product"] = Relationship(back_populates="categories_product",
-                                                sa_relationship_kwargs={'lazy': 'joined'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Product(SQLModel, table=True):
@@ -167,8 +171,10 @@ class Product(SQLModel, table=True):
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     images: List[str] = Field(sa_column=Column(JSONB, nullable=False))
     description: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    short_description: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
     popularity_score: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
     total_sold: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"),default=0)
+    review_count: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
     avg_rating: Optional[float] = Field(sa_column=Column(pg.FLOAT, nullable=False, server_default="0"), default=0.0)
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
     special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", default=None, nullable=True)
@@ -176,12 +182,12 @@ class Product(SQLModel, table=True):
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
-    order_detail: List["Order_Detail"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'selectin'})
-    categories_product: List["Categories_Product"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'selectin'})
-    product_variant: List["Product_Variant"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'selectin'})
-    evaluate: List["Evaluate"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'selectin'})
-    categories: List["Categories"] = Relationship(back_populates="products", link_model=Categories_Product, sa_relationship_kwargs={'lazy': 'selectin'})
-    special_offer: Optional["Special_Offer"] = Relationship(back_populates="products", sa_relationship_kwargs={'lazy': 'selectin'})
+    order_detail: List["Order_Detail"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    categories_product: List["Categories_Product"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: List["Product_Variant"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    evaluate: List["Evaluate"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    categories: List["Categories"] = Relationship(back_populates="products", link_model=Categories_Product, sa_relationship_kwargs={'lazy': 'noload'})
+    special_offer: Optional["Special_Offer"] = Relationship(back_populates="products", sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Product_Variant(SQLModel, table=True):
@@ -200,6 +206,7 @@ class Product_Variant(SQLModel, table=True):
     price: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     sku: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    image: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -211,13 +218,13 @@ class Product_Variant(SQLModel, table=True):
     color_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
 
     order_detail: List["Order_Detail"] = Relationship(back_populates="product_variant",
-                                                      sa_relationship_kwargs={'lazy': 'selectin'})
+                                                      sa_relationship_kwargs={'lazy': 'noload'})
     product: Optional["Product"] = Relationship(back_populates="product_variant",
-                                                sa_relationship_kwargs={'lazy': 'joined'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
     evaluate: List["Evaluate"] = Relationship(back_populates="product_variant",
-                                              sa_relationship_kwargs={'lazy': 'selectin'})
+                                              sa_relationship_kwargs={'lazy': 'noload'})
     color: Optional["Color"] = Relationship(back_populates="product_variant",
-                                                sa_relationship_kwargs={'lazy': 'joined'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Categories(SQLModel, table=True):
@@ -241,11 +248,11 @@ class Categories(SQLModel, table=True):
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     categories_product: List["Categories_Product"] = Relationship(back_populates="categories",
-                                                sa_relationship_kwargs={'lazy': 'selectin'})
-    products: List["Product"] = Relationship(back_populates="categories", link_model=Categories_Product, sa_relationship_kwargs={'lazy': 'selectin'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
+    products: List["Product"] = Relationship(back_populates="categories", link_model=Categories_Product, sa_relationship_kwargs={'lazy': 'noload'})
     parent: Optional["Categories"] = Relationship(
         back_populates="children",
-        sa_relationship_kwargs={"remote_side": "Categories.id", "lazy": "joined"}
+        sa_relationship_kwargs={"remote_side": "Categories.id", "lazy": "noload"}
     )
     children: List["Categories"] = Relationship(
         back_populates="parent",
@@ -276,6 +283,8 @@ class Evaluate(SQLModel, table=True):
     additional_image: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     additional_created_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    seller_reply: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    seller_reply_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     product_id: uuid.UUID = Field(foreign_key="product.id")
@@ -284,13 +293,13 @@ class Evaluate(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
 
     order_detail: Optional["Order_Detail"] = Relationship(back_populates="evaluate",
-                                                      sa_relationship_kwargs={'lazy': 'joined', "uselist": False})
+                                                      sa_relationship_kwargs={'lazy': 'noload', "uselist": False})
     product: Optional["Product"] = Relationship(back_populates="evaluate",
-                                                sa_relationship_kwargs={'lazy': 'joined'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
     user: Optional["User"] = Relationship(back_populates="evaluate",
-                                                sa_relationship_kwargs={'lazy': 'joined'})
+                                                sa_relationship_kwargs={'lazy': 'noload'})
     product_variant: Optional["Product_Variant"] = Relationship(back_populates="evaluate",
-                                                            sa_relationship_kwargs={'lazy': 'joined'})
+                                                            sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Special_Offer(SQLModel, table=True):
@@ -319,7 +328,43 @@ class Special_Offer(SQLModel, table=True):
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
-    products: List["Product"] = Relationship(back_populates="special_offer", sa_relationship_kwargs={"lazy": "selectin"})
+    products: List["Product"] = Relationship(back_populates="special_offer", sa_relationship_kwargs={"lazy": "noload"})
+    user_special_offer: List["UserSpecialOffer"] = Relationship(
+        back_populates="special_offer",
+        sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
+class UserSpecialOffer(SQLModel, table=True):
+    __tablename__ = 'user_special_offer'
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "special_offer_id",
+            name="uq_user_special_offer"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    special_offer_id: uuid.UUID = Field(foreign_key="special_offer.id")
+    is_used: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    used_at: Optional[datetime] = Field(default=None)
+
+    user: Optional["User"] = Relationship(back_populates="user_special_offer", sa_relationship_kwargs={'lazy': 'noload'})
+    special_offer: Optional["Special_Offer"] = Relationship(back_populates="user_special_offer",
+                                                sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Color(SQLModel, table=True):
@@ -341,7 +386,7 @@ class Color(SQLModel, table=True):
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     product_variant: List["Product_Variant"] = Relationship(back_populates="color",
-                                                                sa_relationship_kwargs={'lazy': 'selectin'})
+                                                                sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Size(SQLModel, table=True):
@@ -358,3 +403,49 @@ class Size(SQLModel, table=True):
 
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, index=True))
+
+
+class Cart(SQLModel, table=True):
+    __tablename__ = "cart"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4)
+    )
+
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
+
+    user: Optional["User"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    items: List["Cart_Item"] = Relationship(back_populates="cart", sa_relationship_kwargs={"lazy": "noload"})
+
+
+class Cart_Item(SQLModel, table=True):
+    __tablename__ = "cart_item"
+    __table_args__ = (
+        UniqueConstraint(
+            "cart_id", "product_id", "product_variant_id",
+            name="uq_cart_item_cart_product_variant"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4)
+    )
+
+    cart_id: uuid.UUID = Field(foreign_key="cart.id", nullable=False)
+    product_id: uuid.UUID = Field(foreign_key="product.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=True)
+
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="1"), default=1)
+    price: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
+
+    cart: Optional["Cart"] = Relationship(back_populates="items", sa_relationship_kwargs={"lazy": "noload"})
+    product: Optional["Product"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})

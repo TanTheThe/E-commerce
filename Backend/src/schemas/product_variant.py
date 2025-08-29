@@ -18,16 +18,18 @@ class ProductVariantCreateModel(BaseModel):
     color_id: Optional[str] = None
     color_name: Optional[str] = None
     color_code: Optional[str] = None
+    image: str
     price: int
     quantity: int
-    sku: str
+    sku: Optional[str] = None
 
 class ProductVariantUpdateModel(BaseModel):
-    id: Optional[str]
+    id: Optional[str] = None
     size: Optional[str] = None
+    image: Optional[str] = None
     color_id: Optional[str] = None
     color_name: Optional[str] = None
     color_code: Optional[str] = None
     price: int
     quantity: int
-    sku: str
+    sku: Optional[str] = None

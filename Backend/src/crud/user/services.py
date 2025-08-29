@@ -1,13 +1,15 @@
+from typing import Optional
+
 from sqlalchemy.orm import noload, selectinload
 from starlette.responses import JSONResponse
-from src.database.models import User, Address
+from src.database.models import User, Address, UserSpecialOffer
 from src.errors.authentication import AuthException
 from src.errors.user import UserException
 from src.schemas.user import UserCreateModel, UserReadModel, UserDeleteModel, \
     FilterUserInputModel
 from src.crud.authentication.utils import generate_password_hash, create_url_safe_token, decode_url_safe_token, \
     verify_password
-from sqlmodel import and_, or_, func, desc, asc
+from sqlmodel import and_, or_, func, desc, asc, select
 from src.mail import create_message, mail
 from fastapi import HTTPException, BackgroundTasks
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -22,11 +24,7 @@ class UserService:
     async def get_detail_admin_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
         joins = [
-            selectinload(User.address).options(
-                noload(Address.user)
-            ),
-            noload(User.evaluate),
-            noload(User.order)
+            selectinload(User.address)
         ]
         user = await user_repository.get_user(condition, session, joins)
 
@@ -80,12 +78,52 @@ class UserService:
             order_by = [desc(User.created_at)]
 
         condition = and_(*filters) if filters else None
-        joins = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
+        users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit)
+
+        filtered_users = [
+            {
+                "id": str(user.id),
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "phone": user.phone,
+                "customer_status": user.customer_status,
+                "created_at": str(user.created_at)
+            }
+            for user in users
         ]
-        users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit, joins)
+
+        return {
+            "data": filtered_users,
+            "total": total
+        }
+
+
+    async def get_all_customer_for_offer_service(self, offer_id: str, search: Optional[str], session: AsyncSession, skip: int = 0,
+                                       limit: int = 10):
+        filters = [User.deleted_at.is_(None)]
+
+        if search:
+            search_term = f"%{search}%"
+            full_name_search = func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
+            filters.append(or_(
+                User.first_name.ilike(search_term),
+                User.last_name.ilike(search_term),
+                User.email.ilike(search_term),
+                full_name_search
+            ))
+
+        subquery = (
+            select(UserSpecialOffer.user_id)
+            .where(UserSpecialOffer.special_offer_id == offer_id)
+            .where(UserSpecialOffer.deleted_at.is_(None))
+        )
+        filters.append(User.id.notin_(subquery))
+
+        order_by = [desc(User.created_at)]
+
+        condition = and_(*filters) if filters else None
+        users, total = await user_repository.get_all_user(condition, session, order_by, skip, limit)
 
         filtered_users = [
             {
@@ -121,8 +159,7 @@ class UserService:
 
     async def get_profile_customer_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        joins = [noload(User.address), noload(User.order), noload(User.evaluate)]
-        user = await user_repository.get_user(condition, session, joins)
+        user = await user_repository.get_user(condition, session)
 
         if not user:
             AuthException.user_not_found()
@@ -138,12 +175,7 @@ class UserService:
 
     async def get_profile_admin_service(self, id: str, session: AsyncSession):
         condition = and_(User.id == id)
-        joins = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
-        ]
-        user = await user_repository.get_user(condition, session, joins)
+        user = await user_repository.get_user(condition, session)
 
         if not user:
             AuthException.user_not_found()
@@ -159,12 +191,7 @@ class UserService:
 
     async def update_profile_service(self, user_id: str, update_data, session: AsyncSession):
         condition = and_(User.id == user_id)
-        joins = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
-        ]
-        user_need_update = await user_repository.get_user(condition, session, joins)
+        user_need_update = await user_repository.get_user(condition, session)
 
         if not user_need_update:
             AuthException.user_not_found()
@@ -179,12 +206,7 @@ class UserService:
         email = user_data.email
 
         condition = and_(User.email == email)
-        joins = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
-        ]
-        user_exists = await user_repository.get_user(condition, session, joins)
+        user_exists = await user_repository.get_user(condition, session)
         if user_exists:
             UserException.email_exists()
 
@@ -217,12 +239,7 @@ class UserService:
 
         if user_email:
             condition = and_(User.email == user_email)
-            joins = [
-                noload(User.address),
-                noload(User.order),
-                noload(User.evaluate)
-            ]
-            user = await user_repository.get_user(condition, session, joins)
+            user = await user_repository.get_user(condition, session)
 
             if not user:
                 AuthException.user_not_found()
@@ -235,12 +252,7 @@ class UserService:
 
     async def change_password_service(self, id: str, password_data, session: AsyncSession):
         condition = and_(User.id == id)
-        joins = [
-            noload(User.address),
-            noload(User.order),
-            noload(User.evaluate)
-        ]
-        user = await user_repository.get_user(condition, session, joins)
+        user = await user_repository.get_user(condition, session)
         if not user:
             AuthException.user_not_found()
 

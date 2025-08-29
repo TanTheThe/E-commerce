@@ -72,8 +72,6 @@ class OrderRepository:
             select(Order)
             .options(
                 load_only(Order.id),
-                noload(Order.user),
-                noload(Order.order_detail),
             )
             .where(base_condition)
         )

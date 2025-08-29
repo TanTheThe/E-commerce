@@ -17,13 +17,7 @@ class CategoriesProductService:
         await categories_product_repository.delete_cate_product(condition, session)
 
         condition = Categories.id.in_(new_category_ids)
-        joins = [
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent),
-        ]
-        valid_categories, total = await categories_repository.get_all_categories([condition], session, 0, 1000, joins)
+        valid_categories, total = await categories_repository.get_all_categories([condition], session, 0, 1000)
         valid_categories = [cat for cat in valid_categories if cat.deleted_at is None]
 
         await categories_product_repository.create_cate_product(valid_categories, product_id, session)

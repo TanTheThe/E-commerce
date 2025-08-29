@@ -59,6 +59,10 @@ const Sidebar = ({ categoryId,
         setTempMaxPrice(maxPrice || '');
     }, [minPrice, maxPrice]);
 
+    useEffect(() => {
+
+    }, [selectedCategoryIds]);
+
     const handleCategoryChange = (categoryId, checked) => {
         let newSelected;
         if (checked) {
@@ -79,12 +83,12 @@ const Sidebar = ({ categoryId,
         onFilterChange('sizes', newSelected);
     };
 
-    const handleColorChange = (color, checked) => {
+    const handleColorChange = (colorId, checked) => {
         let newSelected;
         if (checked) {
-            newSelected = [...selectedColors, color];
+            newSelected = [...selectedColors, colorId];
         } else {
-            newSelected = selectedColors.filter(c => c !== color);
+            newSelected = selectedColors.filter(c => c !== colorId);
         }
         onFilterChange('colors', newSelected);
     };
@@ -140,7 +144,7 @@ const Sidebar = ({ categoryId,
                                 checked={
                                     type === 'categories' ? selectedCategoryIds.includes(item.id) :
                                         type === 'sizes' ? selectedSizes.includes(item.name) :
-                                            type === 'colors' ? selectedColors.includes(item.name) : false
+                                            type === 'colors' ? selectedColors.includes(item.id) : false
                                 }
                                 onChange={(e) => {
                                     if (type === 'categories') {
@@ -148,7 +152,7 @@ const Sidebar = ({ categoryId,
                                     } else if (type === 'sizes') {
                                         handleSizeChange(item.name, e.target.checked);
                                     } else if (type === 'colors') {
-                                        handleColorChange(item.name, e.target.checked);
+                                        handleColorChange(item.id, e.target.checked);
                                     }
                                 }}
                             />

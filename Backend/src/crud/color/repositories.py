@@ -47,7 +47,6 @@ class ColorRepository:
             combined_condition = base_condition
 
         statement = select(Color).options(
-            noload(Color.product_variant),
             load_only(Color.name, Color.code, Color.id)
         ).where(combined_condition)
 

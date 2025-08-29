@@ -127,13 +127,25 @@ const ProductItemListView = ({ product = null }) => {
                     </Link>
                 </h3>
 
-                <Rating
-                    name="product-rating"
-                    value={product.avg_rating || 0}
-                    size="small"
-                    readOnly
-                    precision={0.1}
-                />
+                <p className="text-gray-500 text-[14px] mb-2">
+                    {product.description && product.description.length > 100
+                        ? product.description.slice(0, 200) + "..."
+                        : product.description || "Không có mô tả"}
+                </p>
+
+                <div className="flex items-center gap-2 mt-1">
+                    <Rating
+                        name="product-rating"
+                        value={product.avg_rating || 0}
+                        size="small"
+                        readOnly
+                        precision={0.1}
+                    />
+                    <span className="text-gray-400 text-[13px]">|</span>
+                    <span className="text-[13px] text-gray-500">
+                        Đã bán: {product.total_sold || 0}
+                    </span>
+                </div>
 
                 <div className="flex items-center gap-2 mt-2">
                     {product.discounted_price || product.original_price ? (

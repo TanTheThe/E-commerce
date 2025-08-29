@@ -90,3 +90,23 @@ class SpecialOfferException:
                 "error_code": "voucher_009"
             }
         )
+
+    @staticmethod
+    def exists_user_special_offer():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Tồn tại khách hàng đã được gắn voucher này rồi",
+                "error_code": "voucher_010"
+            }
+        )
+
+    @staticmethod
+    def invalid_scope_for_user():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ cho phép gán offer cho khách hàng",
+                "error_code": "voucher_011"
+            }
+        )

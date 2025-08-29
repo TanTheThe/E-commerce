@@ -33,9 +33,7 @@ class ColorService:
                 Color.code.ilike(search_term),
             ))
 
-
-        joins = [noload(Color.product_variant)]
-        colors, total = await color_repository.get_all_color(conditions, session, skip, limit, joins)
+        colors, total = await color_repository.get_all_color(conditions, session, skip, limit)
 
         response = []
         for color in colors:

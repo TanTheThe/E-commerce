@@ -1,13 +1,16 @@
-from typing import Optional, List
-from sqlalchemy import ColumnElement
+from typing import Optional, List, Dict, Any
+from sqlalchemy import ColumnElement, update
 from sqlalchemy.orm import noload
 
-from src.database.models import Evaluate, Order_Detail
+from src.crud.product.repositories import ProductRepository
+from src.database.models import Evaluate, Order_Detail, Product
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, and_, func, distinct
 from datetime import datetime
 from src.errors.evaluate import EvaluateException
-from src.schemas.evaluate import SupplementEvaluateModel
+from src.schemas.evaluate import SupplementEvaluateModel, ReplyEvaluateModel
+
+product_repository = ProductRepository()
 
 
 class EvaluateRepository:
@@ -67,18 +70,14 @@ class EvaluateRepository:
         result = await session.exec(statement)
         return result.one_or_none()
 
-    async def supplement_evaluate(self, data: SupplementEvaluateModel, condition: Optional[ColumnElement[bool]],
-                                  session: AsyncSession):
-        evaluate = await self.get_evaluate(condition, session)
-        if not evaluate:
-            EvaluateException.review_not_found()
-
-        if evaluate.additional_comment:
-            EvaluateException.already_supplemented()
-
-        evaluate.additional_comment = data.additional_comment
-        evaluate.additional_image = data.additional_image
-        evaluate.additional_created_at = datetime.now()
+    async def update_evaluate_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
+        stmt = (
+            update(Evaluate)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)
+        await session.commit()
 
     async def get_average_rate(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         statement = select(func.avg(Evaluate.rate)).where(condition)
@@ -94,6 +93,12 @@ class EvaluateRepository:
             EvaluateException.review_not_found_to_delete()
 
         evaluate_delete.deleted_at = datetime.now()
+
+        await product_repository.update_product_some_field(
+            Product.id == evaluate_delete.product_id,
+            {"review_count": Product.review_count - 1},
+            session
+        )
         await session.commit()
 
         return str(evaluate_delete.id)

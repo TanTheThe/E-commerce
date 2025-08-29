@@ -2,7 +2,8 @@ from fastapi import APIRouter, status, Depends
 from typing import Optional
 from src.crud.evaluate.services import EvaluateService
 from src.dependencies import AccessTokenBearer
-from src.schemas.evaluate import EvaluateInputModel, SupplementEvaluateModel, GetEvaluateByProduct, EvaluateFilterModel
+from src.schemas.evaluate import EvaluateInputModel, SupplementEvaluateModel, EvaluateFilterModel, \
+    EvaluateAdditionalModel, ReplyEvaluateModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -31,7 +32,6 @@ async def create_evaluate(evaluate_data: EvaluateInputModel,
             "content": new_evaluate_dict
         }
     )
-
 
 @evaluate_customer_router.get("/my-reviews", status_code=status.HTTP_200_OK,
                               dependencies=[Depends(customer_role_middleware)])
@@ -83,6 +83,20 @@ async def get_detail_evaluate_admin(id: str,
         }
     )
 
+@evaluate_customer_router.get("/{id}", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
+async def get_detail_evaluate_customer(id: str,
+                                       token_details: dict = Depends(access_token_bearer),
+                                       session: AsyncSession = Depends(get_session)):
+    evaluate_dict = await evaluate_service.get_detail_evaluate_customer(id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin chi tiết đánh giá",
+            "content": evaluate_dict
+        }
+    )
+
 
 @evaluate_customer_router.get("/", status_code=status.HTTP_200_OK)
 async def get_all_evaluate_customer(skip: int = 0, limit: int = 10,
@@ -99,10 +113,10 @@ async def get_all_evaluate_customer(skip: int = 0, limit: int = 10,
 
 
 @evaluate_customer_router.get("/by-product/{product_id}", status_code=status.HTTP_200_OK)
-async def get_evaluate_by_product(product_id: str, data: GetEvaluateByProduct,
+async def get_evaluate_by_product(product_id: str,
                                   skip: int = 0, limit: int = 10,
                                   session: AsyncSession = Depends(get_session)):
-    evaluate_list = await evaluate_service.get_evaluate_by_product(product_id, data, session, skip, limit)
+    evaluate_list = await evaluate_service.get_evaluate_by_product(product_id, session, skip, limit)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -126,7 +140,7 @@ async def get_average_rate(product_id: str,
     )
 
 
-@evaluate_customer_router.patch("/{id}/supplement", dependencies=[Depends(customer_role_middleware)])
+@evaluate_customer_router.put("/{id}/supplement", dependencies=[Depends(customer_role_middleware)])
 async def supplement_evaluate(id: str, data: SupplementEvaluateModel,
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
@@ -135,6 +149,17 @@ async def supplement_evaluate(id: str, data: SupplementEvaluateModel,
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"message": "Bổ sung đánh giá thành công"}
+    )
+
+
+@evaluate_admin_router.put("/{id}/reply", dependencies=[Depends(admin_role_middleware)])
+async def reply_evaluate(id: str, data: ReplyEvaluateModel,
+                         token_details: dict = Depends(access_token_bearer),
+                         session: AsyncSession = Depends(get_session)):
+    await evaluate_service.reply_evaluate(id, data, session)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"message": "Phản hồi đánh giá thành công"}
     )
 
 

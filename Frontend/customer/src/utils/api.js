@@ -84,11 +84,12 @@ export const putDataApi = async (url, data) => {
     }
 }
 
-export const deleteDataApi = async (url, data) => {
+export const deleteDataApi = async (url, requestData) => {
     try {
         const response = await axios.delete(
             apiUrl + url,
             {
+                data: requestData, // Body data ở đây
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem("accesstoken")}`,
                     "Content-Type": 'application/json'

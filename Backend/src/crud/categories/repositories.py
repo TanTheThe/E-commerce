@@ -3,7 +3,6 @@ from sqlalchemy import ColumnElement
 from src.database.models import Categories
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, func, and_
-from sqlalchemy.orm import noload
 from datetime import datetime
 from src.errors.categories import CategoriesException
 
@@ -68,13 +67,7 @@ class CategoriesRepository:
         return data_need_update
 
     async def delete_categories(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        joins = [
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent),
-        ]
-        categories_to_delete = await self.get_category(condition, session, joins)
+        categories_to_delete = await self.get_category(condition, session)
 
         if categories_to_delete is None:
             CategoriesException.not_found_to_delete()
@@ -82,13 +75,7 @@ class CategoriesRepository:
         categories_to_delete.deleted_at = datetime.now()
 
     async def delete_sub_categories(self, condition: List[Optional[ColumnElement[bool]]], session: AsyncSession):
-        joins = [
-            noload(Categories.categories_product),
-            noload(Categories.products),
-            noload(Categories.children),
-            noload(Categories.parent),
-        ]
-        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000, joins)
+        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000)
 
         if sub_categories is None:
             CategoriesException.not_found_to_delete()

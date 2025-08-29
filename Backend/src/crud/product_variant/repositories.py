@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload
-
+import uuid
 from src.database.models import Product_Variant
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, update
@@ -18,14 +18,16 @@ class ProductVariantRepository:
 
         new_objects = []
         for item in product_variant_data:
+            sku = item.sku or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
             if item.color_id:
                 new_variant = Product_Variant(
                     product_id=product_id,
                     size=item.size,
+                    image=item.image,
                     color_id=item.color_id,
                     price=item.price,
                     quantity=item.quantity,
-                    sku=item.sku,
+                    sku=sku,
                     created_at=datetime.now(),
                     updated_at=datetime.now()
                 )
@@ -35,11 +37,12 @@ class ProductVariantRepository:
                 new_variant = Product_Variant(
                     product_id=product_id,
                     size=item.size,
+                    image=item.image,
                     color_name=item.color_name,
                     color_code=item.color_code,
                     price=item.price,
                     quantity=item.quantity,
-                    sku=item.sku,
+                    sku=sku,
                     created_at=datetime.now(),
                     updated_at=datetime.now()
                 )
@@ -60,12 +63,9 @@ class ProductVariantRepository:
         return result.all()
 
 
-    async def get_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
+    async def get_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         statement = select(Product_Variant).options(
-            noload(Product_Variant.order_detail),
-            noload(Product_Variant.product),
-            noload(Product_Variant.evaluate),
-            noload(Product_Variant.color),
+            *joins if joins else []
         ).where(conditions)
         result = await session.exec(statement)
 

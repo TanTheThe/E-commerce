@@ -61,3 +61,13 @@ class EvaluateException:
                 "error_code": "eval_006"
             }
         )
+
+    @staticmethod
+    def already_reply():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đơn hàng này đã được phản hồi trước đó",
+                "error_code": "eval_007"
+            }
+        )

@@ -74,12 +74,7 @@ class UserRepository:
         return new_user
 
     async def delete_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        joins = [
-            noload(User.address),
-            noload(User.evaluate),
-            noload(User.order)
-        ]
-        user_to_delete = await self.get_user(condition, session, joins)
+        user_to_delete = await self.get_user(condition, session)
 
         if user_to_delete is None:
             raise HTTPException(
@@ -96,12 +91,7 @@ class UserRepository:
 
     async def delete_multiple_user(self, data: UserDeleteModel, session: AsyncSession):
         condition = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None))
-        joins = [
-            noload(User.address),
-            noload(User.evaluate),
-            noload(User.order)
-        ]
-        users = await self.get_all_user(condition, session, None, 0, 1000, joins)
+        users = await self.get_all_user(condition, session, None, 0, 1000)
         existing_ids = {str(row.id) for row in users}
         missing_ids = set(data.user_ids) - existing_ids
         if missing_ids:
@@ -116,11 +106,6 @@ class UserRepository:
         return data.user_ids
 
     async def change_status_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        joins = [
-            noload(User.address),
-            noload(User.evaluate),
-            noload(User.order)
-        ]
         user_to_block = await self.get_user(condition, session)
 
         if user_to_block is None:

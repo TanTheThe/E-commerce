@@ -141,3 +141,13 @@ class ProductException:
                 "error_code": "product_014",
             },
         )
+
+    @staticmethod
+    def not_enough_variant():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không đủ số lượng biến thể",
+                "error_code": "product_015",
+            },
+        )

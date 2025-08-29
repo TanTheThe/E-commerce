@@ -5,7 +5,7 @@ import { LazyLoadImage } from "react-lazy-load-image-component";
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import { IoMdClose } from "react-icons/io";
 import Button from "@mui/material/Button";
-import { FaCloudUploadAlt, FaPlus } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp, FaCloudUploadAlt, FaCopy, FaPlus } from "react-icons/fa";
 import ColorPicker from "../../Components/ColorPicker";
 import { Checkbox, ListItemText } from "@mui/material";
 import { MyContext } from "../../App";
@@ -14,9 +14,13 @@ import HierarchicalCategorySelect from "./categoriesSelect";
 
 
 const AddProduct = () => {
-    const [variants, setVariants] = useState([]);
+    const [variantGroups, setVariantGroups] = useState([]);
     const [images, setImages] = useState([]);
-    const [formData, setFormData] = useState({ name: '', description: '' });
+    const [formData, setFormData] = useState({
+        name: '',
+        short_description: '',
+        description: ''
+    });
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState([]);
     const [selectedCategories, setSelectedCategories] = useState([]);
@@ -26,6 +30,7 @@ const AddProduct = () => {
         groups: [],
         sizes: []
     });
+    const [collapsedGroups, setCollapsedGroups] = useState({});
 
     const context = useContext(MyContext);
     const { onUpdated } = context?.isOpenFullScreenPanel || {};
@@ -147,7 +152,7 @@ const AddProduct = () => {
                 });
 
                 const res = await getDataApi(`/admin/color?${queryParams.toString()}`);
-  
+
                 if (res.success === true) {
                     setColors(res.data.data || []);
                 } else {
@@ -171,6 +176,133 @@ const AddProduct = () => {
         });
     };
 
+    const handleAddVariantGroup = () => {
+        const newGroupId = `group_${Date.now()}`;
+        const newGroup = {
+            id: newGroupId,
+            color_type: 'none',
+            color_id: null,
+            color_name: null,
+            color_code: null,
+            selectedSizes: [],
+            variants: []
+        };
+        setVariantGroups(prev => [...prev, newGroup]);
+    };
+
+    const handleRemoveVariantGroup = (groupId) => {
+        setVariantGroups(prev => prev.filter(group => group.id !== groupId));
+    };
+
+    const handleColorChange = (groupId, field, value) => {
+        setVariantGroups(prev =>
+            prev.map(group => {
+                if (group.id !== groupId) return group;
+
+                if (field === 'color_type') {
+                    return {
+                        ...group,
+                        color_type: value,
+                        color_id: null,
+                        color_name: null,
+                        color_code: null,
+                        selectedSizes: [],
+                        variants: []
+                    };
+                }
+
+                if (field === 'color_id') {
+                    return {
+                        ...group,
+                        color_id: value || null,
+                        color_name: null,
+                        color_code: null
+                    };
+                }
+
+                if (field === 'color_name' || field === 'color_code') {
+                    return {
+                        ...group,
+                        color_id: null,
+                        [field]: value
+                    };
+                }
+
+                return group;
+            })
+        );
+    };
+
+    const handleSizeToggle = (groupId, sizeName) => {
+        setVariantGroups(prev =>
+            prev.map(group => {
+                if (group.id !== groupId) return group;
+
+                const isSelected = group.selectedSizes.includes(sizeName);
+                let newSelectedSizes;
+                let newVariants;
+
+                if (isSelected) {
+                    newSelectedSizes = group.selectedSizes.filter(size => size !== sizeName);
+                    newVariants = group.variants.filter(variant => variant.size !== sizeName);
+                } else {
+                    newSelectedSizes = [...group.selectedSizes, sizeName];
+                    newVariants = [...group.variants, {
+                        size: sizeName,
+                        price: '',
+                        quantity: '',
+                        sku: '',
+                        image: null
+                    }];
+                }
+
+                return {
+                    ...group,
+                    selectedSizes: newSelectedSizes,
+                    variants: newVariants
+                };
+            })
+        );
+    };
+
+    const handleVariantUpdate = (groupId, size, field, value) => {
+        setVariantGroups(prev =>
+            prev.map(group => {
+                if (group.id !== groupId) return group;
+
+                return {
+                    ...group,
+                    variants: group.variants.map(variant => {
+                        if (variant.size !== size) return variant;
+                        return { ...variant, [field]: value };
+                    })
+                };
+            })
+        );
+    };
+
+    const handleVariantImageUpload = async (groupId, size, file) => {
+        if (!file) return;
+
+        const base64 = await convertToBase64(file);
+        handleVariantUpdate(groupId, size, 'image', base64);
+    };
+
+    const handleFormDataChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleCategorySelectionChange = (selectedIds) => {
+        setSelectedCategories(selectedIds);
+    };
+
+    const isColorSelected = (group) => {
+        if (group.color_type === 'none') return true;
+        if (group.color_type === 'available') return !!group.color_id;
+        if (group.color_type === 'custom') return !!(group.color_name && group.color_code);
+        return false;
+    };
+
     const handleImageUpload = async (e) => {
         const files = Array.from(e.target.files);
         const newImages = await Promise.all(files.map(async (file) => {
@@ -191,114 +323,171 @@ const AddProduct = () => {
         setImages(prev => prev.filter(img => img.id !== id));
     };
 
-    const handleAddVariant = () => {
-        setVariants(prev => [
-            ...prev,
-            {
-                id: Date.now(),
-                size: '',
-                quantity: '',
-                price: '',
-                sku: '',
-                color: null,
-            }
-        ]);
+    const getAvailableSizesList = () => {
+        if (!availableSizes.hasMultipleTypes) {
+            return availableSizes.sizes || [];
+        } else {
+            return availableSizes.groups.flatMap(group => group.sizes) || [];
+        }
     };
 
-    const handleRemoveVariant = (id) => {
-        setVariants(prev => prev.filter(v => v.id !== id));
-    };
+    const renderColorSelection = (group) => {
+        return (
+            <div className="mb-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Chọn loại màu</h4>
+                <div className="flex gap-4 mb-3">
+                    <label className="flex items-center cursor-pointer">
+                        <input
+                            type="radio"
+                            name={`color_type_${group.id}`}
+                            value="available"
+                            checked={group.color_type === 'available'}
+                            onChange={(e) => handleColorChange(group.id, 'color_type', e.target.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Màu có sẵn</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                        <input
+                            type="radio"
+                            name={`color_type_${group.id}`}
+                            value="custom"
+                            checked={group.color_type === 'custom'}
+                            onChange={(e) => handleColorChange(group.id, 'color_type', e.target.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Màu tùy chỉnh</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                        <input
+                            type="radio"
+                            name={`color_type_${group.id}`}
+                            value="none"
+                            checked={group.color_type === 'none'}
+                            onChange={(e) => handleColorChange(group.id, 'color_type', e.target.value)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">Không màu</span>
+                    </label>
+                </div>
 
-    const handleVariantChange = (id, field, value) => {
-        setVariants(prev =>
-            prev.map(v => {
-                if (v.id !== id) return v;
+                {group.color_type === 'available' && (
+                    <div>
+                        <Select
+                            size="small"
+                            className="w-full"
+                            value={group.color_id || ""}
+                            onChange={(e) => handleColorChange(group.id, 'color_id', e.target.value)}
+                        >
+                            <MenuItem value="">Chọn màu</MenuItem>
+                            {colors.map((c) => (
+                                <MenuItem key={c.id} value={c.id}>
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-4 h-4 rounded-full border border-gray-300"
+                                            style={{ backgroundColor: c.code }}
+                                        ></div>
+                                        {c.name} ({c.code})
+                                    </div>
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </div>
+                )}
 
-                if (field === 'color_id') {
-                    return {
-                        ...v,
-                        color_id: value || null,
-                        color_name: null,
-                        color_code: null
-                    };
-                }
-
-                if (field === 'color_override') {
-                    return {
-                        ...v,
-                        color_id: null,
-                        color_name: value?.name || null,
-                        color_code: value?.code || null
-                    };
-                }
-
-                return { ...v, [field]: value };
-            })
+                {group.color_type === 'custom' && (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Tên màu tùy chỉnh</label>
+                            <input
+                                type="text"
+                                value={group.color_name || ''}
+                                onChange={(e) => handleColorChange(group.id, 'color_name', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Ví dụ: Xanh Navy"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Chọn màu</label>
+                            <div className="flex items-center gap-3">
+                                <ColorPicker
+                                    color={group.color_code || "#000000"}
+                                    onChange={(newCode) => handleColorChange(group.id, 'color_code', newCode)}
+                                />
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="w-8 h-8 rounded-lg border-2 border-gray-300 shadow-sm"
+                                        style={{ backgroundColor: group.color_code || "#000000" }}
+                                    ></div>
+                                    <span className="text-xs text-gray-500 font-mono">
+                                        {group.color_code || "#000000"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         );
     };
 
-    const handleFormDataChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-    };
+    const renderSizeSelection = (group) => {
+        const availableSizesList = getAvailableSizesList();
+        const isColorChosen = isColorSelected(group);
 
-    const handleCategorySelectionChange = (selectedIds) => {
-        setSelectedCategories(selectedIds);
-    };
-
-    const renderSizeSelection = (variant) => {
-        if (availableSizes.sizes.length === 0 && availableSizes.groups.length === 0) {
+        if (availableSizesList.length === 0) {
             return (
-                <Select
-                    size="small"
-                    className="w-full"
-                    value=""
-                    disabled
-                >
-                    <MenuItem value="">Chọn danh mục trước</MenuItem>
-                </Select>
+                <div className="text-sm text-gray-500 italic">
+                    Chọn danh mục trước để hiển thị kích cỡ
+                </div>
+            );
+        }
+
+        if (!isColorChosen) {
+            return (
+                <div className="text-sm text-gray-500 italic">
+                    Vui lòng chọn loại màu trước
+                </div>
             );
         }
 
         if (!availableSizes.hasMultipleTypes) {
             return (
-                <Select
-                    size="small"
-                    className="w-full"
-                    value={variant.size}
-                    onChange={(e) =>
-                        handleVariantChange(variant.id, 'size', e.target.value)
-                    }
-                >
-                    <MenuItem value="">None</MenuItem>
-                    {availableSizes.sizes.map((size) => (
-                        <MenuItem key={size.id} value={size.name}>
-                            {size.name}
-                        </MenuItem>
+                <div className="grid grid-cols-4 gap-2">
+                    {availableSizesList.map((size) => (
+                        <label key={size.id} className="flex items-center cursor-pointer p-2 border rounded-md hover:bg-gray-50">
+                            <input
+                                type="checkbox"
+                                checked={group.selectedSizes.includes(size.name)}
+                                onChange={() => handleSizeToggle(group.id, size.name)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-sm">{size.name}</span>
+                        </label>
                     ))}
-                </Select>
+                </div>
             );
         } else {
             return (
-                <div className="w-full">
-                    <Select
-                        size="small"
-                        className="w-full"
-                        value={variant.size}
-                        onChange={(e) =>
-                            handleVariantChange(variant.id, 'size', e.target.value)
-                        }
-                    >
-                        <MenuItem value="">None</MenuItem>
-                        {availableSizes.groups.map((group) => (
-                            <optgroup key={group.type} label={group.label}>
-                                {group.sizes.map((size) => (
-                                    <MenuItem key={size.id} value={size.name}>
-                                        {size.name}
-                                    </MenuItem>
+                <div className="space-y-4">
+                    {availableSizes.groups.map((group_type) => (
+                        <div key={group_type.type}>
+                            <h5 className="text-sm font-medium text-gray-700 mb-2">{group_type.label}</h5>
+                            <div className="grid grid-cols-4 gap-2">
+                                {group_type.sizes.map((size) => (
+                                    <label key={size.id} className="flex items-center cursor-pointer p-2 border rounded-md hover:bg-gray-50">
+                                        <input
+                                            type="checkbox"
+                                            checked={group.selectedSizes.includes(size.name)}
+                                            onChange={() => handleSizeToggle(group.id, size.name)}
+                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="ml-2 text-sm">{size.name}</span>
+                                    </label>
                                 ))}
-                            </optgroup>
-                        ))}
-                    </Select>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             );
         }
@@ -310,33 +499,45 @@ const AddProduct = () => {
             return false;
         }
 
+        if (!formData.short_description.trim()) {
+            context.openAlertBox("error", 'Mô tả ngắn không được để trống');
+            return false;
+        }
+
+        if (images.length === 0) {
+            context.openAlertBox("error", 'Vui lòng thêm ít nhất một ảnh chính cho sản phẩm');
+            return false;
+        }
+
         if (selectedCategories.length === 0) {
             context.openAlertBox("error", 'Vui lòng chọn ít nhất một danh mục');
             return false;
         }
 
-        if (images.length === 0) {
-            context.openAlertBox("error", 'Vui lòng thêm ít nhất một hình ảnh');
+        if (variantGroups.length === 0) {
+            context.openAlertBox("error", 'Vui lòng thêm ít nhất một biến thể');
             return false;
         }
 
-        if (variants.length === 0) {
-            context.openAlertBox("error", 'Vui lòng thêm ít nhất một variant');
-            return false;
-        }
+        for (let group of variantGroups) {
+            if (group.variants.length === 0) {
+                context.openAlertBox("error", 'Vui lòng chọn ít nhất một kích cỡ cho mỗi nhóm biến thể');
+                return false;
+            }
 
-        for (let variant of variants) {
-            if (!variant.sku.trim()) {
-                context.openAlertBox("error", 'SKU không được để trống');
-                return false;
-            }
-            if (!variant.price || variant.price <= 0) {
-                context.openAlertBox("error", 'Giá phải lớn hơn 0');
-                return false;
-            }
-            if (!variant.quantity || variant.quantity < 0) {
-                context.openAlertBox("error", 'Số lượng không được âm');
-                return false;
+            for (let variant of group.variants) {
+                if (!variant.price || variant.price <= 0) {
+                    context.openAlertBox("error", `Giá phải lớn hơn 0 cho biến thể ${variant.size || 'không xác định'}`);
+                    return false;
+                }
+                if (!variant.quantity || variant.quantity < 0) {
+                    context.openAlertBox("error", `Số lượng không được âm cho biến thể ${variant.size || 'không xác định'}`);
+                    return false;
+                }
+                if (!variant.image) {
+                    context.openAlertBox("error", `Vui lòng thêm ảnh phụ cho biến thể ${variant.size || 'không xác định'}`);
+                    return false;
+                }
             }
         }
         return true;
@@ -348,31 +549,38 @@ const AddProduct = () => {
 
         setLoading(true);
         try {
+            const allVariants = variantGroups.flatMap(group =>
+                group.variants.map(variant => {
+                    const variantData = {
+                        size: variant.size || null,
+                        image: variant.image,
+                        price: parseInt(variant.price),
+                        quantity: parseInt(variant.quantity),
+                        sku: variant.sku?.trim() || null
+                    };
+
+                    if (variant.id) {
+                        variantData.id = variant.id;
+                    }
+
+                    if (group.color_type === 'available' && group.color_id) {
+                        variantData.color_id = group.color_id;
+                    } else if (group.color_type === 'custom' && (group.color_name || group.color_code)) {
+                        variantData.color_name = group.color_name;
+                        variantData.color_code = group.color_code;
+                    }
+
+                    return variantData;
+                })
+            );
+
             const submitData = {
                 name: formData.name.trim(),
+                short_description: formData.short_description.trim(),
                 description: formData.description?.trim() || null,
                 images: images.map(img => img.base64),
                 categories_id: selectedCategories,
-                product_variant: variants.map(variant => {
-                    if (variant.color_id) {
-                        return {
-                            size: variant.size || null,
-                            color_id: variant.color_id,
-                            price: parseInt(variant.price),
-                            quantity: parseInt(variant.quantity),
-                            sku: variant.sku.trim()
-                        };
-                    } else {
-                        return {
-                            size: variant.size || null,
-                            color_name: variant.color_name,
-                            color_code: variant.color_code,
-                            price: parseInt(variant.price),
-                            quantity: parseInt(variant.quantity),
-                            sku: variant.sku.trim()
-                        };
-                    }
-                })
+                product_variant: allVariants
             };
 
             const result = await postDataApi('/admin/product/', submitData);
@@ -387,10 +595,11 @@ const AddProduct = () => {
                 onUpdated();
             }
             context.setIsOpenFullScreenPanel({ open: false });
-            setFormData({ name: '', description: '' });
-            setVariants([]);
-            setImages([]);
+            setFormData({ name: '', short_description: '', description: '' });
+            setVariantGroups([]);
             setSelectedCategories([]);
+            images.forEach(img => URL.revokeObjectURL(img.url));
+            setImages([]);
         } catch (err) {
             console.error('Submit error:', err);
             context.openAlertBox("error", 'Có lỗi xảy ra khi tạo sản phẩm');
@@ -399,185 +608,366 @@ const AddProduct = () => {
         }
     };
 
+    const toggleGroupCollapse = (groupId) => {
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [groupId]: !prev[groupId]
+        }));
+    };
+
+    const copyFirstVariantToAll = (groupId) => {
+        setVariantGroups(prev =>
+            prev.map(group => {
+                if (group.id !== groupId || group.variants.length === 0) return group;
+
+                const firstVariant = group.variants[0];
+                const updatedVariants = group.variants.map(variant => ({
+                    ...variant,
+                    price: firstVariant.price,
+                    quantity: firstVariant.quantity,
+                    image: firstVariant.image
+                }));
+
+                return {
+                    ...group,
+                    variants: updatedVariants
+                };
+            })
+        );
+    };
+
     return (
-        <section className="p-5 bg-gray-50">
-            <form className="form py-3 p-8" onSubmit={handleSubmit}>
-                <div className="flex-1 overflow-y-auto pr-4">
-                    <div className="mb-3">
-                        <h3 className="text-[14px] font-[500] mb-1">Tên sản phẩm</h3>
-                        <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => handleFormDataChange('name', e.target.value)}
-                            className="w-full h-[40px] border border-[rgba(0,0,0,0.2)] rounded-sm p-3 bg-white text-sm"
-                        />
-                    </div>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+            <div className="max-w-6xl mx-auto p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-6">
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2">Thêm sản phẩm mới</h1>
+                    <p className="text-gray-600">Tạo sản phẩm mới với thông tin chi tiết và biến thể</p>
+                </div>
 
-                    <div className="mb-3">
-                        <h3 className="text-[14px] font-[500] mb-1">Mô tả sản phẩm</h3>
-                        <textarea
-                            value={formData.description}
-                            onChange={(e) => handleFormDataChange('description', e.target.value)}
-                            className="w-full h-[100px] border border-[rgba(0,0,0,0.2)] rounded-sm p-3 bg-white text-sm"
-                        />
-                    </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-blue-500 rounded-full mr-3"></div>
+                                    Thông tin cơ bản
+                                </h2>
 
-                    <div className="mb-5">
-                        <h3 className="text-[14px] font-[500] mb-1">Danh mục sản phẩm</h3>
-                        <HierarchicalCategorySelect
-                            categories={categories}
-                            selectedCategoryIds={selectedCategories}
-                            onSelectionChange={handleCategorySelectionChange}
-                            label=""
-                            placeholder="Chọn danh mục sản phẩm"
-                        />
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Tên sản phẩm <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.name}
+                                            onChange={(e) => handleFormDataChange('name', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+                                            placeholder="Nhập tên sản phẩm..."
+                                        />
+                                    </div>
 
-                        {availableSizes.hasMultipleTypes && (
-                            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                <div className="flex items-center">
-                                    <span className="text-yellow-600 mr-2">⚠️</span>
-                                    <span className="text-sm text-yellow-800">
-                                        Bạn đã chọn các danh mục với hệ thống kích cỡ khác nhau ({availableSizes.groups.map(g => g.label).join(', ')}).
-                                        Kích cỡ được nhóm theo loại để dễ phân biệt.
-                                    </span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Mô tả ngắn <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={formData.short_description}
+                                            onChange={(e) => handleFormDataChange('short_description', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white resize-none"
+                                            rows="3"
+                                            placeholder="Mô tả ngắn gọn về sản phẩm..."
+                                        />
+                                    </div>
 
-                    <div className="mb-4">
-                        <h3 className="font-bold text-[16px] mb-3">Tải lên ảnh</h3>
-                        <div className="grid grid-cols-7 gap-4">
-                            {images.map((img) => (
-                                <div key={img.id} className="relative">
-                                    <span
-                                        className="absolute w-[20px] h-[20px] rounded-full bg-red-700 -top-[10px] -right-[10px] flex items-center justify-center cursor-pointer z-10"
-                                        onClick={() => removeImage(img.id)}
-                                    >
-                                        <IoMdClose className="text-white text-[14px]" />
-                                    </span>
-                                    <div className="border border-dashed h-[150px] bg-gray-100 rounded-md overflow-hidden">
-                                        <LazyLoadImage
-                                            src={img.url}
-                                            alt="image"
-                                            className="w-full h-full object-cover"
-                                            effect="blur"
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Mô tả chi tiết
+                                        </label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => handleFormDataChange('description', e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white resize-none"
+                                            rows="5"
+                                            placeholder="Mô tả chi tiết về sản phẩm..."
                                         />
                                     </div>
                                 </div>
-                            ))}
-                            <div className="border-dashed border h-[150px] flex items-center justify-center bg-gray-100 rounded relative">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={handleImageUpload}
-                                    className="absolute inset-0 opacity-0 z-10 cursor-pointer"
-                                    id="imageUpload"
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-green-500 rounded-full mr-3"></div>
+                                    Ảnh chính sản phẩm
+                                </h2>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Thêm ảnh chính <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={handleImageUpload}
+                                            className="hidden"
+                                            id="main-images-upload"
+                                        />
+                                        <label
+                                            htmlFor="main-images-upload"
+                                            className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors block"
+                                        >
+                                            <div className="flex flex-col items-center">
+                                                <FaCloudUploadAlt className="text-3xl text-gray-400 mb-2" />
+                                                <p className="text-sm font-medium text-gray-700">Nhấp để chọn ảnh</p>
+                                                <p className="text-xs text-gray-500">Hỗ trợ nhiều ảnh cùng lúc</p>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    {images.length > 0 && (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {images.map((image) => (
+                                                <div key={image.id} className="relative group">
+                                                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                                        <img
+                                                            src={image.url}
+                                                            alt={image.name}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(image.id)}
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <IoMdClose />
+                                                    </button>
+                                                    <p className="text-xs text-gray-500 mt-1 truncate">{image.name}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                                        <div className="w-2 h-6 bg-purple-500 rounded-full mr-3"></div>
+                                        Biến thể sản phẩm
+                                    </h2>
+                                    <Button
+                                        type="button"
+                                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                                        onClick={handleAddVariantGroup}
+                                    >
+                                        <FaPlus className="text-sm" />
+                                        Thêm biến thể
+                                    </Button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {variantGroups.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <FaPlus className="text-2xl text-gray-400" />
+                                            </div>
+                                            <p className="text-lg font-medium">Chưa có biến thể nào</p>
+                                            <p className="text-sm">Nhấn "Thêm biến thể" để bắt đầu</p>
+                                        </div>
+                                    ) : (
+                                        variantGroups.map((group, index) => (
+                                            <div key={group.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-sm font-medium text-gray-700">Nhóm biến thể #{index + 1}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleGroupCollapse(group.id)}
+                                                            className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                        >
+                                                            {collapsedGroups[group.id] ? (
+                                                                <>
+                                                                    <FaChevronDown size={10} />
+                                                                    Mở rộng
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <FaChevronUp size={10} />
+                                                                    Thu gọn
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveVariantGroup(group.id)}
+                                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                                    >
+                                                        <IoMdClose size={20} />
+                                                    </button>
+                                                </div>
+                                                {!collapsedGroups[group.id] && (
+                                                    <>
+                                                        {renderColorSelection(group)}
+
+                                                        <div className="mb-4">
+                                                            <h4 className="text-sm font-medium text-gray-700 mb-2">Chọn kích cỡ</h4>
+                                                            {renderSizeSelection(group)}
+                                                        </div>
+
+                                                        {group.variants.length > 0 && (
+                                                            <div className="space-y-4">
+                                                                <div className="flex items-center justify-between">
+                                                                    <h4 className="text-sm font-medium text-gray-700">Chi tiết biến thể</h4>
+                                                                    {group.variants.length > 1 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => copyFirstVariantToAll(group.id)}
+                                                                            className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md transition-colors flex items-center gap-1"
+                                                                        >
+                                                                            <FaCopy size={10} />
+                                                                            Sao chép từ đầu tiên
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {group.variants.map((variant) => (
+                                                                    <div key={variant.size} className="bg-white p-4 rounded-lg border">
+                                                                        <div className="mb-3">
+                                                                            <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                                                                                Kích cỡ: {variant.size}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                                            <div>
+                                                                                <label className="block text-xs font-medium text-gray-600 mb-1">Giá (VNĐ)</label>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={variant.price}
+                                                                                    onChange={(e) => handleVariantUpdate(group.id, variant.size, 'price', e.target.value)}
+                                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                                    placeholder="0"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <label className="block text-xs font-medium text-gray-600 mb-1">Số lượng</label>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={variant.quantity}
+                                                                                    onChange={(e) => handleVariantUpdate(group.id, variant.size, 'quantity', e.target.value)}
+                                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                                    placeholder="0"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <label className="block text-xs font-medium text-gray-600 mb-1">SKU</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={variant.sku}
+                                                                                    onChange={(e) => handleVariantUpdate(group.id, variant.size, 'sku', e.target.value)}
+                                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                                    placeholder="SKU-001"
+                                                                                />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <label className="block text-xs font-medium text-gray-600 mb-1">Ảnh phụ</label>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <input
+                                                                                        type="file"
+                                                                                        accept="image/*"
+                                                                                        onChange={(e) => handleVariantImageUpload(group.id, variant.size, e.target.files[0])}
+                                                                                        className="hidden"
+                                                                                        id={`image-${group.id}-${variant.size}`}
+                                                                                    />
+                                                                                    <label
+                                                                                        htmlFor={`image-${group.id}-${variant.size}`}
+                                                                                        className="flex-1 px-3 py-2 border border-dashed border-gray-300 rounded-md text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors text-sm"
+                                                                                    >
+                                                                                        {variant.image ? '✓ Đã chọn' : 'Chọn ảnh'}
+                                                                                    </label>
+                                                                                    {variant.image && (
+                                                                                        <div className="w-10 h-10 border rounded overflow-hidden">
+                                                                                            <img
+                                                                                                src={variant.image}
+                                                                                                alt="Preview"
+                                                                                                className="w-full h-full object-cover"
+                                                                                            />
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-orange-500 rounded-full mr-3"></div>
+                                    Danh mục
+                                </h2>
+
+                                <HierarchicalCategorySelect
+                                    categories={categories}
+                                    selectedCategoryIds={selectedCategories}
+                                    onSelectionChange={handleCategorySelectionChange}
+                                    label=""
+                                    placeholder="Chọn danh mục sản phẩm"
                                 />
-                                <label htmlFor="imageUpload" className="text-center text-gray-500">
-                                    <FaPlus className="mx-auto mb-2 text-xl" />
-                                    Thêm ảnh
-                                </label>
+
+                                {availableSizes.hasMultipleTypes && (
+                                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <div className="flex items-start">
+                                            <span className="text-amber-600 mr-2 mt-0.5">⚠️</span>
+                                            <div>
+                                                <p className="text-sm font-medium text-amber-800 mb-1">Lưu ý về kích cỡ</p>
+                                                <p className="text-xs text-amber-700">
+                                                    Bạn đã chọn các danh mục với hệ thống kích cỡ khác nhau: {availableSizes.groups.map(g => g.label).join(', ')}.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <Button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-3 px-6 rounded-lg font-medium flex items-center justify-center gap-3 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <FaCloudUploadAlt className="text-xl text-white" />
+                                    <p className="text-white">{loading ? 'Đang tạo sản phẩm...' : 'Tạo sản phẩm'}</p>
+                                </Button>
+
+                                {loading && (
+                                    <div className="mt-3 text-center">
+                                        <div className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                        <span className="text-sm text-gray-600">Đang xử lý...</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
-
-                    {variants.map((variant) => (
-                        <div key={variant.id} className="border border-gray-300 p-4 mb-4 rounded-md bg-white relative">
-                            <button
-                                type="button"
-                                onClick={() => handleRemoveVariant(variant.id)}
-                                className="absolute top-2 right-2 text-red-600 cursor-pointer"
-                            >
-                                <IoMdClose size={20} />
-                            </button>
-
-                            <div className="grid grid-cols-6 gap-4 mb-3">
-                                <div className="col-span-1">
-                                    <h3 className="text-sm font-medium mb-1">Kích cỡ</h3>
-                                    {renderSizeSelection(variant)}
-                                </div>
-                                <div className="col-span-1">
-                                    <h3 className="text-sm font-medium mb-1">Số lượng</h3>
-                                    <input
-                                        type="number"
-                                        value={variant.quantity}
-                                        onChange={(e) => handleVariantChange(variant.id, 'quantity', e.target.value)}
-                                        className="w-full h-[40px] border border-gray-300 p-3 text-sm rounded-sm"
-                                    />
-                                </div>
-                                <div className="col-span-1">
-                                    <h3 className="text-sm font-medium mb-1">Đơn giá</h3>
-                                    <input
-                                        type="number"
-                                        value={variant.price}
-                                        onChange={(e) => handleVariantChange(variant.id, 'price', e.target.value)}
-                                        className="w-full h-[40px] border border-gray-300 p-3 text-sm rounded-sm"
-                                    />
-                                </div>
-                                <div className="col-span-1">
-                                    <h3 className="text-sm font-medium mb-1">SKU</h3>
-                                    <input
-                                        type="text"
-                                        value={variant.sku}
-                                        onChange={(e) => handleVariantChange(variant.id, 'sku', e.target.value)}
-                                        className="w-full h-[40px] border border-gray-300 p-3 text-sm rounded-sm"
-                                    />
-                                </div>
-                                <div className="col-span-1">
-                                    <h3 className="text-sm font-medium mb-1">Màu (có sẵn)</h3>
-                                    <Select
-                                        size="small"
-                                        className="w-full"
-                                        value={variant.color_id || ""}
-                                        onChange={(e) =>
-                                            handleVariantChange(variant.id, 'color_id', e.target.value)
-                                        }
-                                    >
-                                        <MenuItem value="">None</MenuItem>
-                                        {colors.map((c) => (
-                                            <MenuItem key={c.id} value={c.id}>
-                                                {c.name} ({c.code})
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </div>
-
-                                <div className="col-span-2">
-                                    <ColorPicker
-                                        color={variant.color_code || ""}
-                                        onChange={(newCode) =>
-                                            handleVariantChange(variant.id, 'color_override', {
-                                                name: `Custom-${variant.id}`,
-                                                code: newCode
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="mb-4">
-                    <Button
-                        type="button"
-                        className="btn-outline-blue px-4"
-                        onClick={handleAddVariant}
-                    >
-                        Thêm biến thể
-                    </Button>
-                </div>
-                <Button
-                    type="submit"
-                    disabled={loading}
-                    className="btn-blue btn-lg w-full flex gap-2"
-                >
-                    <FaCloudUploadAlt className="text-[25px] text-white" />
-                    {loading ? 'Đang tạo sản phẩm...' : 'Tạo sản phẩm'}
-                </Button>
-            </form>
-        </section>
+                </form>
+            </div>
+        </div>
     );
 }
 

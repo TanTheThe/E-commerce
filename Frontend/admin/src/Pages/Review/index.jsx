@@ -13,10 +13,11 @@ import SearchBox from "../../Components/SearchBox";
 
 import Dialog from '@mui/material/Dialog';
 import { MyContext } from "../../App";
-import { deleteDataApi, getDataApi } from "../../utils/api";
+import { deleteDataApi, getDataApi, putDataApi } from "../../utils/api";
 import { debounce } from "lodash";
 import { AiOutlineEye } from "react-icons/ai";
 import ReviewDetailDialog from "./reviewDetail";
+import { BiReply } from "react-icons/bi";
 
 const columns = [
     { id: 'customer', label: 'CUSTOMER', minWidth: 200, align: 'left' },
@@ -24,7 +25,7 @@ const columns = [
     { id: 'order_code', label: 'ORDER CODE', minWidth: 150, align: 'center' },
     { id: 'rating', label: 'RATING', minWidth: 120, align: 'center' },
     { id: 'created_at', label: 'CREATED AT', minWidth: 160, align: 'center' },
-    { id: 'action', label: 'ACTION', minWidth: 120, align: 'center' }
+    { id: 'action', label: 'ACTION', minWidth: 180, align: 'center' }
 ];
 
 const Reviews = () => {
@@ -44,6 +45,11 @@ const Reviews = () => {
     const [rateFilter, setRateFilter] = useState('');
     const [sortByCreatedAt, setSortByCreatedAt] = useState('');
     const [sortByRate, setSortByRate] = useState('');
+
+    const [replyDialogOpen, setReplyDialogOpen] = useState(false);
+    const [reviewToReply, setReviewToReply] = useState(null);
+    const [replyContent, setReplyContent] = useState('');
+    const [replying, setReplying] = useState(false);
 
     const context = useContext(MyContext);
 
@@ -146,6 +152,18 @@ const Reviews = () => {
         setReviewIdToView(null);
     };
 
+    const openReplyDialog = (review) => {
+        setReviewToReply(review);
+        setReplyContent(review.seller_reply || '');
+        setReplyDialogOpen(true);
+    };
+
+    const closeReplyDialog = () => {
+        setReplyDialogOpen(false);
+        setReviewToReply(null);
+        setReplyContent('');
+    };
+
     const handleDeleteReview = async () => {
         if (!reviewToDelete) return;
 
@@ -165,6 +183,44 @@ const Reviews = () => {
             context.openAlertBox("error", "Có lỗi hệ thống trong quá trình xóa đánh giá!");
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleReplyReview = async () => {
+        if (!reviewToReply || !replyContent.trim()) {
+            context.openAlertBox("error", "Vui lòng nhập nội dung phản hồi");
+            return;
+        }
+
+        try {
+            setReplying(true);
+            const response = await putDataApi(`/admin/evaluate/${reviewToReply.id}/reply`, {
+                seller_reply: replyContent.trim()
+            });
+
+            if (response.success) {
+                setReviews(prevReviews =>
+                    prevReviews.map(review =>
+                        review.id === reviewToReply.id
+                            ? {
+                                ...review,
+                                seller_reply: replyContent.trim(),
+                                seller_reply_at: new Date().toISOString()
+                            }
+                            : review
+                    )
+                );
+
+                context.openAlertBox("success", response.message || "Phản hồi đánh giá thành công");
+                closeReplyDialog();
+            } else {
+                context.openAlertBox("error", response.message || "Có lỗi trong quá trình phản hồi đánh giá");
+            }
+        } catch (error) {
+            console.error('Error replying review:', error);
+            context.openAlertBox("error", "Có lỗi hệ thống trong quá trình phản hồi đánh giá!");
+        } finally {
+            setReplying(false);
         }
     };
 
@@ -388,6 +444,15 @@ const Reviews = () => {
                                                             </Button>
 
                                                             <Button
+                                                                className="!w-[35px] !h-[35px] bg-[#f1f1f1] !border-[rgba(0,0,0,0.4)] !rounded-full hover:!bg-green-100 !min-w-[35px]"
+                                                                onClick={() => openReplyDialog(review)}
+                                                                title={review.seller_reply ? "Xem phản hồi" : "Phản hồi"}
+                                                                disabled={review.seller_reply ? true : false}
+                                                            >
+                                                                <BiReply className={`text-[18px] ${review.seller_reply ? 'text-green-600' : 'text-[rgba(0,0,0,0.7)] hover:text-green-600'}`} />
+                                                            </Button>
+
+                                                            <Button
                                                                 className="!w-[35px] !h-[35px] bg-[#f1f1f1] !border-[rgba(0,0,0,0.4)] !rounded-full hover:!bg-red-100 !min-w-[35px]"
                                                                 onClick={() => openDeleteDialog(review)}
                                                                 title="Xóa"
@@ -458,6 +523,86 @@ const Reviews = () => {
                 onClose={closeDetailDialog}
                 reviewId={reviewIdToView}
             />
+
+            <Dialog
+                open={replyDialogOpen}
+                onClose={closeReplyDialog}
+                aria-labelledby="reply-dialog-title"
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle id="reply-dialog-title">
+                    {reviewToReply?.seller_reply ? 'Xem phản hồi đánh giá' : 'Phản hồi đánh giá'}
+                </DialogTitle>
+                <DialogContent>
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-2">
+                            <strong>Khách hàng:</strong> {reviewToReply?.customer?.full_name ||
+                                `${reviewToReply?.customer?.first_name || ''} ${reviewToReply?.customer?.last_name || ''}`.trim() || 'N/A'}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-2">
+                            <strong>Sản phẩm:</strong> {reviewToReply?.product?.name || 'N/A'}
+                        </p>
+                        <div className="flex items-center gap-2 mb-2">
+                            <strong className="text-sm text-gray-600">Điểm:</strong>
+                            <Rating value={reviewToReply?.rate} readOnly size="small" />
+                            <span className="text-sm text-gray-600">({reviewToReply?.rate}/5)</span>
+                        </div>
+                        {reviewToReply?.content && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                                <p className="text-sm text-gray-600 mb-1"><strong>Nội dung đánh giá:</strong></p>
+                                <p className="text-sm">{reviewToReply.content}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {reviewToReply?.seller_reply ? (
+                        <div className="p-3 bg-blue-50 rounded-md">
+                            <p className="text-sm text-gray-600 mb-1"><strong>Phản hồi của shop:</strong></p>
+                            <p className="text-sm">{reviewToReply.seller_reply}</p>
+                            {reviewToReply?.seller_reply_at && (
+                                <p className="text-xs text-gray-500 mt-2">
+                                    Phản hồi lúc: {formatDate(reviewToReply.seller_reply_at)}
+                                </p>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                label="Nội dung phản hồi"
+                                fullWidth
+                                multiline
+                                rows={4}
+                                variant="outlined"
+                                value={replyContent}
+                                onChange={(e) => setReplyContent(e.target.value)}
+                                placeholder="Nhập nội dung phản hồi của bạn..."
+                                disabled={replying}
+                            />
+
+                            <div className="mt-2 text-xs text-gray-500">
+                                {replyContent.length}/500 ký tự
+                            </div>
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeReplyDialog} disabled={replying}>
+                        {reviewToReply?.seller_reply ? 'Đóng' : 'Hủy'}
+                    </Button>
+                    {!reviewToReply?.seller_reply && (
+                        <Button
+                            onClick={handleReplyReview}
+                            variant="contained"
+                            disabled={replying || !replyContent.trim() || replyContent.length > 500}
+                        >
+                            {replying ? 'Đang gửi...' : 'Gửi phản hồi'}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
         </>
     )
 }

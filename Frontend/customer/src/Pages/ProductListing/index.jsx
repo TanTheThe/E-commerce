@@ -12,7 +12,7 @@ import { LuMenu } from "react-icons/lu";
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Pagination from "@mui/material/Pagination";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { getDataApi } from "../../utils/api";
 
 
@@ -23,6 +23,8 @@ function handleClick(event) {
 
 const ProductListing = () => {
     const { categoryId } = useParams();
+    const [searchParams] = useSearchParams();
+    const [searchParamsProcessed, setSearchParamsProcessed] = useState(false);
 
     const [itemView, setItemView] = useState('grid');
     const [anchorEl, setAnchorEl] = useState(null);
@@ -108,8 +110,8 @@ const ProductListing = () => {
             }
 
             if (filterData.colors?.length) {
-                filterData.colors.forEach(c => {
-                    queryParams.append('colors', c);
+                filterData.colors.forEach(colorId => {
+                    queryParams.append('colors', colorId);
                 });
             }
 
@@ -152,10 +154,21 @@ const ProductListing = () => {
     };
 
     useEffect(() => {
-        if (categoryId) {
+        if (categoryId && searchParamsProcessed) {
             fetchProducts();
         }
-    }, [categoryId, currentPage, sortBy, searchVal, selectedCategoryIds, minPrice, maxPrice, selectedColors, selectedSizes, selectedRatings]);
+    }, [categoryId, currentPage, sortBy, searchVal, selectedCategoryIds, minPrice, maxPrice, selectedColors, selectedSizes, selectedRatings, searchParamsProcessed]);
+
+    useEffect(() => {
+        const selectedCategoriesFromUrl = searchParams.get('selected_categories');
+        if (selectedCategoriesFromUrl) {
+            const categoryIds = selectedCategoriesFromUrl.split(',').map(id => id.trim());
+            setSelectedCategoryIds(categoryIds);
+        } else {
+            setSelectedCategoryIds([]);
+        }
+        setSearchParamsProcessed(true);
+    }, [searchParams]);
 
     const handleSortChange = (option) => {
         setSortBy(option);
