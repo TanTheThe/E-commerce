@@ -7,7 +7,7 @@ class CategoriesProductModel(BaseModel):
     id: uuid.UUID
     categories_id: uuid.UUID
     product_id: uuid.UUID
-    created_at: datetime = Field(default=datetime.now)
+    created_at: datetime = Field(default=datetime.now())
     updated_at: datetime = None
     deleted_at: datetime = None
 

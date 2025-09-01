@@ -45,6 +45,8 @@ function App() {
 
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutTotal, setCheckoutTotal] = useState(0);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState(null);
 
   const { isLogin, setIsLogin, userData, setUserData, isLoading, checkLogin } = useAuth();
 
@@ -73,6 +75,7 @@ function App() {
   const clearCheckout = () => {
     setCheckoutItems([]);
     setCheckoutTotal(0);
+    setSelectedVoucher(null);
   };
 
   const updateCheckoutItemQuantity = (cartItemId, newQuantity) => {
@@ -118,7 +121,11 @@ function App() {
     addItemsToCheckout,
     clearCheckout,
     updateCheckoutItemQuantity,
-    removeCheckoutItem
+    removeCheckoutItem,
+    selectedVoucher,
+    setSelectedVoucher,
+    selectedAddress,
+    setSelectedAddress,
   }
 
   return (

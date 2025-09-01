@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload
 import uuid
@@ -51,13 +51,16 @@ class ProductVariantRepository:
         session.add_all(new_objects)
 
 
-    async def get_all_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+    async def get_all_product_variant(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None, for_update: bool = False):
         statement = select(Product_Variant).options(
             *joins if joins else []
         )
 
         if conditions is not None:
             statement = statement.where(conditions)
+
+        if for_update:
+            statement = statement.with_for_update()
 
         result = await session.exec(statement)
         return result.all()
@@ -82,6 +85,7 @@ class ProductVariantRepository:
         )
 
         await session.exec(statement)
+
 
 
     async def delete_product_variant(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):

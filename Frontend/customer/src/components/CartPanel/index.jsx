@@ -17,7 +17,7 @@ const CartPanel = () => {
     const [quantities, setQuantities] = useState({});
     const [selectedVariants, setSelectedVariants] = useState(new Set());
 
-    const { addItemsToCheckout } = useContext(MyContext);
+    const { addItemsToCheckout, setOpenCartPanel } = useContext(MyContext);
     const navigate = useNavigate();
 
     const getCurrentQuantity = (cartItemId, originalQuantity) => {
@@ -242,6 +242,8 @@ const CartPanel = () => {
         const totalPrice = getTotalPrice();
 
         addItemsToCheckout(selectedItems, totalPrice);
+
+        setOpenCartPanel(false);
 
         navigate('/cart');
     };

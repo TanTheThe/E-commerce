@@ -7,10 +7,10 @@ from src.errors.user import UserException
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
     SetOfferToProduct, AssignOfferToUsers
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, or_
+from sqlmodel import and_, or_, select
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from sqlalchemy.orm import noload
 
 special_offer_repository = SpecialOfferRepository()
@@ -90,6 +90,53 @@ class SpecialOfferService:
             conditions.append(Special_Offer.end_time < now)
 
         special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit)
+
+        response = []
+        for offer in special_offers:
+            offer_dict = {
+                "id": str(offer.id),
+                "code": offer.code,
+                "name": offer.name,
+                "discount": offer.discount,
+                "type": offer.type,
+                "scope": offer.scope,
+                "condition": offer.condition,
+                "total_quantity": offer.total_quantity,
+                "used_quantity": offer.used_quantity,
+                "start_time": str(offer.start_time),
+                "end_time": str(offer.end_time),
+            }
+            response.append(offer_dict)
+
+        return {
+            "data": response,
+            "total": total
+        }
+
+
+    async def get_all_special_offer_customer_service(self, user_id: str, session: AsyncSession, search: Optional[str], skip: int = 0, limit: int = 10):
+        condition_offers = [Special_Offer.deleted_at.is_(None), Special_Offer.scope == 'order',
+                            Special_Offer.start_time <= datetime.now(), Special_Offer.end_time >= datetime.now(),
+                            Special_Offer.total_quantity > Special_Offer.used_quantity]
+
+        if search:
+            search_term = f"%{search}%"
+            condition_offers.append(or_(
+                Special_Offer.name.ilike(search_term),
+                Special_Offer.code.ilike(search_term),
+            ))
+
+        subquery = (
+            select(UserSpecialOffer.special_offer_id)
+            .where(UserSpecialOffer.user_id == user_id)
+            .where(UserSpecialOffer.deleted_at.is_(None))
+            .where(UserSpecialOffer.is_used == False)
+            .where(UserSpecialOffer.used_at.is_(None))
+        )
+
+        condition_offers.append(Special_Offer.id.in_(subquery))
+
+        special_offers, total = await special_offer_repository.get_all_special_offer(condition_offers, session, skip, limit)
 
         response = []
         for offer in special_offers:

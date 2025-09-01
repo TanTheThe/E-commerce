@@ -9,7 +9,7 @@ from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, func, or_, asc, desc, update
-from sqlalchemy import update
+from sqlalchemy import update, bindparam
 from src.errors.address import AddressException
 from src.errors.order import OrderException
 from src.errors.product import ProductException
@@ -31,33 +31,25 @@ product_variant_repository = ProductVariantRepository()
 class OrderService:
     async def validate_order_dependencies(self, customer_id, address_id, offer_id, session):
         conditions_user = and_(User.id == customer_id, User.deleted_at.is_(None))
+        customer = await user_repository.get_user(conditions_user, session)
+        if not customer:
+            AuthException.user_not_found()
+
         conditions_address = and_(Address.id == address_id, Address.deleted_at.is_(None))
+        address = await address_repository.get_address(conditions_address, session)
+        if not address:
+            AddressException.not_found()
 
-        tasks = [
-            user_repository.get_user(conditions_user, session),
-            address_repository.get_address(conditions_address, session),
-        ]
-
+        order_offer = None
         if offer_id:
             conditions_offer = and_(
                 Special_Offer.id == offer_id,
                 Special_Offer.deleted_at.is_(None),
                 Special_Offer.scope == "order"
             )
-            tasks.append(special_offer_repository.get_special_offer(conditions_offer, session))
-        else:
-            tasks.append(asyncio.sleep(0))
-
-        customer, address, order_offer = await asyncio.gather(*tasks)
-
-        if not customer:
-            AuthException.user_not_found()
-
-        if not address:
-            AddressException.not_found()
-
-        if offer_id and not order_offer:
-            SpecialOfferException.not_found()
+            order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
+            if not order_offer:
+                SpecialOfferException.not_found()
 
         return customer, address, order_offer
 
@@ -74,199 +66,261 @@ class OrderService:
             ),
         ]
 
-        variants = await product_variant_repository.get_all_product_variant(condition, session, joins)
+        variants = await product_variant_repository.get_all_product_variant(condition, session, joins, for_update=True)
         return {str(v.id): v for v in variants}
 
     async def calculate_order_totals(self, order_items, variant_map):
-        sub_total = 0
-        total_discount = 0
-        order_detail_objs = []
-        product_offers_to_update = {}
+        try:
+            sub_total = 0
+            total_discount = 0
+            order_detail_objs = []
+            product_offers_to_update = {}
 
-        for item in order_items:
-            variant = variant_map.get(item.product_variant_id)
-            if not variant:
-                ProductException.not_found_variant()
+            for item in order_items:
+                variant = variant_map.get(item.product_variant_id)
+                if not variant:
+                    ProductException.not_found_variant()
 
-            product = variant.product
-            if not product:
-                ProductException.not_found()
+                product = variant.product
+                if not product:
+                    ProductException.not_found()
 
-            if item.quantity > variant.quantity:
-                ProductException.out_of_stock(str(variant.id))
+                if item.quantity > variant.quantity:
+                    ProductException.out_of_stock(str(variant.id))
 
-            discounted_price = variant.price
-            product_discount_per_item = 0
+                discounted_price = variant.price
+                product_discount_per_item = 0
+                if product.special_offer_id and product.special_offer:
+                    product_offer = product.special_offer
+                    if product_offer.scope != "product":
+                        continue
 
-            if product.special_offer_id and product.special_offer:
-                product_offer = product.special_offer
-                if product_offer.scope != "product":
-                    continue
+                    remaining_quantity = product_offer.total_quantity - product_offer.used_quantity
+                    if remaining_quantity < item.quantity:
+                        raise Exception(f"Product offer {product_offer.code} không đủ số lượng")
 
-                remaining_quantity = product_offer.total_quantity - product_offer.used_quantity
-                if remaining_quantity < item.quantity:
-                    raise Exception(f"Product offer {product_offer.code} không đủ số lượng")
+                    if product_offer.type == "percent":
+                        product_discount_per_item = int(variant.price * product_offer.discount / 100)
+                        discounted_price = variant.price - product_discount_per_item
 
-                if product_offer.type == "percent":
-                    product_discount_per_item = int(variant.price * product_offer.discount / 100)
-                    discounted_price = variant.price - product_discount_per_item
+                        if str(product_offer.id) not in product_offers_to_update:
+                            product_offers_to_update[str(product_offer.id)] = 0
+                        product_offers_to_update[str(product_offer.id)] += item.quantity
 
-                    if str(product_offer.id) not in product_offers_to_update:
-                        product_offers_to_update[str(product_offer.id)] = 0
-                    product_offers_to_update[str(product_offer.id)] += item.quantity
+                item_sub_total = discounted_price * item.quantity
+                item_total_discount = product_discount_per_item * item.quantity
 
-            item_sub_total = discounted_price * item.quantity
-            item_total_discount = product_discount_per_item * item.quantity
+                sub_total += item_sub_total
+                total_discount += item_total_discount
 
-            sub_total += item_sub_total
-            total_discount += item_total_discount
+                product_dict = {
+                    "name": product.name,
+                    "product_image": product.images,
+                    "price": discounted_price,
+                    "original_price": variant.price,
+                    "variant_image": variant.image,
+                    "size": variant.size,
+                    "color_id": str(variant.color_id),
+                    "color_name": variant.color_name,
+                    "color_code": variant.color_code,
+                }
 
-            product_dict = {
-                "name": product.name,
-                "images": product.images,
-                "price": discounted_price,
-                "original_price": variant.price,
-                "quantity": variant.quantity,
-                "size": variant.size,
-                "color": variant.color
-            }
+                order_detail_dict = {
+                    "quantity": item.quantity,
+                    "price": discounted_price,
+                    "product_id": variant.product_id,
+                    "product_variant_id": variant.id,
+                    "Product": product_dict
+                }
 
-            order_detail_dict = {
-                "quantity": item.quantity,
-                "price": discounted_price,
-                "product_id": variant.product_id,
-                "product_variant_id": variant.id,
-                "Product": product_dict
-            }
+                order_detail_objs.append(Order_Detail(**order_detail_dict))
 
-            order_detail_objs.append(Order_Detail(**order_detail_dict))
+            return sub_total, total_discount, order_detail_objs, product_offers_to_update
 
-        return sub_total, total_discount, order_detail_objs, product_offers_to_update
+        except Exception as e:
+            raise
 
     async def apply_order_offer(self, order_offer, sub_total):
-        if not order_offer:
-            return 0
+        try:
+            if not order_offer:
+                return 0
 
-        if order_offer.condition and sub_total < order_offer.condition:
-            return 0
+            if order_offer.condition and sub_total < order_offer.condition:
+                return 0
 
-        remaining_quantity = order_offer.total_quantity - order_offer.used_quantity
-        if remaining_quantity < 1:
-            raise Exception(f"Order offer {order_offer.code} đã hết lượt sử dụng")
+            remaining_quantity = order_offer.total_quantity - order_offer.used_quantity
+            if remaining_quantity < 1:
+                raise Exception(f"Order offer {order_offer.code} đã hết lượt sử dụng")
 
-        order_discount = 0
-        if order_offer.type == "percent":
-            order_discount = int(sub_total * order_offer.discount / 100)
-        elif order_offer.type == "fixed":
-            order_discount = order_offer.discount
+            order_discount = 0
+            if order_offer.type == "percent":
+                order_discount = int(sub_total * order_offer.discount / 100)
+            elif order_offer.type == "fixed":
+                order_discount = order_offer.discount
 
-        return order_discount
+            return order_discount
+        except Exception as e:
+            raise
 
     async def update_offers_usage(self, product_offers_to_update, order_offer, session):
-        for offer_id, quantity_used in product_offers_to_update.items():
-            product_offer = await special_offer_repository.get_special_offer(
-                and_(Special_Offer.id == offer_id, Special_Offer.deleted_at.is_(None)),
-                session
-            )
-            if product_offer:
-                product_offer.used_quantity += quantity_used
-                product_offer.total_quantity -= quantity_used
-                session.add(product_offer)
+        try:
+            if product_offers_to_update:
+                offer_ids = list(product_offers_to_update.keys())
+                condition = [Special_Offer.id.in_(offer_ids), Special_Offer.deleted_at.is_(None)]
+                locked_offers, _ = await special_offer_repository.get_all_special_offer(condition, session)
 
-        if order_offer:
-            order_offer.used_quantity += 1
-            order_offer.total_quantity -= 1
-            session.add(order_offer)
+                updates = []
+                for offer in locked_offers:
+                    quantity_used = product_offers_to_update.get(str(offer.id), 0)
+                    if quantity_used > 0:
+                        remaining = offer.total_quantity - offer.used_quantity
+                        if remaining < quantity_used:
+                            SpecialOfferException.insufficient_quantity()
+
+                        updates.append({
+                            "id": str(offer.id),
+                            "used_quantity": offer.used_quantity + quantity_used
+                        })
+
+                if updates:
+                    statement = update(Special_Offer)
+                    await session.execute(statement, updates)
+
+            if order_offer:
+                locked_order_offer = await special_offer_repository.get_special_offer(
+                    and_(Special_Offer.id == order_offer.id, Special_Offer.deleted_at.is_(None)),
+                    session,
+                    for_update=True
+                )
+                if locked_order_offer:
+                    remaining = locked_order_offer.total_quantity - locked_order_offer.used_quantity
+                    if remaining < 1:
+                        SpecialOfferException.insufficient_quantity()
+
+                    condition = and_(Special_Offer.id == locked_order_offer.id)
+                    await special_offer_repository.update_offer_some_field(
+                        condition,
+                        {
+                            "used_quantity": order_offer.used_quantity + 1,
+                        },
+                        session
+                    )
+
+        except Exception as e:
+            raise
+
+    async def update_inventory_batch(self, order_items, variant_map, session: AsyncSession):
+        updates = []
+        for item in order_items:
+            variant = variant_map[item.product_variant_id]
+            if variant.quantity < item.quantity:
+                ProductException.out_of_stock(str(variant.id))
+
+            updates.append({
+                "id": str(variant.id),
+                "quantity": variant.quantity - item.quantity
+            })
+
+        statement = update(Product_Variant)
+        await session.execute(statement, updates)
+
 
     async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
-        customer, address, order_offer = await self.validate_order_dependencies(
-            customer_id, order_data.address_id, order_data.special_offer_id, session
-        )
+        try:
+            customer, address, order_offer = await self.validate_order_dependencies(
+                customer_id, order_data.address_id, order_data.special_offer_id, session
+            )
 
-        variant_ids = {item.product_variant_id for item in order_data.order_detail}
-        variant_map = await self.get_variants_with_product_offers(variant_ids, session)
+            variant_ids = {item.product_variant_id for item in order_data.order_detail}
+            variant_map = await self.get_variants_with_product_offers(variant_ids, session)
 
-        sub_total, product_discount, order_detail_objs, product_offers_to_update = await self.calculate_order_totals(
-            order_data.order_detail, variant_map
-        )
+            sub_total, product_discount, order_detail_objs, product_offers_to_update = await self.calculate_order_totals(
+                order_data.order_detail, variant_map
+            )
 
-        order_discount = await self.apply_order_offer(order_offer, sub_total)
+            order_discount = await self.apply_order_offer(order_offer, sub_total)
 
-        total_discount = product_discount + order_discount
-        total_price = sub_total - total_discount
+            total_discount = product_discount + order_discount
+            total_price = sub_total - total_discount
 
-        address_dict = {
-            "line": address.line,
-            "street": address.street,
-            "ward": address.ward,
-            "city": address.city,
-            "district": address.district,
-            "country": address.country
-        }
-
-        new_order_dict = {
-            "code": str(int(time.time() * 1000)),
-            "sub_total": sub_total,
-            "total_price": total_price,
-            "discount": total_discount,  # Tổng discount từ cả product + order offers
-            "note": order_data.note,
-            "payment_method": "vnpay",
-            "transaction_no": "",
-            "user_id": customer_id,
-            "Address": address_dict
-        }
-
-        new_order = await order_repository.create_order(new_order_dict, session)
-
-        for od in order_detail_objs:
-            od.order_id = new_order.id
-        await order_detail_repository.create_order_detail(order_detail_objs, session)
-
-        for item in order_data.order_detail:
-            variant = variant_map[item.product_variant_id]
-            variant.quantity -= item.quantity
-            session.add(variant)
-
-        await self.update_offers_usage(product_offers_to_update, order_offer, session)
-        await session.commit()
-
-        response = {
-            "order_id": str(new_order.id),
-            "sub_total": sub_total,
-            "total_price": total_price,
-            "product_discount": product_discount,
-            "order_discount": order_discount,
-            "total_discount": total_discount,
-            "note": new_order.note,
-            "order_offer": {
-                "id": str(order_offer.id),
-                "code": order_offer.code,
-                "name": order_offer.name,
-                "discount": order_offer.discount,
-                "condition": order_offer.condition,
-                "type": order_offer.type,
-            } if order_offer else None,
-            "address": {
-                "id": str(address.id),
+            address_dict = {
                 "line": address.line,
                 "street": address.street,
                 "ward": address.ward,
                 "city": address.city,
                 "district": address.district,
-                "country": address.country,
-            },
-            "order_detail": [
-                {
-                    "quantity": od.quantity,
-                    "price": str(od.price),  # Giá sau discount
-                    "product_id": str(od.product_id),
-                    "product_variant_id": str(od.product_variant_id)
-                }
-                for od in order_detail_objs
-            ]
-        }
+                "country": address.country
+            }
 
-        return response
+            new_order_dict = {
+                "code": str(int(time.time() * 1000)),
+                "sub_total": sub_total,
+                "total_price": total_price,
+                "discount": total_discount,  # Tổng discount từ cả product + order offers
+                "note": order_data.note,
+                "payment_method": "vnpay",
+                "transaction_no": "",
+                "user_id": customer_id,
+                "Address": address_dict
+            }
+
+            new_order = await order_repository.create_order(new_order_dict, session)
+
+            for od in order_detail_objs:
+                od.order_id = new_order.id
+            await order_detail_repository.create_order_detail(order_detail_objs, session)
+
+            for item in order_data.order_detail:
+                variant = variant_map[item.product_variant_id]
+                variant.quantity -= item.quantity
+                session.add(variant)
+
+            await self.update_inventory_batch(order_data.order_detail, variant_map, session)
+
+            await self.update_offers_usage(product_offers_to_update, order_offer, session)
+            await session.commit()
+
+            response = {
+                "order_id": str(new_order.id),
+                "sub_total": sub_total,
+                "total_price": total_price,
+                "product_discount": product_discount,
+                "order_discount": order_discount,
+                "total_discount": total_discount,
+                "note": new_order.note,
+                "order_offer": {
+                    "id": str(order_offer.id),
+                    "code": order_offer.code,
+                    "name": order_offer.name,
+                    "discount": order_offer.discount,
+                    "condition": order_offer.condition,
+                    "type": order_offer.type,
+                } if order_offer else None,
+                "address": {
+                    "id": str(address.id),
+                    "line": address.line,
+                    "street": address.street,
+                    "ward": address.ward,
+                    "city": address.city,
+                    "district": address.district,
+                    "country": address.country,
+                },
+                "order_detail": [
+                    {
+                        "quantity": od.quantity,
+                        "price": str(od.price),  # Giá sau discount
+                        "product_id": str(od.product_id),
+                        "product_variant_id": str(od.product_variant_id)
+                    }
+                    for od in order_detail_objs
+                ]
+            }
+
+            return response
+        except Exception as e:
+            await session.rollback()
+            raise
+
 
     async def get_detail_order_admin(self, order_id: str, session: AsyncSession):
         joins = [

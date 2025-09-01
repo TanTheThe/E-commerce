@@ -110,3 +110,13 @@ class SpecialOfferException:
                 "error_code": "voucher_011"
             }
         )
+
+    @staticmethod
+    def insufficient_quantity():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Số lượng offer không đủ",
+                "error_code": "voucher_012"
+            }
+        )

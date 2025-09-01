@@ -27,9 +27,6 @@ class AddressService:
         condition = and_(Address.user_id == user_id)
         addresses = await address_repository.get_all_address(condition, session)
 
-        if len(addresses) == 0:
-            AddressException.empty_list()
-
         filtered_address = [
             {
                 "id": str(address.id),
