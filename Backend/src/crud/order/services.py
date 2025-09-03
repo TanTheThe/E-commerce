@@ -1,5 +1,5 @@
 from sqlalchemy.orm import selectinload, joinedload, noload, load_only
-from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product
+from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product, Color
 from src.crud.address.repositories import AddressRepository
 from src.crud.order.repositories import OrderRepository
 from src.crud.special_offer.repositories import SpecialOfferRepository
@@ -7,6 +7,7 @@ from src.crud.user.repositories import UserRepository
 from src.crud.product.repositories import ProductRepository
 from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
+from src.crud.color.repositories import ColorRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, func, or_, asc, desc, update
 from sqlalchemy import update, bindparam
@@ -26,6 +27,7 @@ address_repository = AddressRepository()
 product_repository = ProductRepository()
 order_detail_repository = OrderDetailRepository()
 product_variant_repository = ProductVariantRepository()
+color_repository = ColorRepository()
 
 
 class OrderService:
@@ -69,7 +71,7 @@ class OrderService:
         variants = await product_variant_repository.get_all_product_variant(condition, session, joins, for_update=True)
         return {str(v.id): v for v in variants}
 
-    async def calculate_order_totals(self, order_items, variant_map):
+    async def calculate_order_totals(self, order_items, variant_map, session: AsyncSession):
         try:
             sub_total = 0
             total_discount = 0
@@ -100,8 +102,9 @@ class OrderService:
                         raise Exception(f"Product offer {product_offer.code} không đủ số lượng")
 
                     if product_offer.type == "percent":
-                        product_discount_per_item = int(variant.price * product_offer.discount / 100)
+                        product_discount_per_item = (variant.price * product_offer.discount) / 100
                         discounted_price = variant.price - product_discount_per_item
+                        discounted_price = int(round(discounted_price / 1000) * 1000)
 
                         if str(product_offer.id) not in product_offers_to_update:
                             product_offers_to_update[str(product_offer.id)] = 0
@@ -113,16 +116,20 @@ class OrderService:
                 sub_total += item_sub_total
                 total_discount += item_total_discount
 
+                if variant.color_id:
+                    condition = and_(Color.id == variant.color_id, Color.deleted_at.is_(None))
+                    color = await color_repository.get_color(condition, session)
+                
                 product_dict = {
                     "name": product.name,
                     "product_image": product.images,
-                    "price": discounted_price,
-                    "original_price": variant.price,
+                    "price_before_discount": variant.price,
+                    "price_after_discount": discounted_price,
                     "variant_image": variant.image,
                     "size": variant.size,
-                    "color_id": str(variant.color_id),
-                    "color_name": variant.color_name,
-                    "color_code": variant.color_code,
+                    "color_id": str(variant.color_id) if variant.color_id else None,
+                    "color_name": color.name if color else variant.color_name,
+                    "color_code": color.code if color else variant.color_code,
                 }
 
                 order_detail_dict = {
@@ -235,13 +242,13 @@ class OrderService:
             variant_map = await self.get_variants_with_product_offers(variant_ids, session)
 
             sub_total, product_discount, order_detail_objs, product_offers_to_update = await self.calculate_order_totals(
-                order_data.order_detail, variant_map
+                order_data.order_detail, variant_map, session
             )
 
             order_discount = await self.apply_order_offer(order_offer, sub_total)
 
             total_discount = product_discount + order_discount
-            total_price = sub_total - total_discount
+            total_price = sub_total - order_discount
 
             address_dict = {
                 "line": address.line,
@@ -256,7 +263,7 @@ class OrderService:
                 "code": str(int(time.time() * 1000)),
                 "sub_total": sub_total,
                 "total_price": total_price,
-                "discount": total_discount,  # Tổng discount từ cả product + order offers
+                "discount": order_discount, 
                 "note": order_data.note,
                 "payment_method": "vnpay",
                 "transaction_no": "",
@@ -397,12 +404,10 @@ class OrderService:
 
     async def get_detail_order_customer(self, order_id: str, customer_id: str, session: AsyncSession):
         joins = [
-            selectinload(Order.order_detail).selectinload(Order_Detail.product),
-            selectinload(Order.order_detail).selectinload(Order_Detail.product_variant),
-            selectinload(Order.user),
+            selectinload(Order.order_detail), selectinload(Order.user),
         ]
 
-        condition = and_(Order.id == order_id)
+        condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         order = await order_repository.get_order(condition, session, joins)
 
         if not order:
@@ -431,20 +436,16 @@ class OrderService:
 
         order_detail_response = []
         for od in order.order_detail:
-            product = od.product
-            variant = od.product_variant
-
-            if product and variant:
-                product_dict = {
-                    "name": product.name,
-                    "images": product.images,
-                    "price": variant.price if variant else None,
-                    "quantity": variant.quantity if variant else None,
-                    "size": variant.size if variant else None,
-                    "color": variant.color if variant else None,
-                }
-            else:
-                product_dict = {}
+            product_dict = {
+                "name": od.Product["name"],
+                "size": od.Product["size"],
+                "color_name": od.Product["color_name"],
+                "product_image": od.Product["product_image"],
+                "variant_image": od.Product["variant_image"],
+                "price_after_discount": od.Product["price_after_discount"],
+                "price_before_discount": od.Product["price_before_discount"],
+                "quantity": od.quantity
+            }
 
             order_detail_response.append(product_dict)
 
@@ -532,9 +533,9 @@ class OrderService:
             "total": total,
         }
 
-    async def get_all_order_customer(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
-        condition = and_(Order.user_id == user_id)
-        orders = await order_repository.get_all_order([condition], session, skip=skip, limit=limit)
+    async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0, limit: int = 10):
+        condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
+        orders = await order_repository.get_all_order(condition, session, skip=skip, limit=limit)
 
         response = []
         for order in orders:
