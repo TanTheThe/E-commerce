@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from sqlalchemy.orm import selectinload, joinedload, noload, load_only
-from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product, Color
+from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product, Color, \
+    OrderStatusHistory
 from src.crud.address.repositories import AddressRepository
 from src.crud.order.repositories import OrderRepository
 from src.crud.special_offer.repositories import SpecialOfferRepository
@@ -119,7 +122,7 @@ class OrderService:
                 if variant.color_id:
                     condition = and_(Color.id == variant.color_id, Color.deleted_at.is_(None))
                     color = await color_repository.get_color(condition, session)
-                
+
                 product_dict = {
                     "name": product.name,
                     "product_image": product.images,
@@ -231,7 +234,6 @@ class OrderService:
         statement = update(Product_Variant)
         await session.execute(statement, updates)
 
-
     async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
         try:
             customer, address, order_offer = await self.validate_order_dependencies(
@@ -263,7 +265,7 @@ class OrderService:
                 "code": str(int(time.time() * 1000)),
                 "sub_total": sub_total,
                 "total_price": total_price,
-                "discount": order_discount, 
+                "discount": order_discount,
                 "note": order_data.note,
                 "payment_method": "vnpay",
                 "transaction_no": "",
@@ -327,7 +329,6 @@ class OrderService:
         except Exception as e:
             await session.rollback()
             raise
-
 
     async def get_detail_order_admin(self, order_id: str, session: AsyncSession):
         joins = [
@@ -434,6 +435,15 @@ class OrderService:
             "country": address["country"],
         } if address else None
 
+        condition_status = and_(OrderStatusHistory.order_id == order_id)
+        latest_status = await order_repository.get_new_status_order(condition_status, session)
+        latest_status_response = None
+        if latest_status:
+            latest_status_response = {
+                "status": latest_status.status,
+                "changed_at": str(latest_status.created_at),
+            }
+
         order_detail_response = []
         for od in order.order_detail:
             product_dict = {
@@ -455,6 +465,7 @@ class OrderService:
                 "note": order.note,
                 "status": order.status,
                 "created_at": str(order.created_at),
+                "last_status_change": latest_status_response,
                 "sub_total": order.sub_total,
                 "discount": order.discount,
                 "total_price": order.total_price,
@@ -465,6 +476,50 @@ class OrderService:
         }
 
         return response
+
+    async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0,
+                                     limit: int = 10):
+        condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
+        joins = [selectinload(Order.order_detail)]
+        orders, total = await order_repository.get_all_order(condition, session, skip=skip, limit=limit, joins=joins)
+
+        order_response = []
+        for order in orders:
+            product_map = {}
+
+            for od in order.order_detail:
+                pid = str(od.product_id)
+                product = od.Product
+
+                if pid not in product_map:
+                    product_map[pid] = {
+                        "product_id": pid,
+                        "name": product["name"],
+                        "variant_image": product["variant_image"],
+                        "price_after_discount": product["price_after_discount"],
+                        "price_before_discount": product["price_before_discount"],
+                        "variants": []
+                    }
+
+                product_map[pid]["variants"].append({
+                    "size": product["size"],
+                    "color_name": product["color_name"],
+                    "quantity": od.quantity
+                })
+
+            order_response.append({
+                "order": {
+                    "order_id": str(order.id),
+                    "code": order.code,
+                    "status": order.status,
+                    "created_at": str(order.created_at),
+                    "discount": order.discount,
+                    "total_price": order.total_price,
+                },
+                "order_detail": list(product_map.values())
+            })
+
+        return {"total": total, "data": order_response}
 
     async def get_all_order_admin(self, session: AsyncSession, filter_data: OrderFilterModel, skip: int = 0,
                                   limit: int = 10):
@@ -533,22 +588,6 @@ class OrderService:
             "total": total,
         }
 
-    async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0, limit: int = 10):
-        condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
-        orders = await order_repository.get_all_order(condition, session, skip=skip, limit=limit)
-
-        response = []
-        for order in orders:
-            order_dict = {
-                "code": order.code,
-                "status": order.status,
-                "created_at": str(order.created_at),
-                "total_price": order.total_price,
-            }
-            response.append(order_dict)
-
-        return response
-
     async def update_status(self, order_id, status, session: AsyncSession):
         condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         joins = [
@@ -564,12 +603,19 @@ class OrderService:
         status_dict = status.model_dump()
         order_after_update = await order_repository.update_order(order_to_update, status_dict, session)
 
+        history_entry = OrderStatusHistory(
+            order_id=order_id,
+            status=order_after_update.status,
+            created_at=datetime.now()
+        )
+        session.add(history_entry)
+
         if order_after_update.status in ["completed", "delivered"] and old_status not in ["completed", "delivered"]:
             for od in order_after_update.order_detail:
                 await product_repository.update_product_some_field(Product.id == od.product_id,
                                                                    {"popularity_score": Product.popularity_score + 1},
                                                                    session)
-
+        await session.commit()
         return order_after_update
 
     async def count_new_orders(self, to_date, from_date, session: AsyncSession):

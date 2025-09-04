@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { getDataApi } from '../../utils/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FaCalendarAlt } from 'react-icons/fa';
-import { FiCalendar, FiCheck, FiClock, FiCopy, FiMail, FiMapPin, FiPhone, FiTruck, FiUser } from 'react-icons/fi';
+import { FiCalendar, FiCheck, FiClock, FiCopy, FiEye, FiMail, FiMapPin, FiPhone, FiTruck, FiUser } from 'react-icons/fi';
 import toast from 'react-hot-toast'
 
-const OrderSuccessPage = () => {
+const OrderSuccessPage = ({ isFromSuccess = true }) => {
     const { orderId } = useParams();
     const navigate = useNavigate();
     const [orderData, setOrderData] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('pending');
     const [error, setError] = useState(null);
 
     const fetchOrderDetails = async () => {
@@ -20,8 +19,6 @@ const OrderSuccessPage = () => {
             const response = await getDataApi(`/customer/order/${orderId}`)
             if (response.success) {
                 setOrderData(response.data)
-                const orderStatus = response.data.order.status.toLowerCase();
-                setActiveTab(orderStatus);
             }
         } catch (err) {
             setError('Không thể tải thông tin đơn hàng');
@@ -36,57 +33,6 @@ const OrderSuccessPage = () => {
             fetchOrderDetails();
         }
     }, [orderId]);
-
-    const tabs = [
-        {
-            key: 'pending',
-            label: 'Chờ xác nhận',
-            icon: FiClock,
-            color: 'text-yellow-600',
-            bgColor: 'bg-yellow-50',
-            borderColor: 'border-yellow-200',
-            route: '/order-tracking/pending'
-        },
-        {
-            key: 'confirmed',
-            label: 'Đã xác nhận',
-            icon: FiCheck,
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-50',
-            borderColor: 'border-blue-200',
-            route: '/order-tracking/confirmed'
-        },
-        {
-            key: 'shipping',
-            label: 'Đang giao hàng',
-            icon: FiTruck,
-            color: 'text-orange-600',
-            bgColor: 'bg-orange-50',
-            borderColor: 'border-orange-200',
-            route: '/order-tracking/shipping'
-        },
-        {
-            key: 'delivered',
-            label: 'Đã giao hàng',
-            icon: FiCheck,
-            color: 'text-green-600',
-            bgColor: 'bg-green-50',
-            borderColor: 'border-green-200',
-            route: '/order-tracking/delivered'
-        }
-    ];
-
-    const handleTabClick = (tab) => {
-        navigate(`${tab.route}?orderId=${orderId}`);
-    };
-
-    const getTabIndex = (tabKey) => {
-        return tabs.findIndex(tab => tab.key === tabKey);
-    };
-
-    const getCurrentTabIndex = () => {
-        return getTabIndex(activeTab);
-    };
 
     const copyOrderCode = () => {
         if (orderData?.order?.code) {
@@ -110,6 +56,7 @@ const OrderSuccessPage = () => {
                 });
         }
     };
+
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('vi-VN', {
             year: 'numeric',
@@ -118,6 +65,40 @@ const OrderSuccessPage = () => {
             hour: '2-digit',
             minute: '2-digit'
         });
+    };
+
+    const getStatusInfo = (status) => {
+        const statusMap = {
+            'pending': {
+                label: 'Chờ xác nhận',
+                icon: FiClock,
+                color: 'text-yellow-600',
+                bgColor: 'bg-yellow-50',
+                borderColor: 'border-yellow-200'
+            },
+            'confirmed': {
+                label: 'Đã xác nhận',
+                icon: FiCheck,
+                color: 'text-blue-600',
+                bgColor: 'bg-blue-50',
+                borderColor: 'border-blue-200'
+            },
+            'shipping': {
+                label: 'Đang giao hàng',
+                icon: FiTruck,
+                color: 'text-orange-600',
+                bgColor: 'bg-orange-50',
+                borderColor: 'border-orange-200'
+            },
+            'delivered': {
+                label: 'Đã giao hàng',
+                icon: FiCheck,
+                color: 'text-green-600',
+                bgColor: 'bg-green-50',
+                borderColor: 'border-green-200'
+            }
+        };
+        return statusMap[status?.toLowerCase()] || statusMap['pending'];
     };
 
     if (loading) {
@@ -151,16 +132,28 @@ const OrderSuccessPage = () => {
 
     if (!orderData) return null;
 
+    const statusInfo = getStatusInfo(orderData.order.status);
+    const StatusIcon = statusInfo.icon;
+
+    const isFromSuccessRoute = window.location.pathname.includes('order-success');
+
     return (
         <div className="min-h-screen bg-gray-50 py-8">
             <div className="container mx-auto px-4 max-w-6xl">
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-                        <FiCheck className="text-4xl text-green-600" />
+                {isFromSuccessRoute ? (
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+                            <FiCheck className="text-4xl text-green-600" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Đặt hàng thành công!</h1>
+                        <p className="text-gray-600">Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đang được xử lý.</p>
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Đặt hàng thành công!</h1>
-                    <p className="text-gray-600">Cảm ơn bạn đã mua hàng. Đơn hàng của bạn đang được xử lý.</p>
-                </div>
+                ) : (
+                    <div className="text-center mb-8">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Chi tiết đơn hàng</h1>
+                        <p className="text-gray-600">Theo dõi tình trạng và thông tin chi tiết đơn hàng của bạn</p>
+                    </div>
+                )}
 
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                     <div className="flex items-center justify-between">
@@ -187,60 +180,32 @@ const OrderSuccessPage = () => {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm mb-6">
-                    <div className="p-6 border-b border-gray-200">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Trạng thái đơn hàng</h2>
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">Trạng thái hiện tại</h2>
 
-                        <div className="relative mb-8">
-                            <div className="flex justify-between">
-                                {tabs.map((tab, index) => {
-                                    const Icon = tab.icon;
-                                    const isActive = index <= getCurrentTabIndex();
-                                    const isCurrent = activeTab === tab.key;
-
-                                    return (
-                                        <div key={tab.key} className="flex flex-col items-center flex-1">
-                                            <button
-                                                onClick={() => handleTabClick(tab)}
-                                                className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-lg ${isActive
-                                                        ? `${tab.bgColor} ${tab.borderColor} ${tab.color} shadow-md`
-                                                        : 'bg-gray-100 border-gray-300 text-gray-400 hover:bg-gray-200 hover:border-gray-400'
-                                                    }`}
-                                                title={`Xem chi tiết trạng thái: ${tab.label}`}
-                                            >
-                                                <Icon className="text-xl" />
-                                                {isCurrent && (
-                                                    <div className="absolute -inset-2 rounded-full border-2 border-dashed border-current opacity-50 animate-pulse"></div>
-                                                )}
-                                            </button>
-                                            <p className={`mt-2 text-sm font-medium text-center ${isActive ? 'text-gray-800' : 'text-gray-400'
-                                                }`}>
-                                                {tab.label}
-                                            </p>
-                                            {isActive && (
-                                                <p className="text-xs text-gray-500 text-center mt-1">
-                                                    Click để xem chi tiết
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                        <div className={`flex items-center gap-4 p-4 rounded-lg border-2 ${statusInfo.bgColor} ${statusInfo.borderColor}`}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${statusInfo.bgColor} ${statusInfo.borderColor} border-2`}>
+                                <StatusIcon className={`text-xl ${statusInfo.color}`} />
                             </div>
-
-                            <div className="absolute top-6 left-6 right-6 h-0.5 bg-gray-300 -z-10">
-                                <div
-                                    className="h-full bg-[#ff5252] transition-all duration-500"
-                                    style={{ width: `${(getCurrentTabIndex() / (tabs.length - 1)) * 100}%` }}
-                                ></div>
+                            <div>
+                                <p className={`font-bold ${statusInfo.color}`}>{statusInfo.label}</p>
+                                <p className="text-gray-600 text-sm">
+                                    {isFromSuccessRoute
+                                        ? `Đặt hàng ${formatDate(orderData.order.created_at)}`
+                                        : `Cập nhật ${formatDate(orderData.order.last_status_change?.changed_at || orderData.order.created_at)}`
+                                    }
+                                </p>
                             </div>
                         </div>
 
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <div className="flex items-center gap-3">
-                                <FiCalendar className="text-gray-500" />
-                                <div>
-                                    <p className="font-medium text-gray-800">Đặt hàng {formatDate(orderData.order.created_at)}</p>
-                                </div>
-                            </div>
+                        <div className="mt-4 text-center">
+                            <button
+                                onClick={() => navigate('/orders?tab=pending')}
+                                className="px-6 py-3 bg-[#ff5252] text-white font-medium rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer inline-flex items-center gap-2"
+                            >
+                                <FiEye />
+                                Theo dõi đơn hàng chi tiết
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -257,7 +222,7 @@ const OrderSuccessPage = () => {
                                         <div key={index} className="flex gap-4 p-4 border border-gray-200 rounded-lg">
                                             <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                                 <img
-                                                    src={item.variant_image || item.product_image[0]}
+                                                    src={item.variant_image || (item.product_image && item.product_image[0])}
                                                     alt={item.name}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -273,7 +238,7 @@ const OrderSuccessPage = () => {
                                                     <span className="font-semibold text-[#ff5252]">
                                                         {item.price_after_discount?.toLocaleString('vi-VN')}đ
                                                     </span>
-                                                    {item.price_before_discount > item.price_after_discount && (
+                                                    {item.price_before_discount && item.price_before_discount > item.price_after_discount && (
                                                         <span className="text-sm text-gray-500 line-through">
                                                             {item.price_before_discount?.toLocaleString('vi-VN')}đ
                                                         </span>
@@ -359,7 +324,7 @@ const OrderSuccessPage = () => {
                         onClick={() => navigate('/orders')}
                         className="px-8 py-3 bg-[#ff5252] text-white font-medium rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer"
                     >
-                        Xem đơn hàng của tôi
+                        {isFromSuccessRoute ? 'Theo dõi đơn hàng' : 'Quay lại đơn hàng'}
                     </button>
                     <button
                         onClick={() => navigate('/')}

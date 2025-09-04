@@ -90,7 +90,6 @@ class ProductRepository:
             .values(**values)
         )
         await session.exec(stmt)
-        await session.commit()
 
 
     async def delete_product(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):

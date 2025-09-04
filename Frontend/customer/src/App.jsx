@@ -152,6 +152,7 @@ function App() {
             <Route path={"/forgot-password-otp"} element={<ResetPasswordOtp />} />
             <Route path={"/send-mail"} element={<EmailToChangePass />} />
             <Route path={"/order-success/:orderId"} exact={true} element={<OrderSuccessPage />} />
+            <Route path={"/order-detail/:orderId"} exact={true} element={<OrderSuccessPage />} />
             <Route path="/order-tracking/pending" element={<OrderTrackingPage status="pending" />} />
             <Route path="/order-tracking/confirmed" element={<OrderTrackingPage status="confirmed" />} />
             <Route path="/order-tracking/shipping" element={<OrderTrackingPage status="shipping" />} />

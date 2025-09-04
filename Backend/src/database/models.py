@@ -102,6 +102,9 @@ class Order(SQLModel, table=True):
     user: Optional["User"] = Relationship(back_populates="order", sa_relationship_kwargs={'lazy': 'noload'})
     order_detail: List["Order_Detail"] = Relationship(back_populates="order",
                                                       sa_relationship_kwargs={'lazy': 'noload'})
+    order_status_history: List["OrderStatusHistory"] = Relationship(
+        back_populates="order", sa_relationship_kwargs={"lazy": "noload"}
+    )
 
 
 class Order_Detail(SQLModel, table=True):
@@ -449,3 +452,21 @@ class Cart_Item(SQLModel, table=True):
     cart: Optional["Cart"] = Relationship(back_populates="items", sa_relationship_kwargs={"lazy": "noload"})
     product: Optional["Product"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
     product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+
+class OrderStatusHistory(SQLModel, table=True):
+    __tablename__ = "order_status_history"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+
+    order_id: uuid.UUID = Field(foreign_key="order.id", nullable=False)
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+
+    order: Optional["Order"] = Relationship(
+        back_populates="order_status_history", sa_relationship_kwargs={"lazy": "noload"}
+    )

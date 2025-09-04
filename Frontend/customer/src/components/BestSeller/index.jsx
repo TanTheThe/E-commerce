@@ -6,37 +6,70 @@ import { MyContext } from '../../App';
 
 const BestSellerSection = () => {
     const context = useContext(MyContext);
+
     const [value, setValue] = useState(0);
     const [bestSellerData, setBestSellerData] = useState({});
     const [parentCategories, setParentCategories] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    const [loadingCategories, setLoadingCategories] = useState(true);
+    const [loadingProducts, setLoadingProducts] = useState(false);
+
+    const [fetchingCategories, setFetchingCategories] = useState(new Set());
 
     useEffect(() => {
-        if (context?.categories && context.categories.length > 0) {
+        if (context?.categories && Array.isArray(context.categories)) {
             const parents = context.categories.filter(cat => cat.parent_id === null);
             setParentCategories(parents);
+            setLoadingCategories(false);
 
-            if (parents.length > 0 && !bestSellerData[parents[0].id]) {
+            if (parents.length > 0 && !bestSellerData[parents[0].id] && !fetchingCategories.has(parents[0].id)) {
                 fetchBestSellersForCategory(parents[0].id);
             }
         }
     }, [context?.categories]);
 
     const fetchBestSellersForCategory = async (parentCategoryId) => {
-        try {
-            const res = await getDataApi(`/customer/product/popular/${parentCategoryId}`);
-            console.log(res);
+        if (fetchingCategories.has(parentCategoryId)) {
+            return;
+        }
 
-            if (res.success) {
+        setFetchingCategories(prev => new Set([...prev, parentCategoryId]));
+        setLoadingProducts(true);
+
+        try {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout')), 10000);
+            });
+
+            const apiPromise = getDataApi(`/customer/product/popular/${parentCategoryId}`);
+
+            const res = await Promise.race([apiPromise, timeoutPromise]);
+
+            if (res && res.success) {
                 setBestSellerData(prev => ({
                     ...prev,
                     [parentCategoryId]: res.data[parentCategoryId] || []
                 }));
+            } else {
+                console.warn("API returned unsuccessful response:", res);
+                setBestSellerData(prev => ({
+                    ...prev,
+                    [parentCategoryId]: []
+                }));
             }
         } catch (error) {
-            console.error('Error fetching best sellers:', error);
+            console.error("Error fetching best sellers:", error);
+            setBestSellerData(prev => ({
+                ...prev,
+                [parentCategoryId]: []
+            }));
         } finally {
-            setLoading(false);
+            setLoadingProducts(false);
+            setFetchingCategories(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(parentCategoryId);
+                return newSet;
+            });
         }
     };
 
@@ -44,8 +77,9 @@ const BestSellerSection = () => {
         setValue(newValue);
 
         const selectedParentId = parentCategories[newValue]?.id;
-
-        if (selectedParentId && !bestSellerData[selectedParentId]) {
+        if (selectedParentId &&
+            !bestSellerData[selectedParentId] &&
+            !fetchingCategories.has(selectedParentId)) {
             await fetchBestSellersForCategory(selectedParentId);
         }
     };
@@ -56,11 +90,31 @@ const BestSellerSection = () => {
         return bestSellerData[currentParentId] || [];
     };
 
-    if (loading && parentCategories.length === 0) {
+    if (!context) {
         return (
             <section className="bg-white py-8">
                 <div className="container">
                     <div className="text-center">Đang tải...</div>
+                </div>
+            </section>
+        );
+    }
+
+    if (loadingCategories) {
+        return (
+            <section className="bg-white py-8">
+                <div className="container">
+                    <div className="text-center">Đang tải danh mục...</div>
+                </div>
+            </section>
+        );
+    }
+
+    if (!loadingCategories && parentCategories.length === 0) {
+        return (
+            <section className="bg-white py-8">
+                <div className="container">
+                    <div className="text-center">Không có danh mục nào.</div>
                 </div>
             </section>
         );
@@ -89,10 +143,11 @@ const BestSellerSection = () => {
                     </div>
                 </div>
 
-                <ProductsSlider
-                    items={6}
-                    products={getCurrentCategoryProducts()}
-                />
+                {loadingProducts ? (
+                    <div className="text-center py-6">Đang tải sản phẩm...</div>
+                ) : (
+                    <ProductsSlider items={6} products={getCurrentCategoryProducts()} />
+                )}
             </div>
         </section>
     );

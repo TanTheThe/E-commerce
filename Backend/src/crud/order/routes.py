@@ -87,6 +87,21 @@ async def create_order(order_data: OrderCreateModel,
         }
     )
 
+@order_customer_router.get("/status/{status_order}", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
+async def get_all_order_customer(status_order: str, skip: int = 0, limit: int = 10,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    customer_id = token_details['user']['id']
+    order_dict = await order_service.get_all_order_customer(customer_id, status_order, session, skip=skip, limit=limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin các đơn hàng",
+            "content": order_dict
+        }
+    )
+
 @order_customer_router.get("/{order_id}", status_code=status.HTTP_200_OK,
                            dependencies=[Depends(customer_role_middleware)])
 async def get_detail_order_customer(order_id: str,
@@ -117,23 +132,6 @@ async def get_detail_order_admin(order_id: str,
             "content": order_dict
         }
     )
-
-
-@order_customer_router.get("/{status_order}", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
-async def get_all_order_customer(status_order: str, skip: int = 0, limit: int = 10,
-                                 token_details: dict = Depends(access_token_bearer),
-                                 session: AsyncSession = Depends(get_session)):
-    customer_id = token_details['user']['id']
-    order_dict = await order_service.get_all_order_customer(customer_id, status_order, session, skip=skip, limit=limit)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin các đơn hàng",
-            "content": order_dict
-        }
-    )
-
 
 @order_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def get_all_order_admin(skip: int = 0, limit: int = 10,

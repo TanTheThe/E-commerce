@@ -127,15 +127,11 @@ const ProductListing = () => {
                 });
             }
 
-            console.log('Query params:', queryParams.toString());
-
             const response = await getDataApi(`/customer/product/category?${queryParams.toString()}`);
 
             if (response.success === true) {
                 const products = response.data?.data || [];
                 const total = response.data?.total || 0;
-
-                console.log('Fetched products:', products.length, 'Total:', total);
 
                 setProducts(products);
                 setTotalProducts(total);

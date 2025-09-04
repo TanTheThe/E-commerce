@@ -17,7 +17,13 @@ const CartPanel = () => {
     const [quantities, setQuantities] = useState({});
     const [selectedVariants, setSelectedVariants] = useState(new Set());
 
-    const { addItemsToCheckout, setOpenCartPanel } = useContext(MyContext);
+    const context = useContext(MyContext);
+    if (!context) {
+        console.warn("MyContext chưa có Provider bọc quanh component này");
+        return null;
+    }
+
+    const { addItemsToCheckout, setOpenCartPanel } = context;
     const navigate = useNavigate();
 
     const getCurrentQuantity = (cartItemId, originalQuantity) => {

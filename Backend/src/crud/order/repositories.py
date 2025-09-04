@@ -1,7 +1,7 @@
 from typing import Optional, List
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload, load_only
-from src.database.models import Order
+from src.database.models import Order, OrderStatusHistory
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, desc, and_, func, distinct
 from datetime import datetime
@@ -90,6 +90,13 @@ class OrderRepository:
         result = await session.exec(statement)
         value = result.one_or_none()
         return value
+
+    async def get_new_status_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+        statement = select(OrderStatusHistory).where(conditions).order_by(desc(OrderStatusHistory.created_at)).limit(1)
+
+        result = await session.exec(statement)
+
+        return result.first()
 
     async def update_order(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():

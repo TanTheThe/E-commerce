@@ -76,6 +76,18 @@ async def get_products_popular(parent_category_id: str, limit_per_category: int 
         }
     )
 
+@product_customer_router.get('/search')
+async def search_product(search: str, session: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 10, ):
+    products = await product_service.search_product_service(search, session, skip, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin sau khi search",
+            "content": products
+        }
+    )
+
 @product_admin_router.get('/offer')
 async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
     categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
@@ -179,6 +191,22 @@ async def get_all_product_admin(search: Optional[str] = None,
         }
     )
 
+@product_admin_router.get('/offer')
+async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
+    categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
+    if not categories_list:
+        CategoriesException.empty_list()
+
+    products = await product_service.get_all_product_for_offer(categories_list, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
 
 @product_customer_router.get('/{id}')
 async def get_detail_product_customer(id: str, session: AsyncSession = Depends(get_session)):
@@ -204,23 +232,6 @@ async def get_detail_product_admin(id: str,
         content={
             "message": "Thông tin chi tiết của sản phẩm",
             "content": product_dict
-        }
-    )
-
-
-@product_admin_router.get('/offer')
-async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
-    categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
-    if not categories_list:
-        CategoriesException.empty_list()
-
-    products = await product_service.get_all_product_for_offer(categories_list, session)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin của các sản phẩm",
-            "content": products
         }
     )
 

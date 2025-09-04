@@ -194,17 +194,9 @@ const CartPage = () => {
                 address_id: selectedAddress.id
             };
 
-            console.log('Order data:', orderData);
-
             const response = await postDataApi('/customer/order', orderData);
 
             if (response.success) {
-                const orderInfo = {
-                    ...response.data,
-                    created_at: new Date().toISOString()
-                };
-
-                localStorage.setItem('latest_order', JSON.stringify(orderInfo));
 
                 toast.success('Đặt hàng thành công!');
 

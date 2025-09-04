@@ -8,12 +8,22 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
 
     const statusOptions = [
         { value: "Pending", label: "Pending", color: "bg-red-500", description: "Đơn hàng đang chờ xử lý" },
-        { value: "Confirm", label: "Confirmed", color: "bg-yellow-500", description: "Đơn hàng đã được xác nhận" },
-        { value: "Processing", label: "Processing", color: "bg-blue-500", description: "Đơn hàng đang được xử lý" },
-        { value: "Shipped", label: "Shipped", color: "bg-purple-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
+        { value: "Confirmed", label: "Confirmed", color: "bg-amber-500", description: "Đơn hàng đã được xác nhận và đang xử lý" },
+        { value: "Shipping", label: "Shipped", color: "bg-violet-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
         { value: "Delivered", label: "Delivered", color: "bg-green-700", description: "Đơn hàng đã được giao thành công" },
         { value: "Cancelled", label: "Cancelled", color: "bg-gray-500", description: "Đơn hàng đã bị hủy" }
     ];
+
+    const getStatusColorStyle = (status) => {
+        const colorMap = {
+            "Pending": "#ef4444", 
+            "Confirmed": "#f59e0b",  
+            "Shipping": "#8b5cf6", 
+            "Delivered": "#15803d", 
+            "Cancelled": "#6b7280"
+        };
+        return { backgroundColor: colorMap[status] || "#6b7280" };
+    };
 
     const handleUpdateStatus = async () => {
         if (!selectedStatus || selectedStatus === order?.status) {
@@ -35,21 +45,17 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={onClose}
             ></div>
 
-            {/* Modal */}
             <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all">
-                {/* Header */}
                 <div className="bg-gradient-to-r from-white-600 to-gray-500 p-6 rounded-t-xl text-white">
                     <h3 className="text-xl font-bold text-gray-700">Update Order Status</h3>
                     <p className="text-sm mt-1 text-black">Order Code: {order?.code}</p>
                 </div>
 
-                {/* Content */}
                 <div className="p-6">
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -60,8 +66,8 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
                                 <div
                                     key={status.value}
                                     className={`relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedStatus === status.value
-                                            ? 'border-blue-500 bg-blue-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                     onClick={() => setSelectedStatus(status.value)}
                                 >
@@ -75,7 +81,10 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
                                     />
 
                                     <div className="flex items-center flex-1">
-                                        <div className={`w-4 h-4 rounded-full ${status.color} mr-3`}></div>
+                                        <div
+                                            className="w-4 h-4 rounded-full mr-3"
+                                            style={getStatusColorStyle(status.value)}
+                                        ></div>
                                         <div>
                                             <div className="font-medium text-gray-900">{status.label}</div>
                                             <div className="text-xs text-gray-500">{status.description}</div>
@@ -90,18 +99,18 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
                         </div>
                     </div>
 
-                    {/* Current Status Info */}
                     <div className="bg-gray-50 p-3 rounded-lg mb-4">
                         <div className="text-xs text-gray-500 mb-1">Current Status</div>
                         <div className="flex items-center">
-                            <div className={`w-3 h-3 rounded-full mr-2 ${statusOptions.find(s => s.value === order?.status)?.color || 'bg-gray-400'
-                                }`}></div>
+                            <div
+                                className="w-3 h-3 rounded-full mr-2"
+                                style={getStatusColorStyle(order?.status)}
+                            ></div>
                             <span className="text-sm font-medium">{order?.status}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
                     <Button
                         onClick={onClose}
@@ -115,8 +124,8 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
                         onClick={handleUpdateStatus}
                         disabled={isUpdating || !selectedStatus || selectedStatus === order?.status}
                         className={`px-4 py-2 text-white rounded-lg transition-colors ${isUpdating || !selectedStatus || selectedStatus === order?.status
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-blue-600 hover:bg-blue-700'
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
                             }`}
                     >
                         <FaCheck className="mr-2" />

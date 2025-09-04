@@ -109,7 +109,7 @@ const Header = () => {
                                                 <h4 className="leading-3 text-[14px] text-[rgba(0,0,0,0.6)] font-[500] mb-0 capitalize text-left justify-start">
                                                     {context?.userData.first_name} {context?.userData.last_name}
                                                 </h4>
-                                                <span className="text-[13px] text-[rgba(0,0,0,0.6)] font-[400] capitalize text-left justify-start">
+                                                <span className="text-[13px] text-[rgba(0,0,0,0.6)] font-[400] normal-case text-left justify-start">
                                                     {context?.userData.email}
                                                 </span>
                                             </div>
