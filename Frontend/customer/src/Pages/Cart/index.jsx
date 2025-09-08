@@ -34,6 +34,9 @@ const CartPage = () => {
         country: 'Việt Nam'
     });
     const [creatingAddress, setCreatingAddress] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('cod');
+    const [onlinePaymentMethod, setOnlinePaymentMethod] = useState('vnpay');
+
     const navigate = useNavigate();
 
     const shippingFee = 0;
@@ -212,9 +215,11 @@ const CartPage = () => {
 
                 toast.success('Đặt hàng thành công! Đang chuyển đến trang thanh toán...');
 
-                // navigate(`/order-success/${response.data.order_id}`);
-
-                navigate(`/payment/${orderCode}`);
+                if (paymentMethod === 'cod') {
+                    navigate(`/order-success/${response.data.order_id}`);
+                } else {
+                    navigate(`/payment/${orderCode}`);
+                }
             } else {
                 toast.error(response.data?.message || 'Đặt hàng thất bại!');
             }
@@ -354,6 +359,57 @@ const CartPage = () => {
                         )}
 
                         <div className="border-t border-[rgba(0,0,0,0.1)] pt-3 mt-3">
+                            <h4 className="text-[14px] font-[500] mb-3">Phương thức thanh toán</h4>
+
+                            <div className="flex gap-2 mb-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('cod')}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${paymentMethod === 'cod'
+                                        ? 'bg-[#ff5252] text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    💵 Thanh toán trực tiếp
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod('online')}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${paymentMethod === 'online'
+                                        ? 'bg-[#ff5252] text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    🏧 Thanh toán online
+                                </button>
+                            </div>
+
+                            {paymentMethod === 'cod' && (
+                                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                    <p className="text-sm text-orange-800">Trả tiền mặt khi nhận được hàng</p>
+                                </div>
+                            )}
+
+                            {paymentMethod === 'online' && (
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-3 cursor-pointer p-3 border border-blue-200 bg-blue-50 rounded-lg">
+                                        <input
+                                            type="radio"
+                                            name="onlinePaymentMethod"
+                                            value="vnpay"
+                                            checked={onlinePaymentMethod === 'vnpay'}
+                                            onChange={(e) => setOnlinePaymentMethod(e.target.value)}
+                                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                                        />
+                                        <div>
+                                            <p className="font-medium text-sm text-blue-800">VNPay</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="border-t border-[rgba(0,0,0,0.1)] pt-3 mt-3">
                             <p className="flex items-center justify-between text-lg">
                                 <span className="font-bold">Total</span>
                                 <span className="text-[#ff5252] font-bold text-xl">
@@ -368,7 +424,6 @@ const CartPage = () => {
                             )}
                         </div>
 
-                        <br />
                         <Button
                             className="btn-org btn-lg w-full flex gap-2"
                             disabled={checkoutItems.length === 0 || isCheckingOut || !selectedAddress}
@@ -609,6 +664,8 @@ const CartPage = () => {
                                 </div>
                             )}
                         </div>
+
+
                     </div>
                 </div>
             )}

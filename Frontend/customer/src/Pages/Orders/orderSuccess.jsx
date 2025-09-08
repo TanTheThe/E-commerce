@@ -5,7 +5,7 @@ import { FaCalendarAlt } from 'react-icons/fa';
 import { FiCalendar, FiCheck, FiClock, FiCopy, FiEye, FiMail, FiMapPin, FiPhone, FiTruck, FiUser } from 'react-icons/fi';
 import toast from 'react-hot-toast'
 
-const OrderSuccessPage = ({ isFromSuccess = true }) => {
+const OrderSuccessPage = () => {
     const { orderId } = useParams();
     const navigate = useNavigate();
     const [orderData, setOrderData] = useState(null);

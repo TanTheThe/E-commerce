@@ -1,0 +1,17 @@
+
+dpi 800; hz 1000
+
+pubg settings
+
+resolution 1728x1080
+
+general sens 35 
+vertical sens 1
+ads sens 35
+aim sens 35 
+The rest is up to you
+
+
+GLHF!
+
+

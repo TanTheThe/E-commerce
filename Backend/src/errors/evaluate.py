@@ -71,3 +71,13 @@ class EvaluateException:
                 "error_code": "eval_007"
             }
         )
+
+    @staticmethod
+    def order_not_delivered():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể đánh giá đơn hàng chưa được giao",
+                "error_code": "eval_008"
+            }
+        )

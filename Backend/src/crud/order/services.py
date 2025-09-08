@@ -481,7 +481,11 @@ class OrderService:
     async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0,
                                      limit: int = 10):
         condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
-        joins = [selectinload(Order.order_detail)]
+        if status_order == 'delivered':
+            joins = [selectinload(Order.order_detail).selectinload(Order_Detail.evaluate)]
+        else:
+            joins = [selectinload(Order.order_detail)]
+
         orders, total = await order_repository.get_all_order(condition, session, skip=skip, limit=limit, joins=joins)
 
         order_response = []
@@ -502,11 +506,26 @@ class OrderService:
                         "variants": []
                     }
 
-                product_map[pid]["variants"].append({
+                variant_info = {
                     "size": product["size"],
                     "color_name": product["color_name"],
-                    "quantity": od.quantity
-                })
+                    "quantity": od.quantity,
+                    "order_detail_id": str(od.id)
+                }
+
+                if status_order == 'delivered':
+                    has_evaluation = od.evaluate is not None and od.evaluate.deleted_at is None
+                    variant_info["has_evaluation"] = has_evaluation
+
+                    if has_evaluation:
+                        variant_info["evaluation_id"] = str(od.evaluate.id)
+                        has_additional_evaluation = (
+                                od.evaluate.additional_comment is not None or
+                                od.evaluate.additional_image is not None
+                        )
+                        variant_info["has_additional_evaluation"] = has_additional_evaluation
+
+                product_map[pid]["variants"].append(variant_info)
 
             order_response.append({
                 "order": {

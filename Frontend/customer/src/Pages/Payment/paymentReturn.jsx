@@ -23,13 +23,54 @@ const PaymentReturn = () => {
             setLoading(true);
             setError(null);
 
-            const result = await getDataApi('/customer/vnpay/payment_return');
+            const urlParams = new URLSearchParams(window.location.search);
+            const encodedData = urlParams.get('data');
+            const errorParam = urlParams.get('error');
+            const sessionId = urlParams.get('session_id');
 
-            if (result.success && result.data?.payment) {
-                setPaymentResult(result.data.payment);
-            } else {
-                throw new Error(result.data?.message || result.message || 'Không thể lấy thông tin thanh toán');
+            if (errorParam) {
+                throw new Error(decodeURIComponent(errorParam));
             }
+
+            if (encodedData) {
+                try {
+                    const decodedData = atob(encodedData);
+                    const paymentData = JSON.parse(decodedData);
+                    setPaymentResult(paymentData);
+                    return;
+                } catch (decodeError) {
+                    console.error('Error decoding payment data:', decodeError);
+                    throw new Error('Không thể giải mã thông tin thanh toán');
+                }
+            }
+
+            if (sessionId) {
+                const result = await getDataApi(`/customer/vnpay/payment_result/${sessionId}`);
+
+                if (result.success && result.data?.payment) {
+                    setPaymentResult(result.data.payment);
+                    return;
+                } else {
+                    throw new Error(result.message || 'Không thể lấy thông tin thanh toán');
+                }
+            }
+
+            if (urlParams.get('vnp_TxnRef')) {
+                const directResult = {
+                    order_code: urlParams.get('vnp_TxnRef'),
+                    amount: parseInt(urlParams.get('vnp_Amount') || '0') / 100,
+                    response_code: urlParams.get('vnp_ResponseCode'),
+                    transaction_no: urlParams.get('vnp_TransactionNo'),
+                    status: urlParams.get('vnp_ResponseCode') === '00' ? 'success' : 'failed',
+                    order_info: urlParams.get('vnp_OrderInfo') || '',
+                    already_processed: false
+                };
+
+                setPaymentResult(directResult);
+                return;
+            }
+
+            throw new Error('Không tìm thấy thông tin thanh toán trong URL');
         } catch (error) {
             console.error('Payment return error:', error);
             setError(error.message || 'Có lỗi xảy ra khi xử lý kết quả thanh toán');
@@ -52,13 +93,11 @@ const PaymentReturn = () => {
     const handleGoHome = () => {
         localStorage.removeItem('paymentData');
         localStorage.removeItem('currentPayment');
-
         window.location.href = '/';
     };
 
     const handleViewOrders = () => {
-        // Redirect to orders page
-        window.location.href = '/orders'; // Adjust as needed
+        window.location.href = '/my-orders';
     };
 
     const getStatusIcon = (status) => {
@@ -79,21 +118,21 @@ const PaymentReturn = () => {
                     bg: 'from-green-50 to-emerald-50',
                     border: 'border-green-200',
                     text: 'text-green-800',
-                    button: 'from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
+                    button: 'from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 cursor-pointer'
                 };
             case 'failed':
                 return {
                     bg: 'from-red-50 to-rose-50',
                     border: 'border-red-200',
                     text: 'text-red-800',
-                    button: 'from-red-600 to-red-700 hover:from-red-700 hover:to-red-800'
+                    button: 'from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 cursor-pointer'
                 };
             default:
                 return {
                     bg: 'from-yellow-50 to-amber-50',
                     border: 'border-yellow-200',
                     text: 'text-yellow-800',
-                    button: 'from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800'
+                    button: 'from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 cursor-pointer'
                 };
         }
     };
@@ -116,6 +155,11 @@ const PaymentReturn = () => {
         };
 
         return codes[responseCode] || `Mã lỗi: ${responseCode}`;
+    };
+
+    const formatAmount = (amount) => {
+        if (!amount) return '0';
+        return parseInt(amount).toLocaleString('vi-VN') + ' VND';
     };
 
     if (loading) {
@@ -145,7 +189,7 @@ const PaymentReturn = () => {
                             {retryCount < maxRetries && (
                                 <button
                                     onClick={handleRetry}
-                                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-2"
+                                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                                 >
                                     <FiRefreshCw className="w-5 h-5" />
                                     Thử lại ({retryCount + 1}/{maxRetries})
@@ -154,7 +198,7 @@ const PaymentReturn = () => {
 
                             <button
                                 onClick={handleGoHome}
-                                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 rounded-xl font-semibold hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 rounded-xl font-semibold hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                             >
                                 <FiHome className="w-5 h-5" />
                                 Về trang chủ
@@ -177,7 +221,7 @@ const PaymentReturn = () => {
 
                         <button
                             onClick={handleGoHome}
-                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-2"
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                         >
                             <FiHome className="w-5 h-5" />
                             Về trang chủ
@@ -192,152 +236,76 @@ const PaymentReturn = () => {
     const isSuccess = paymentResult.status === 'success';
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
-            <div className="container mx-auto max-w-2xl px-4">
-                <div className={`bg-gradient-to-br ${statusConfig.bg} rounded-2xl shadow-xl p-8 mb-8 border ${statusConfig.border}`}>
-                    <div className="text-center">
-                        <div className="mb-6">
-                            {getStatusIcon(paymentResult.status)}
-                        </div>
+        <div className={`min-h-screen bg-gradient-to-br ${statusConfig.bg} flex items-center justify-center`}>
+            <div className={`bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mx-4 border-2 ${statusConfig.border}`}>
+                <div className="text-center mb-8">
+                    <div className='ml-47'>{getStatusIcon(paymentResult.status)}</div>
 
-                        <h1 className={`text-3xl font-bold ${statusConfig.text} mb-2`}>
-                            {isSuccess ? '✅ Thanh toán thành công!' : '❌ Thanh toán thất bại'}
-                        </h1>
+                    <h1 className={`text-3xl font-bold ${statusConfig.text} mt-4 mb-2`}>
+                        {isSuccess ? 'Thanh toán thành công!' : 'Thanh toán không thành công'}
+                    </h1>
 
-                        <p className="text-lg text-gray-600 mb-6">
-                            {isSuccess
-                                ? 'Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi'
-                                : getResponseCodeMessage(paymentResult.response_code)
-                            }
-                        </p>
-
-                        {paymentResult.already_processed && (
-                            <div className="bg-blue-100 border border-blue-300 rounded-lg p-3 mb-4">
-                                <p className="text-blue-800 text-sm">
-                                    ℹ️ Giao dịch này đã được xử lý trước đó
-                                </p>
-                            </div>
-                        )}
-                    </div>
+                    <p className={`${statusConfig.text} text-lg`}>
+                        {getResponseCodeMessage(paymentResult.response_code)}
+                    </p>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b">
-                        <FiFileText className="text-2xl text-blue-600" />
-                        <h2 className="text-xl font-semibold text-gray-800">Chi tiết giao dịch</h2>
+                <div className="bg-gray-50 rounded-xl p-6 mb-8 space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-gray-600 font-medium">Mã đơn hàng:</span>
+                        <span className="font-semibold text-gray-800">{paymentResult.order_code}</span>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Mã đơn hàng
-                                </label>
-                                <p className="text-lg font-mono bg-gray-50 px-3 py-2 rounded-lg">
-                                    {paymentResult.order_code}
-                                </p>
-                            </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-gray-600 font-medium">Số tiền:</span>
+                        <span className="font-semibold text-gray-800">{formatAmount(paymentResult.amount)}</span>
+                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Số tiền
-                                </label>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    {parseInt(paymentResult.amount || 0).toLocaleString('vi-VN')} VNĐ
-                                </p>
-                            </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-gray-600 font-medium">Mã giao dịch:</span>
+                        <span className="font-semibold text-gray-800">{paymentResult.transaction_no || 'N/A'}</span>
+                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Trạng thái
-                                </label>
-                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold
-                                    ${isSuccess
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                    {isSuccess ? <FiCheck className="w-4 h-4" /> : <FiX className="w-4 h-4" />}
-                                    {isSuccess ? 'Thành công' : 'Thất bại'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            {paymentResult.transaction_no && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                                        Mã giao dịch VNPay
-                                    </label>
-                                    <p className="text-lg font-mono bg-gray-50 px-3 py-2 rounded-lg">
-                                        {paymentResult.transaction_no}
-                                    </p>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Mã phản hồi
-                                </label>
-                                <p className="text-lg font-mono bg-gray-50 px-3 py-2 rounded-lg">
-                                    {paymentResult.response_code}
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Thời gian
-                                </label>
-                                <p className="text-lg bg-gray-50 px-3 py-2 rounded-lg">
-                                    {new Date().toLocaleString('vi-VN')}
-                                </p>
-                            </div>
-                        </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-gray-600 font-medium">Mã phản hồi:</span>
+                        <span className="font-semibold text-gray-800">{paymentResult.response_code}</span>
                     </div>
 
                     {paymentResult.order_info && (
-                        <div className="mt-6 pt-4 border-t">
-                            <label className="block text-sm font-medium text-gray-600 mb-2">
-                                Nội dung thanh toán
-                            </label>
-                            <p className="text-gray-800 bg-gray-50 px-4 py-3 rounded-lg">
+                        <div className="flex justify-between items-start py-2">
+                            <span className="text-gray-600 font-medium">Thông tin đơn hàng:</span>
+                            <span className="font-semibold text-gray-800 text-right max-w-xs break-words">
                                 {paymentResult.order_info}
+                            </span>
+                        </div>
+                    )}
+
+                    {paymentResult.already_processed && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+                            <p className="text-yellow-800 text-sm font-medium">
+                                ⚠️ Giao dịch này đã được xử lý trước đó
                             </p>
                         </div>
                     )}
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                    <button
-                        onClick={handleViewOrders}
-                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-3"
-                    >
-                        <FiFileText className="text-xl" />
-                        Xem đơn hàng
-                    </button>
+                <div className="space-y-3">
+                    {isSuccess && (
+                        <button
+                            onClick={handleViewOrders}
+                            className={`w-full bg-gradient-to-r ${statusConfig.button} text-white py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer`}
+                        >
+                            Xem đơn hàng
+                        </button>
+                    )}
 
                     <button
                         onClick={handleGoHome}
-                        className="bg-gradient-to-r from-gray-600 to-gray-700 text-white py-4 rounded-xl font-semibold text-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center gap-3"
+                        className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 rounded-xl font-semibold hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                        <FiHome className="text-xl" />
+                        <FiHome className="w-5 h-5" />
                         Về trang chủ
                     </button>
-                </div>
-
-                <div className="mt-8 bg-gray-50 rounded-2xl p-6">
-                    <h3 className="font-semibold text-gray-800 mb-3">Cần hỗ trợ?</h3>
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p className="text-gray-600 mb-2">Liên hệ hỗ trợ khách hàng:</p>
-                            <p><strong>Hotline:</strong> 1900 1234</p>
-                            <p><strong>Email:</strong> support@yourstore.com</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-600 mb-2">Hỗ trợ VNPay:</p>
-                            <p><strong>Hotline VNPay:</strong> 1900 555 577</p>
-                            <p><strong>Website:</strong> vnpay.vn</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

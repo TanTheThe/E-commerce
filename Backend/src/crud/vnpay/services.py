@@ -2,7 +2,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, or_, select
 from fastapi.responses import JSONResponse
 from src.config import Config
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from src.crud.vnpay.utils import hmacsha512
 from src.config import Config
 from datetime import datetime, timedelta
@@ -13,11 +13,16 @@ from src.database.models import Order, Payment
 import urllib.parse
 import httpx
 import json
+import uuid
 
 order_repository = OrderRepository()
 vnpay_repository = VNPayRepository()
 
 class VNPayService:
+    def __init__(self):
+        self.payment_results_cache = {}
+
+
     def build_query_string(self, data: Dict[str, Any]) -> str:
         input_data = sorted(data.items())
         return "&".join(
@@ -126,7 +131,7 @@ class VNPayService:
             existing_payment = await vnpay_repository.get_payment(condition_payment, session)
             if existing_payment:
                 return {
-                    "order_id": existing_payment.order_id,
+                    "order_id": str(existing_payment.order_id),
                     "order_code": order_code,
                     "amount": existing_payment.amount,
                     "order_info": existing_payment.order_info,
@@ -155,7 +160,7 @@ class VNPayService:
             payment = await vnpay_repository.create_payment(payment_dict, session)
 
             return {
-                "order_id": payment.order_id,
+                "order_id": str(payment.order_id),
                 "order_code": order_code,
                 "amount": payment.amount,
                 "order_info": payment.order_info,
@@ -205,12 +210,45 @@ class VNPayService:
         
         try:
             result = await self.process_payment_completion(input_data, session)
-            return result
+
+            session_id = str(uuid.uuid4())
+            self.payment_results_cache[session_id] = {
+                "result": result,
+                "timestamp": datetime.now(),
+                "expires_at": datetime.now() + timedelta(minutes=10)  # Expires in 10 minutes
+            }
+
+            self._cleanup_expired_results()
+
+            return {"session_id": session_id, **result}
             
         except Exception as e:
             await session.rollback()
             raise
-    
+
+
+    async def get_payment_result_by_session(self, session_id: str, session: AsyncSession) -> Optional[Dict[str, Any]]:
+        if session_id not in self.payment_results_cache:
+            return None
+
+        cached_data = self.payment_results_cache[session_id]
+
+        if datetime.now() > cached_data["expires_at"]:
+            del self.payment_results_cache[session_id]
+            return None
+
+        return cached_data["result"]
+
+
+    def _cleanup_expired_results(self):
+        now = datetime.now()
+        expired_keys = [
+            key for key, value in self.payment_results_cache.items()
+            if now > value["expires_at"]
+        ]
+        for key in expired_keys:
+            del self.payment_results_cache[key]
+
 
     async def query_transaction(self, order_id: str, trans_date: str, ipaddr: str):
         vnp_TmnCode = Config.VNPAY_TMN_CODE

@@ -1,6 +1,8 @@
+from venv import logger
 from fastapi import APIRouter, Depends, Request, Form, status
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
+from src.config import Config
 from src.crud.vnpay.services import VNPayService
 from src.crud.vnpay.utils import get_client_ip
 from src.dependencies import AccessTokenBearer
@@ -10,6 +12,9 @@ from src.database.main import get_session
 from src.dependencies import customer_role_middleware
 from datetime import datetime
 import random
+import urllib.parse
+import json
+import base64
 
 vnpay_admin_router = APIRouter(prefix="/vnpay")
 vnpay_customer_router = APIRouter(prefix="/vnpay")
@@ -20,15 +25,16 @@ access_token_bearer = AccessTokenBearer()
 
 templates = Jinja2Templates(directory="src/templates")
 
-n = random.randint(10**11, 10**12 - 1)
+n = random.randint(10 ** 11, 10 ** 12 - 1)
 n_str = str(n).zfill(12)
+
 
 @vnpay_customer_router.post("/payment", dependencies=[Depends(customer_role_middleware)])
 async def create_payment(
-    request: Request,
-    payment_data: PaymentRequest,
-    token_details: dict = Depends(access_token_bearer),
-    session: AsyncSession = Depends(get_session)
+        request: Request,
+        payment_data: PaymentRequest,
+        token_details: dict = Depends(access_token_bearer),
+        session: AsyncSession = Depends(get_session)
 ):
     if not payment_data.order_code or not payment_data.amount:
         return JSONResponse(
@@ -38,8 +44,8 @@ async def create_payment(
                 "content": None
             }
         )
-        
-    if payment_data.amount < 5000 or payment_data.amount > 1000000000: 
+
+    if payment_data.amount < 5000 or payment_data.amount > 1000000000:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
@@ -47,7 +53,7 @@ async def create_payment(
                 "content": None
             }
         )
-    
+
     try:
         payment_url = await vnpay_service.create_payment_url(
             request=request,
@@ -72,7 +78,7 @@ async def create_payment(
                 }
             }
         )
-    
+
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -81,7 +87,6 @@ async def create_payment(
                 "content": None
             }
         )
-        
 
 
 @vnpay_customer_router.get("/payment_ipn")
@@ -93,35 +98,61 @@ async def payment_ipn(request: Request, session: AsyncSession = Depends(get_sess
         return JSONResponse({"RspCode": "99", "Message": "Internal error"})
 
 
-@vnpay_customer_router.get("/payment_return", dependencies=[Depends(customer_role_middleware)])
+@vnpay_customer_router.get("/payment_return", response_class=HTMLResponse)
 async def payment_return(request: Request,
-                         token_details: dict = Depends(access_token_bearer), 
                          session: AsyncSession = Depends(get_session)):
     try:
-        payment = await vnpay_service.handle_return(dict(request.query_params), request, session)
+        payment_result = await vnpay_service.handle_return(dict(request.query_params), request, session)
+
+        payment_data = json.dumps(payment_result)
+        encoded_data = base64.urlsafe_b64encode(payment_data.encode()).decode()
+
+        frontend_url = f"{Config.DOMAIN_CLIENT}/payment-return?data={encoded_data}"
+
+        return RedirectResponse(url=frontend_url, status_code=302)
+
+    except ValueError as e:
+        error_url = f"{Config.FRONTEND_URL}/payment-return?error={urllib.parse.quote(str(e))}"
+        return RedirectResponse(url=error_url, status_code=302)
+
+    except Exception as e:
+        error_url = f"{Config.FRONTEND_URL}/payment-return?error={urllib.parse.quote('Lỗi xử lý kết quả thanh toán')}"
+        return RedirectResponse(url=error_url, status_code=302)
+
+
+@vnpay_customer_router.get("/payment_result/{session_id}")
+async def get_payment_result(session_id: str, session: AsyncSession = Depends(get_session)):
+    try:
+        payment_result = await vnpay_service.get_payment_result_by_session(session_id, session)
+
+        if not payment_result:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "success": False,
+                    "message": "Không tìm thấy thông tin thanh toán",
+                    "data": None
+                }
+            )
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "message": "Thông tin thanh toán",
                 "content": {
-                    "payment": payment
+                    "payment": payment_result
                 }
             }
         )
-    except ValueError as e:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "message": str(e),
-                "content": None
-            }
-        )
+
     except Exception as e:
+        logger.error(f"Error fetching payment result: {e}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
-                "message": "Lỗi xử lý kết quả thanh toán",
-                "content": None
+                "success": False,
+                "message": "Lỗi hệ thống",
+                "data": None
             }
         )
 
@@ -129,7 +160,7 @@ async def payment_return(request: Request,
 @vnpay_customer_router.get("/query", response_class=HTMLResponse)
 async def query_form(request: Request):
     return templates.TemplateResponse("payment/query.html", {
-        "request": request, 
+        "request": request,
         "title": "Kiểm tra kết quả giao dịch",
         "current_year": datetime.now().year
     })
@@ -137,10 +168,10 @@ async def query_form(request: Request):
 
 @vnpay_customer_router.post("/query", response_class=HTMLResponse)
 async def query(
-    request: Request,
-    order_id: str = Form(...),
-    trans_date: str = Form(...),
-    session: AsyncSession = Depends(get_session)
+        request: Request,
+        order_id: str = Form(...),
+        trans_date: str = Form(...),
+        session: AsyncSession = Depends(get_session)
 ):
     # dependencies=[Depends(customer_role_middleware)]
     # token_details: dict = Depends(access_token_bearer),
@@ -156,7 +187,7 @@ async def query(
 @vnpay_customer_router.get("/refund", response_class=HTMLResponse)
 async def refund_form(request: Request):
     return templates.TemplateResponse("payment/refund.html", {
-        "request": request, 
+        "request": request,
         "title": "Hoàn tiền giao dịch",
         "current_year": datetime.now().year
     })
@@ -164,13 +195,13 @@ async def refund_form(request: Request):
 
 @vnpay_customer_router.post("/refund", response_class=HTMLResponse)
 async def refund(
-    request: Request,
-    TransactionType: str = Form(...),
-    order_id: str = Form(...),
-    amount: str = Form(...),
-    order_desc: str = Form(...),
-    trans_date: str = Form(...),
-    session: AsyncSession = Depends(get_session)
+        request: Request,
+        TransactionType: str = Form(...),
+        order_id: str = Form(...),
+        amount: str = Form(...),
+        order_desc: str = Form(...),
+        trans_date: str = Form(...),
+        session: AsyncSession = Depends(get_session)
 ):
     # dependencies=[Depends(customer_role_middleware)]
     # token_details: dict = Depends(access_token_bearer),
@@ -183,4 +214,3 @@ async def refund(
         "response_json": response_json,
         "current_year": datetime.now().year
     })
-
