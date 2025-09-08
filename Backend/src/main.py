@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
 from src.database.main import engine
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -34,3 +35,4 @@ register_middleware(app)
 app.include_router(public_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(customer_router, prefix="/api/v1")
+app.mount("/static", StaticFiles(directory="src/static"), name="static")

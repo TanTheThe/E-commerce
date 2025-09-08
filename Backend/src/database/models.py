@@ -92,7 +92,7 @@ class Order(SQLModel, table=True):
     note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     payment_method: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="vnpay"), default="vnpay")
-    transaction_no: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    payment_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -105,6 +105,7 @@ class Order(SQLModel, table=True):
     order_status_history: List["OrderStatusHistory"] = Relationship(
         back_populates="order", sa_relationship_kwargs={"lazy": "noload"}
     )
+    payments: List["Payment"] = Relationship(back_populates="order", sa_relationship_kwargs={"lazy": "noload"})
 
 
 class Order_Detail(SQLModel, table=True):
@@ -453,6 +454,7 @@ class Cart_Item(SQLModel, table=True):
     product: Optional["Product"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
     product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
 
+
 class OrderStatusHistory(SQLModel, table=True):
     __tablename__ = "order_status_history"
 
@@ -470,3 +472,28 @@ class OrderStatusHistory(SQLModel, table=True):
     order: Optional["Order"] = Relationship(
         back_populates="order_status_history", sa_relationship_kwargs={"lazy": "noload"}
     )
+
+
+class Payment(SQLModel, table=True):
+    __tablename__ = "payment"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+    order_id: uuid.UUID = Field(foreign_key="order.id", nullable=False)
+
+    payment_gateway: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # vnpay, momo, paypal...
+    transaction_no: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))   # vnp_TransactionNo
+    amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))           # vnp_Amount / 100
+    response_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=True))     # vnp_ResponseCode
+    order_info: str = Field(sa_column=Column(pg.VARCHAR, nullable=True))        # vnp_OrderInfo
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="success"), default="success")
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now,
+    )
+
+    order: Optional["Order"] = Relationship(back_populates="payments", sa_relationship_kwargs={"lazy": "noload"})
+
+    

@@ -40,3 +40,23 @@ class OrderException:
                 "error_code": "order_004",
             },
         )
+    
+    @staticmethod
+    def order_already_paid():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Đơn hàng đã được thanh toán trước đó",
+                "error_code": "order_005",
+            },
+        )
+    
+    @staticmethod
+    def order_not_match():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Tổng tiền trong order không khớp với tiền sau khi thanh toán",
+                "error_code": "order_006",
+            },
+        )

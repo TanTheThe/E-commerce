@@ -197,10 +197,24 @@ const CartPage = () => {
             const response = await postDataApi('/customer/order', orderData);
 
             if (response.success) {
+                const orderCode = response.data.order_code;
 
-                toast.success('Đặt hàng thành công!');
+                const paymentData = {
+                    orderCode: orderCode,
+                    amount: finalTotal.toString(),
+                    orderItems: checkoutItems,
+                    address: selectedAddress,
+                    voucher: selectedVoucher,
+                    note: orderNote
+                };
 
-                navigate(`/order-success/${response.data.order_id}`);
+                localStorage.setItem('paymentData', JSON.stringify(paymentData));
+
+                toast.success('Đặt hàng thành công! Đang chuyển đến trang thanh toán...');
+
+                // navigate(`/order-success/${response.data.order_id}`);
+
+                navigate(`/payment/${orderCode}`);
             } else {
                 toast.error(response.data?.message || 'Đặt hàng thất bại!');
             }
@@ -231,7 +245,7 @@ const CartPage = () => {
                         <div className="py-4 px-3 border-t border-[rgba(0,0,0,0.1)]">
                             <div className="flex items-center gap-2 mb-3">
                                 <h3 className="text-lg font-semibold">Ghi chú đơn hàng</h3>
-                                <p className="text-xs text-gray-500">(không bắt buộc)</p>
+                                <p className="text-xs text-gray-500">(không bắt buộc)</p>
                             </div>
                             <textarea
                                 value={orderNote}
@@ -308,7 +322,7 @@ const CartPage = () => {
 
                         <p className="flex items-center justify-between">
                             <span className="text-[14px] font-[500]">Estimate for</span>
-                            <span className="font-bold">Việt Nam</span>
+                            <span className="font-bold">Việt Nam</span>
                         </p>
 
                         {selectedAddress ? (

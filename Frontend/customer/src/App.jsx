@@ -34,6 +34,8 @@ import EmailToChangePass from './Pages/EmailToChangePass'
 import useAuth from './Pages/Login/auth'
 import OrderSuccessPage from './Pages/Orders/orderSuccess'
 import OrderTrackingPage from './Pages/Orders/orderTracking'
+import VNPayPayment from './Pages/Payment'
+import PaymentReturn from './Pages/Payment/paymentReturn'
 
 
 const MyContext = createContext()
@@ -145,6 +147,8 @@ function App() {
             <Route path={"/verify"} exact={true} element={<Verify />} />
             <Route path={"/reset-password/:token"} exact={true} element={<ChangePassword />} />
             <Route path={"/checkout"} exact={true} element={<Checkout />} />
+            <Route path={"/payment/:orderCode"} exact={true} element={<VNPayPayment />} />
+            <Route path={"/payment-return"} exact={true} element={<PaymentReturn />} />
             <Route path={"/my-account"} exact={true} element={<MyAccount />} />
             <Route path={"/my-list"} exact={true} element={<MyList />} />
             <Route path={"/my-orders"} exact={true} element={<Orders />} />

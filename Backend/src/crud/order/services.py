@@ -268,7 +268,7 @@ class OrderService:
                 "discount": order_discount,
                 "note": order_data.note,
                 "payment_method": "vnpay",
-                "transaction_no": "",
+                "payment_status": "pending",
                 "user_id": customer_id,
                 "Address": address_dict
             }
@@ -291,6 +291,7 @@ class OrderService:
 
             response = {
                 "order_id": str(new_order.id),
+                "order_code": new_order.code,
                 "sub_total": sub_total,
                 "total_price": total_price,
                 "product_discount": product_discount,

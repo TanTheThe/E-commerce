@@ -15,7 +15,7 @@ class OrderModel(BaseModel):
     created_at: datetime = Field(default=datetime.now)
     status: str
     payment_method: str = Field(default="vnpay")
-    transaction_no: str
+    payment_status: str
     order_detail: List[OrderDetailModel]
     user_id: uuid.UUID
     special_offer_id: uuid.UUID
@@ -31,7 +31,7 @@ class StatusUpdateModel(BaseModel):
 
 class CheckOut(BaseModel):
     payment_method: str = Field(default="vnpay")
-    transaction_no: Optional[str]
+    payment_status: str = Field(default="pending")
 
 class OrderFilterModel(BaseModel):
     search: Optional[str] = None

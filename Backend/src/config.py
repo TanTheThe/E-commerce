@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     USE_CREDENTIALS: bool = True
     VALIDATE_CERTS: bool = True
 
+    VNPAY_TMN_CODE: str
+    VNPAY_HASH_SECRET_KEY: str
+    VNPAY_PAYMENT_URL: str
+    VNPAY_RETURN_URL: str
+    VNPAY_API_URL: str
+
     model_config = SettingsConfigDict(
         env_file='../.env',
         extra='ignore'
