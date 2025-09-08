@@ -6,7 +6,11 @@ import Badge from "../../components/Badge";
 import { Collapse } from "react-collapse";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiCheck, FiChevronDown, FiChevronUp, FiClock, FiTruck, FiStar, FiX, FiCamera, FiMessageSquare } from "react-icons/fi";
-import { getDataApi } from "../../utils/api";
+import { getDataApi, postDataApi, putDataApi } from "../../utils/api";
+import EvaluationButtons from "../Evaluate/evaluationButton";
+import EvaluateModal from "../Evaluate/evaluateModal";
+import AdditionalEvaluateModal from "../Evaluate/additionalEvalModal";
+import ViewEvaluationModal from "../Evaluate/viewEvalModal";
 
 const Orders = () => {
     const navigate = useNavigate();
@@ -166,7 +170,7 @@ const Orders = () => {
         try {
             const response = await getDataApi(`/customer/evaluate/${variant.evaluation_id}`);
             if (response.success) {
-                setEvaluationData(response.data.content);
+                setEvaluationData(response.data);
                 setSelectedVariant(variant);
                 setShowViewModal(true);
             }
@@ -339,44 +343,12 @@ const Orders = () => {
 
                                                                         {activeTab === 'delivered' && (
                                                                             <div className="flex gap-2 flex-wrap">
-                                                                                {!variant.has_evaluation ? (
-                                                                                    <button
-                                                                                        onClick={() => handleOpenEvaluate(variant)}
-                                                                                        className="px-3 py-1 text-xs bg-[#ff5252] text-white rounded-md hover:bg-[#e53e3e] transition-colors cursor-pointer"
-                                                                                    >
-                                                                                        Đánh giá
-                                                                                    </button>
-                                                                                ) : !variant.has_additional_evaluation ? (
-                                                                                    <>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(variant)}
-                                                                                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenAdditional(variant)}
-                                                                                            className="px-3 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Đánh giá bổ sung
-                                                                                        </button>
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(variant)}
-                                                                                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(variant, 'additional')}
-                                                                                            className="px-3 py-1 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá bổ sung
-                                                                                        </button>
-                                                                                    </>
-                                                                                )}
+                                                                                <EvaluationButtons
+                                                                                    item={variant}
+                                                                                    onEvaluate={handleOpenEvaluate}
+                                                                                    onViewEvaluation={handleOpenView}
+                                                                                    onAdditionalEvaluation={handleOpenAdditional}
+                                                                                />
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -392,44 +364,12 @@ const Orders = () => {
 
                                                                         {activeTab === 'delivered' && (
                                                                             <div className="flex gap-2 flex-wrap">
-                                                                                {!product.has_evaluation ? (
-                                                                                    <button
-                                                                                        onClick={() => handleOpenEvaluate(product)}
-                                                                                        className="px-3 py-1 text-xs bg-[#ff5252] text-white rounded-md hover:bg-[#e53e3e] transition-colors cursor-pointer"
-                                                                                    >
-                                                                                        Đánh giá
-                                                                                    </button>
-                                                                                ) : !product.has_additional_evaluation ? (
-                                                                                    <>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(product)}
-                                                                                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenAdditional(product)}
-                                                                                            className="px-3 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Đánh giá bổ sung
-                                                                                        </button>
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(product)}
-                                                                                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={() => handleOpenView(product, 'additional')}
-                                                                                            className="px-3 py-1 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors cursor-pointer"
-                                                                                        >
-                                                                                            Xem đánh giá bổ sung
-                                                                                        </button>
-                                                                                    </>
-                                                                                )}
+                                                                                <EvaluationButtons
+                                                                                    item={product}
+                                                                                    onEvaluate={handleOpenEvaluate}
+                                                                                    onViewEvaluation={handleOpenView}
+                                                                                    onAdditionalEvaluation={handleOpenAdditional}
+                                                                                />
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -530,225 +470,30 @@ const Orders = () => {
                     </div>
                 )}
             </div>
-            {showEvaluateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-gray-800">Đánh giá sản phẩm</h3>
-                            <button onClick={() => setShowEvaluateModal(false)} className="text-gray-500 hover:text-gray-700">
-                                <FiX className="text-xl" />
-                            </button>
-                        </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Đánh giá sao</label>
-                                <div className="flex gap-1">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setEvaluateForm(prev => ({ ...prev, rate: star }))}
-                                            className={`text-2xl ${star <= evaluateForm.rate ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
-                                        >
-                                            <FiStar className={star <= evaluateForm.rate ? 'fill-current' : ''} />
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+            <EvaluateModal
+                isOpen={showEvaluateModal}
+                onClose={() => setShowEvaluateModal(false)}
+                selectedVariant={selectedVariant}
+                onSubmit={handleSubmitEvaluate}
+                evaluateForm={evaluateForm}
+                setEvaluateForm={setEvaluateForm}
+            />
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Nhận xét</label>
-                                <textarea
-                                    value={evaluateForm.comment}
-                                    onChange={(e) => setEvaluateForm(prev => ({ ...prev, comment: e.target.value }))}
-                                    className="w-full p-3 border border-gray-300 rounded-lg resize-none"
-                                    rows="4"
-                                    placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
-                                />
-                            </div>
+            <AdditionalEvaluateModal
+                isOpen={showAdditionalModal}
+                onClose={() => setShowAdditionalModal(false)}
+                selectedVariant={selectedVariant}
+                onSubmit={handleSubmitAdditional}
+                additionalForm={additionalForm}
+                setAdditionalForm={setAdditionalForm}
+            />
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh (tùy chọn)</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setEvaluateForm(prev => ({ ...prev, image: e.target.files[0] }))}
-                                    className="w-full p-2 border border-gray-300 rounded-lg"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowEvaluateModal(false)}
-                                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={handleSubmitEvaluate}
-                                className="flex-1 py-2 bg-[#ff5252] text-white rounded-lg hover:bg-[#e53e3e] transition-colors"
-                            >
-                                Gửi đánh giá
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showAdditionalModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-gray-800">Đánh giá bổ sung</h3>
-                            <button onClick={() => setShowAdditionalModal(false)} className="text-gray-500 hover:text-gray-700">
-                                <FiX className="text-xl" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Nhận xét bổ sung</label>
-                                <textarea
-                                    value={additionalForm.additional_comment}
-                                    onChange={(e) => setAdditionalForm(prev => ({ ...prev, additional_comment: e.target.value }))}
-                                    className="w-full p-3 border border-gray-300 rounded-lg resize-none"
-                                    rows="4"
-                                    placeholder="Thêm nhận xét sau khi sử dụng sản phẩm..."
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh bổ sung (tùy chọn)</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setAdditionalForm(prev => ({ ...prev, additional_image: e.target.files[0] }))}
-                                    className="w-full p-2 border border-gray-300 rounded-lg"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowAdditionalModal(false)}
-                                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                onClick={handleSubmitAdditional}
-                                className="flex-1 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                            >
-                                Gửi bổ sung
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showViewModal && evaluationData && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-gray-800">Chi tiết đánh giá</h3>
-                            <button onClick={() => setShowViewModal(false)} className="text-gray-500 hover:text-gray-700">
-                                <FiX className="text-xl" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                                <div className="w-16 h-16 bg-gray-200 rounded-lg overflow-hidden">
-                                    <img
-                                        src={evaluationData.product.variant_image}
-                                        alt={evaluationData.product.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="font-medium text-gray-800">{evaluationData.product.name}</h4>
-                                    <p className="text-sm text-gray-600">
-                                        Size: {evaluationData.product.size} • Màu: {evaluationData.product.color_name}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="flex">
-                                        {[1, 2, 3, 4, 5].map(star => (
-                                            <FiStar
-                                                key={star}
-                                                className={`text-lg ${star <= evaluationData.rate ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
-                                            />
-                                        ))}
-                                    </div>
-                                    <span className="text-sm text-gray-600">
-                                        {new Date(evaluationData.created_at).toLocaleDateString('vi-VN')}
-                                    </span>
-                                </div>
-
-                                {evaluationData.comment && (
-                                    <p className="text-gray-700 mb-2">{evaluationData.comment}</p>
-                                )}
-
-                                {evaluationData.image && (
-                                    <img
-                                        src={evaluationData.image}
-                                        alt="Evaluation"
-                                        className="w-full max-w-xs rounded-lg"
-                                    />
-                                )}
-                            </div>
-
-                            {evaluationData.additional_evaluation.has_additional && (
-                                <div className="border-t pt-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <FiMessageSquare className="text-green-500" />
-                                        <span className="text-sm font-medium text-green-600">Đánh giá bổ sung</span>
-                                        <span className="text-sm text-gray-600">
-                                            {new Date(evaluationData.additional_evaluation.created_at).toLocaleDateString('vi-VN')}
-                                        </span>
-                                    </div>
-
-                                    {evaluationData.additional_evaluation.comment && (
-                                        <p className="text-gray-700 mb-2">{evaluationData.additional_evaluation.comment}</p>
-                                    )}
-
-                                    {evaluationData.additional_evaluation.image && (
-                                        <img
-                                            src={evaluationData.additional_evaluation.image}
-                                            alt="Additional Evaluation"
-                                            className="w-full max-w-xs rounded-lg"
-                                        />
-                                    )}
-                                </div>
-                            )}
-
-                            {evaluationData.seller_reply.has_reply && (
-                                <div className="border-t pt-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-sm font-medium text-blue-600">Phản hồi từ người bán</span>
-                                        <span className="text-sm text-gray-600">
-                                            {new Date(evaluationData.seller_reply.replied_at).toLocaleDateString('vi-VN')}
-                                        </span>
-                                    </div>
-                                    <p className="text-gray-700 bg-blue-50 p-3 rounded-lg">{evaluationData.seller_reply.content}</p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6">
-                            <button
-                                onClick={() => setShowViewModal(false)}
-                                className="w-full py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                            >
-                                Đóng
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ViewEvaluationModal
+                isOpen={showViewModal}
+                onClose={() => setShowViewModal(false)}
+                evaluationData={evaluationData}
+            />
         </div>
     );
 };
