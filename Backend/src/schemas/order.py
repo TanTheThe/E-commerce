@@ -21,8 +21,9 @@ class OrderModel(BaseModel):
     special_offer_id: uuid.UUID
 
 class OrderCreateModel(BaseModel):
-    special_offer_id: Optional[str]
-    note: Optional[str]
+    special_offer_id: Optional[str] = None
+    note: Optional[str] = None
+    payment_method: str = "direct"
     order_detail: List[OrderDetailCreateModel]
     address_id: str
 

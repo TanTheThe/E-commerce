@@ -1,8 +1,13 @@
+import { useContext, useEffect } from 'react';
 import { FaCloudUploadAlt } from 'react-icons/fa';
 import { FiX, FiStar } from 'react-icons/fi';
 import { IoMdClose } from 'react-icons/io';
+import { MyContext } from "../../App";
+import { LazyLoadImage } from 'react-lazy-load-image-component';
 
 const EvaluateModal = ({ isOpen, onClose, selectedVariant, onSubmit, evaluateForm, setEvaluateForm }) => {
+    const context = useContext(MyContext);
+
     if (!isOpen) return null;
 
     const convertToBase64 = (file) => {
@@ -18,27 +23,66 @@ const EvaluateModal = ({ isOpen, onClose, selectedVariant, onSubmit, evaluateFor
         const file = e.target.files[0];
         if (!file) return;
 
-        const base64 = await convertToBase64(file);
-        const imageData = {
-            file: file,
-            url: URL.createObjectURL(file),
-            name: file.name,
-            base64
-        };
+        try {
+            const previewUrl = URL.createObjectURL(file);
 
-        setEvaluateForm(prev => ({ ...prev, image: imageData }));
+            const base64 = await convertToBase64(file);
+
+            const imageData = {
+                file: file,
+                url: previewUrl,
+                name: file.name,
+                base64
+            };
+
+            setEvaluateForm(prev => ({ ...prev, image: imageData }));
+        } catch (error) {
+            console.error("Error uploading image:", error);
+            if (context?.openAlertBox) {
+                context.openAlertBox("error", "Có lỗi xảy ra trong quá trình upload ảnh");
+            }
+        }
     };
 
     const removeImage = () => {
-        if (evaluateForm.image && evaluateForm.image.url) {
+        if (evaluateForm.image?.url) {
             URL.revokeObjectURL(evaluateForm.image.url);
         }
         setEvaluateForm(prev => ({ ...prev, image: null }));
     };
 
     const handleSubmit = () => {
+        if (!evaluateForm.rate || evaluateForm.rate === 0) {
+            if (context?.openAlertBox) {
+                context.openAlertBox("error", "Vui lòng chọn số sao đánh giá!");
+            }
+            return;
+        }
+
+        if (!evaluateForm.comment?.trim()) {
+            if (context?.openAlertBox) {
+                context.openAlertBox("error", "Vui lòng nhập nhận xét!");
+            }
+            return;
+        }
+
         onSubmit();
     };
+
+    const handleClose = () => {
+        if (evaluateForm.image?.url) {
+            URL.revokeObjectURL(evaluateForm.image.url);
+        }
+        onClose();
+    };
+
+    useEffect(() => {
+        return () => {
+            if (evaluateForm.image?.url) {
+                URL.revokeObjectURL(evaluateForm.image.url);
+            }
+        };
+    }, [evaluateForm.image]);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
@@ -46,7 +90,7 @@ const EvaluateModal = ({ isOpen, onClose, selectedVariant, onSubmit, evaluateFor
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-800">Đánh giá sản phẩm</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+                    <button onClick={handleClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
                         <FiX className="text-xl" />
                     </button>
                 </div>
@@ -84,42 +128,34 @@ const EvaluateModal = ({ isOpen, onClose, selectedVariant, onSubmit, evaluateFor
                         </label>
 
                         {!evaluateForm.image ? (
-                            <>
+                            <div className="border-dashed border-2 border-gray-300 h-[150px] flex items-center justify-center bg-gray-100 rounded relative hover:border-blue-400 hover:bg-blue-50 transition-colors">
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={handleImageUpload}
-                                    className="hidden"
+                                    className="absolute inset-0 opacity-0 z-10 cursor-pointer"
                                     id="evaluate-image-upload"
                                 />
-                                <label
-                                    htmlFor="evaluate-image-upload"
-                                    className="w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors block"
-                                >
-                                    <div className="flex flex-col items-center">
-                                        <FaCloudUploadAlt className="text-2xl text-gray-400 mb-2" />
-                                        <p className="text-sm font-medium text-gray-700">Nhấp để chọn ảnh</p>
-                                        <p className="text-xs text-gray-500">Hỗ trợ định dạng JPG, PNG</p>
-                                    </div>
+                                <label htmlFor="evaluate-image-upload" className="text-center text-gray-500 cursor-pointer">
+                                    <FaCloudUploadAlt className="mx-auto mb-2 text-2xl" />
+                                    <p className="text-sm font-medium">Nhấp để chọn ảnh</p>
+                                    <p className="text-xs">Hỗ trợ định dạng JPG, PNG</p>
                                 </label>
-                            </>
+                            </div>
                         ) : (
-                            <div className="relative group">
-                                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden max-w-32">
-                                    <img
-                                        src={evaluateForm.image.url}
-                                        alt={evaluateForm.image.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <button
-                                    type="button"
+                            <div className="relative w-full h-[150px] border rounded overflow-hidden">
+                                <LazyLoadImage
+                                    src={evaluateForm.image.url}
+                                    alt={evaluateForm.image.name}
+                                    className="object-cover w-full h-full"
+                                    effect="blur"
+                                />
+                                <span
                                     onClick={removeImage}
-                                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-red-700 transition-colors"
                                 >
                                     <IoMdClose />
-                                </button>
-                                <p className="text-xs text-gray-500 mt-1 truncate">{evaluateForm.image.name}</p>
+                                </span>
                             </div>
                         )}
                     </div>
@@ -127,7 +163,7 @@ const EvaluateModal = ({ isOpen, onClose, selectedVariant, onSubmit, evaluateFor
 
                 <div className="flex gap-3 mt-6">
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                         Hủy

@@ -4,11 +4,12 @@ const ViewEvaluationModal = ({ isOpen, onClose, evaluationData }) => {
     if (!isOpen || !evaluationData) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.4)' }}>
             <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-gray-800">Chi tiết đánh giá</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
                         <FiX className="text-xl" />
                     </button>
                 </div>
@@ -98,7 +99,7 @@ const ViewEvaluationModal = ({ isOpen, onClose, evaluationData }) => {
                 <div className="mt-6">
                     <button
                         onClick={onClose}
-                        className="w-full py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                        className="w-full py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors cursor-pointer"
                     >
                         Đóng
                     </button>

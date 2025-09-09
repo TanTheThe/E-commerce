@@ -313,8 +313,7 @@ class EvaluateService:
                 User.last_name,
             ),
             joinedload(Evaluate.product).load_only(
-                Product.name,
-                Product.variant_image
+                Product.name
             ),
             joinedload(Evaluate.product_variant).options(
                 joinedload(Product_Variant.color).load_only(
@@ -322,7 +321,8 @@ class EvaluateService:
                 )
             ).load_only(
                 Product_Variant.color_name,
-                Product_Variant.size
+                Product_Variant.size,
+                Product_Variant.image
             ),
             joinedload(Evaluate.order_detail).options(
                 joinedload(Order_Detail.order).load_only(
@@ -353,7 +353,7 @@ class EvaluateService:
             "created_at": evaluate.created_at.isoformat() if evaluate.created_at else None,
             "product": {
                 "name": evaluate.product.name if evaluate.product else None,
-                "variant_image": evaluate.product.variant_image if evaluate.product else None,
+                "variant_image": evaluate.product_variant.image if evaluate.product_variant else None,
                 "size": evaluate.product_variant.size if evaluate.product_variant else None,
                 "color_name": (
                     evaluate.product_variant.color.name

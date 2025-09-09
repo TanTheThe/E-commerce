@@ -148,12 +148,6 @@ const ProductDetails = () => {
         return variant;
     };
 
-    const handleSubmitReview = async (e) => {
-        e.preventDefault();
-        // TODO: Implement review submission API call
-        console.log('Submit review:', reviewForm);
-    };
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">

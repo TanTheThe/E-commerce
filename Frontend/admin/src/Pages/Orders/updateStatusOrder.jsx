@@ -7,20 +7,20 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const statusOptions = [
-        { value: "Pending", label: "Pending", color: "bg-red-500", description: "Đơn hàng đang chờ xử lý" },
-        { value: "Confirmed", label: "Confirmed", color: "bg-amber-500", description: "Đơn hàng đã được xác nhận và đang xử lý" },
-        { value: "Shipping", label: "Shipped", color: "bg-violet-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
-        { value: "Delivered", label: "Delivered", color: "bg-green-700", description: "Đơn hàng đã được giao thành công" },
-        { value: "Cancelled", label: "Cancelled", color: "bg-gray-500", description: "Đơn hàng đã bị hủy" }
+        { value: "pending", label: "pending", color: "bg-red-500", description: "Đơn hàng đang chờ xử lý" },
+        { value: "confirmed", label: "confirmed", color: "bg-amber-500", description: "Đơn hàng đã được xác nhận và đang xử lý" },
+        { value: "shipping", label: "shipped", color: "bg-violet-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
+        { value: "delivered", label: "delivered", color: "bg-green-700", description: "Đơn hàng đã được giao thành công" },
+        { value: "cancelled", label: "cancelled", color: "bg-gray-500", description: "Đơn hàng đã bị hủy" }
     ];
 
     const getStatusColorStyle = (status) => {
         const colorMap = {
-            "Pending": "#ef4444", 
-            "Confirmed": "#f59e0b",  
-            "Shipping": "#8b5cf6", 
-            "Delivered": "#15803d", 
-            "Cancelled": "#6b7280"
+            "pending": "#ef4444", 
+            "confirmed": "#f59e0b",  
+            "shipping": "#8b5cf6", 
+            "delivered": "#15803d", 
+            "cancelled": "#6b7280"
         };
         return { backgroundColor: colorMap[status] || "#6b7280" };
     };

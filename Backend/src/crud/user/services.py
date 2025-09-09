@@ -116,7 +116,6 @@ class UserService:
         subquery = (
             select(UserSpecialOffer.user_id)
             .where(UserSpecialOffer.special_offer_id == offer_id)
-            .where(UserSpecialOffer.deleted_at.is_(None))
         )
         filters.append(User.id.notin_(subquery))
 

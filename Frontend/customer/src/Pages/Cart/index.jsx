@@ -190,9 +190,17 @@ const CartPage = () => {
                 product_variant_id: item.product_variant_id || item.variant_id
             }));
 
+            let paymentMethodValue;
+            if (paymentMethod === 'cod') {
+                paymentMethodValue = 'direct';
+            } else if (paymentMethod === 'online') {
+                paymentMethodValue = 'vnpay';
+            }
+
             const orderData = {
                 special_offer_id: selectedVoucher?.id || null,
                 note: orderNote.trim() || null,
+                payment_method: paymentMethodValue,
                 order_detail: orderDetail,
                 address_id: selectedAddress.id
             };

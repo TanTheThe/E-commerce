@@ -16,7 +16,6 @@ class OrderRepository:
 
         new_order = Order(
             **order_data_dict,
-            status="Pending",
             created_at=datetime.now()
         )
 

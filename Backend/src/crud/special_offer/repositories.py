@@ -77,6 +77,15 @@ class SpecialOfferRepository:
 
         return special_offers
 
+    async def get_user_special_offer(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+        statement = select(UserSpecialOffer).options(
+            *joins if joins else []
+        ).where(*conditions)
+
+        result = await session.exec(statement)
+        special_offers = result.one_or_none()
+
+        return special_offers
 
     async def update_special_offer(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
@@ -104,6 +113,13 @@ class SpecialOfferRepository:
         else:
             await session.execute(stmt)
 
+    async def update_user_offer_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
+        stmt = (
+            update(UserSpecialOffer)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)
 
     async def delete_special_offer(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         special_offer_to_delete = await self.get_special_offer(condition, session)

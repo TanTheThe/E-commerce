@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import selectinload, joinedload, noload, load_only
 from src.database.models import Special_Offer, User, Address, Order, Order_Detail, Product_Variant, Product, Color, \
-    OrderStatusHistory
+    OrderStatusHistory, UserSpecialOffer
 from src.crud.address.repositories import AddressRepository
 from src.crud.order.repositories import OrderRepository
 from src.crud.special_offer.repositories import SpecialOfferRepository
@@ -21,6 +21,7 @@ from src.errors.special_offer import SpecialOfferException
 from src.schemas.order import OrderCreateModel, OrderFilterModel
 import time
 import asyncio
+import uuid
 from src.errors.authentication import AuthException
 
 order_repository = OrderRepository()
@@ -119,6 +120,7 @@ class OrderService:
                 sub_total += item_sub_total
                 total_discount += item_total_discount
 
+                color = None
                 if variant.color_id:
                     condition = and_(Color.id == variant.color_id, Color.deleted_at.is_(None))
                     color = await color_repository.get_color(condition, session)
@@ -172,7 +174,7 @@ class OrderService:
         except Exception as e:
             raise
 
-    async def update_offers_usage(self, product_offers_to_update, order_offer, session):
+    async def update_offers_usage(self, product_offers_to_update, order_offer, customer_id, session):
         try:
             if product_offers_to_update:
                 offer_ids = list(product_offers_to_update.keys())
@@ -216,6 +218,27 @@ class OrderService:
                         session
                     )
 
+                    user_offer_condition = and_(
+                        UserSpecialOffer.user_id == customer_id,
+                        UserSpecialOffer.special_offer_id == order_offer.id,
+                        UserSpecialOffer.used_at.is_(None)
+                    )
+
+                    user_offer = await special_offer_repository.get_user_special_offer(
+                        user_offer_condition,
+                        session
+                    )
+
+                    if user_offer:
+                        await special_offer_repository.update_user_offer_some_field(
+                            and_(UserSpecialOffer.id == user_offer.id),
+                            {"used_at": datetime.now()},
+                            session
+                        )
+                        await session.commit()
+                    else:
+                        SpecialOfferException.not_found()
+
         except Exception as e:
             raise
 
@@ -233,6 +256,34 @@ class OrderService:
 
         statement = update(Product_Variant)
         await session.execute(statement, updates)
+
+
+    async def process_inventory_and_offers(self, order_items, variant_map, product_offers_to_update, order_offer,
+                                           session):
+        await self.update_inventory_batch(order_items, variant_map, session)
+
+        await self.update_offers_usage(product_offers_to_update, order_offer, session)
+
+        product_updates = {}
+        for item in order_items:
+            variant = variant_map[item.product_variant_id]
+            product_id = str(variant.product_id)
+            if product_id not in product_updates:
+                product_updates[product_id] = {"total_sold": 0, "popularity_score": 0}
+
+            product_updates[product_id]["total_sold"] += item.quantity
+            product_updates[product_id]["popularity_score"] += 1
+
+        for product_id, updates in product_updates.items():
+            condition = and_(Product.id == uuid.UUID(product_id))
+            await product_repository.update_product_some_field(
+                condition,
+                {
+                    "total_sold": Product.total_sold + updates["total_sold"],
+                    "popularity_score": Product.popularity_score + updates["popularity_score"]
+                },
+                session
+            )
 
     async def create_order(self, customer_id: str, order_data: OrderCreateModel, session: AsyncSession):
         try:
@@ -252,6 +303,8 @@ class OrderService:
             total_discount = product_discount + order_discount
             total_price = sub_total - order_discount
 
+            payment_status = "success" if order_data.payment_method == "direct" else "pending"
+
             address_dict = {
                 "line": address.line,
                 "street": address.street,
@@ -266,10 +319,12 @@ class OrderService:
                 "sub_total": sub_total,
                 "total_price": total_price,
                 "discount": order_discount,
+                "status": "pending",
                 "note": order_data.note,
-                "payment_method": "vnpay",
-                "payment_status": "pending",
+                "payment_method": order_data.payment_method,
+                "payment_status": payment_status,
                 "user_id": customer_id,
+                "special_offer_id": order_data.special_offer_id,
                 "Address": address_dict
             }
 
@@ -279,14 +334,11 @@ class OrderService:
                 od.order_id = new_order.id
             await order_detail_repository.create_order_detail(order_detail_objs, session)
 
-            for item in order_data.order_detail:
-                variant = variant_map[item.product_variant_id]
-                variant.quantity -= item.quantity
-                session.add(variant)
+            if order_data.payment_method == "direct":
+                await self.process_inventory_and_offers(
+                    order_data.order_detail, variant_map, product_offers_to_update, order_offer, session
+                )
 
-            await self.update_inventory_batch(order_data.order_detail, variant_map, session)
-
-            await self.update_offers_usage(product_offers_to_update, order_offer, session)
             await session.commit()
 
             response = {
@@ -481,7 +533,7 @@ class OrderService:
     async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0,
                                      limit: int = 10):
         condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
-        if status_order == 'delivered':
+        if status_order == 'Delivered':
             joins = [selectinload(Order.order_detail).selectinload(Order_Detail.evaluate)]
         else:
             joins = [selectinload(Order.order_detail)]
@@ -513,7 +565,7 @@ class OrderService:
                     "order_detail_id": str(od.id)
                 }
 
-                if status_order == 'delivered':
+                if status_order == 'Delivered':
                     has_evaluation = od.evaluate is not None and od.evaluate.deleted_at is None
                     variant_info["has_evaluation"] = has_evaluation
 
@@ -619,7 +671,6 @@ class OrderService:
         if order_to_update is None:
             OrderException.not_found()
 
-        old_status = order_to_update.status
         status_dict = status.model_dump()
         order_after_update = await order_repository.update_order(order_to_update, status_dict, session)
 
@@ -630,11 +681,6 @@ class OrderService:
         )
         session.add(history_entry)
 
-        if order_after_update.status in ["completed", "delivered"] and old_status not in ["completed", "delivered"]:
-            for od in order_after_update.order_detail:
-                await product_repository.update_product_some_field(Product.id == od.product_id,
-                                                                   {"popularity_score": Product.popularity_score + 1},
-                                                                   session)
         await session.commit()
         return order_after_update
 

@@ -11,6 +11,7 @@ import EvaluationButtons from "../Evaluate/evaluationButton";
 import EvaluateModal from "../Evaluate/evaluateModal";
 import AdditionalEvaluateModal from "../Evaluate/additionalEvalModal";
 import ViewEvaluationModal from "../Evaluate/viewEvalModal";
+import toast from "react-hot-toast";
 
 const Orders = () => {
     const navigate = useNavigate();
@@ -48,7 +49,7 @@ const Orders = () => {
             color: 'text-yellow-600',
             bgColor: 'bg-yellow-50',
             borderColor: 'border-yellow-200',
-            status: 'Pending'
+            status: 'pending'
         },
         {
             key: 'confirmed',
@@ -57,7 +58,7 @@ const Orders = () => {
             color: 'text-blue-600',
             bgColor: 'bg-blue-50',
             borderColor: 'border-blue-200',
-            status: 'Confirmed'
+            status: 'confirmed'
         },
         {
             key: 'shipping',
@@ -66,7 +67,7 @@ const Orders = () => {
             color: 'text-orange-600',
             bgColor: 'bg-orange-50',
             borderColor: 'border-orange-200',
-            status: 'Shipping'
+            status: 'shipping'
         },
         {
             key: 'delivered',
@@ -75,7 +76,7 @@ const Orders = () => {
             color: 'text-green-600',
             bgColor: 'bg-green-50',
             borderColor: 'border-green-200',
-            status: 'Delivered'
+            status: 'delivered'
         }
     ];
 
@@ -140,6 +141,10 @@ const Orders = () => {
     };
 
     const resetEvaluateForm = () => {
+        if (evaluateForm.image && evaluateForm.image.url) {
+            URL.revokeObjectURL(evaluateForm.image.url);
+        }
+
         setEvaluateForm({
             rate: 5,
             comment: '',
@@ -148,6 +153,10 @@ const Orders = () => {
     };
 
     const resetAdditionalForm = () => {
+        if (additionalForm.additional_image?.url) {
+            URL.revokeObjectURL(additionalForm.additional_image.url);
+        }
+
         setAdditionalForm({
             additional_comment: '',
             additional_image: null
@@ -181,16 +190,27 @@ const Orders = () => {
 
     const handleSubmitEvaluate = async () => {
         try {
-            const formData = new FormData();
-            formData.append('order_detail_id', selectedVariant.order_detail_id);
-            formData.append('rate', evaluateForm.rate);
-            formData.append('comment', evaluateForm.comment);
-            if (evaluateForm.image) {
-                formData.append('image', evaluateForm.image);
+            const submitData = {
+                order_detail_id: selectedVariant.order_detail_id,
+                rate: evaluateForm.rate,
+                comment: evaluateForm.comment
+            };
+
+            if (evaluateForm.image && evaluateForm.image.base64) {
+                submitData.image = evaluateForm.image.base64;
             }
 
-            await postDataApi('/customer/evaluate/', formData);
-            setShowEvaluateModal(false);
+            const res = await postDataApi('/customer/evaluate/', submitData);
+            if (res.success) {
+                toast.success(res.message);
+                setShowEvaluateModal(false);
+            } else {
+                toast.error(res.data.detail.message);
+            }
+
+            if (evaluateForm.image && evaluateForm.image.url) {
+                URL.revokeObjectURL(evaluateForm.image.url);
+            }
 
             const currentTab = tabs.find(tab => tab.key === activeTab);
             if (currentTab) {
@@ -203,14 +223,25 @@ const Orders = () => {
 
     const handleSubmitAdditional = async () => {
         try {
-            const formData = new FormData();
-            formData.append('additional_comment', additionalForm.additional_comment);
-            if (additionalForm.additional_image) {
-                formData.append('additional_image', additionalForm.additional_image);
+            const submitData = {
+                additional_comment: additionalForm.additional_comment
+            };
+
+            if (additionalForm.additional_image && additionalForm.additional_image.base64) {
+                submitData.additional_image = additionalForm.additional_image.base64;
             }
 
-            await putDataApi(`/customer/evaluate/${selectedVariant.evaluation_id}/supplement`, formData);
-            setShowAdditionalModal(false);
+            const res = await putDataApi(`/customer/evaluate/${selectedVariant.evaluation_id}/supplement`, submitData);
+            if (res.success) {
+                toast.success(res.message);
+                setShowAdditionalModal(false);
+            } else {
+                toast.error(res.data.detail.message);
+            }
+
+            if (additionalForm.additional_image && additionalForm.additional_image.url) {
+                URL.revokeObjectURL(additionalForm.additional_image.url);
+            }
 
             const currentTab = tabs.find(tab => tab.key === activeTab);
             if (currentTab) {
@@ -220,6 +251,17 @@ const Orders = () => {
             console.error('Error submitting additional evaluation:', error);
         }
     };
+
+    useEffect(() => {
+        return () => {
+            if (evaluateForm.image && evaluateForm.image.url) {
+                URL.revokeObjectURL(evaluateForm.image.url);
+            }
+            if (additionalForm.additional_image && additionalForm.additional_image.url) {
+                URL.revokeObjectURL(additionalForm.additional_image.url);
+            }
+        };
+    }, [evaluateForm.image, additionalForm.additional_image]);
 
     if (loading) {
         return (

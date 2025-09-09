@@ -23,6 +23,9 @@ const PaymentReturn = () => {
             setLoading(true);
             setError(null);
 
+            console.log('Current URL:', window.location.href);
+            console.log('Search params:', window.location.search);
+
             const urlParams = new URLSearchParams(window.location.search);
             const encodedData = urlParams.get('data');
             const errorParam = urlParams.get('error');

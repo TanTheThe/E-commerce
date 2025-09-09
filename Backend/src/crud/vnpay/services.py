@@ -1,15 +1,17 @@
+from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, or_, select
 from fastapi.responses import JSONResponse
-from src.config import Config
 from typing import Dict, Any, Optional
+from src.crud.order.services import OrderService
+from src.crud.special_offer.repositories import SpecialOfferRepository
 from src.crud.vnpay.utils import hmacsha512
 from src.config import Config
 from datetime import datetime, timedelta
 from src.crud.order.repositories import OrderRepository
 from src.crud.vnpay.repositories import VNPayRepository
 from src.errors.order import OrderException
-from src.database.models import Order, Payment
+from src.database.models import Order, Payment, Special_Offer
 import urllib.parse
 import httpx
 import json
@@ -17,6 +19,8 @@ import uuid
 
 order_repository = OrderRepository()
 vnpay_repository = VNPayRepository()
+order_service = OrderService()
+special_offer_repository = SpecialOfferRepository()
 
 class VNPayService:
     def __init__(self):
@@ -119,7 +123,10 @@ class VNPayService:
 
         async with session.begin():
             condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
-            order = await order_repository.get_order(condition_order, session)
+            joins = [
+                selectinload(Order.order_detail)
+            ]
+            order = await order_repository.get_order(condition_order, session, joins)
 
             if not order:
                 raise OrderException.not_found()
@@ -146,6 +153,26 @@ class VNPayService:
 
             order.payment_status = payment_status
             session.add(order)
+
+            if is_success:
+                variant_ids = {od.product_variant_id for od in order.order_detail}
+                variant_map = await order_service.get_variants_with_product_offers(variant_ids, session)
+
+                order_offer = None
+                if order.special_offer_id:
+                    conditions_offer = and_(
+                        Special_Offer.id == order.special_offer_id,
+                        Special_Offer.deleted_at.is_(None)
+                    )
+                    order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
+
+                _, _, _, product_offers_to_update = await order_service.calculate_order_totals(
+                    order.order_detail, variant_map, session
+                )
+
+                await order_service.process_inventory_and_offers(
+                    order.order_detail, variant_map, product_offers_to_update, order_offer, session
+                )
 
             payment_dict = {
                 "order_id": order.id,
@@ -197,19 +224,26 @@ class VNPayService:
     
 
     async def handle_return(self, input_data: dict, request, session: AsyncSession):
+        print("=== HANDLE_RETURN START ===")
         order_code = input_data.get("vnp_TxnRef")
+        print(f"Order code: {order_code}")
 
         if not input_data:
+            print("ERROR: No input data")
             raise ValueError("Invalid request data")
 
         if not order_code:
+            print("ERROR: No order code")
             raise ValueError("Missing order code")
         
-        if not self.validate_response(Config.VNPAY_HASH_SECRET_KEY, input_data): 
+        if not self.validate_response(Config.VNPAY_HASH_SECRET_KEY, input_data):
+            print("ERROR: Invalid signature")
             raise ValueError("Invalid signature")
         
         try:
+            print("Calling process_payment_completion...")
             result = await self.process_payment_completion(input_data, session)
+            print(f"process_payment_completion result: {result}")
 
             session_id = str(uuid.uuid4())
             self.payment_results_cache[session_id] = {
@@ -217,10 +251,13 @@ class VNPayService:
                 "timestamp": datetime.now(),
                 "expires_at": datetime.now() + timedelta(minutes=10)  # Expires in 10 minutes
             }
+            print(f"Created session_id: {session_id}")
 
             self._cleanup_expired_results()
 
-            return {"session_id": session_id, **result}
+            final_result = {"session_id": session_id, **result}
+            print(f"Final result: {final_result}")
+            return final_result
             
         except Exception as e:
             await session.rollback()

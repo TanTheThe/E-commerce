@@ -14,7 +14,6 @@ class VNPayRepository:
         )
         new_payment.created_at = datetime.now()
         session.add(new_payment)
-        await session.commit()
 
         return new_payment
 

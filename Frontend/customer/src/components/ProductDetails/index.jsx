@@ -162,10 +162,50 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
         }
     };
 
+    const sortSizes = (sizes) => {
+        if (!sizes || !Array.isArray(sizes)) return [];
+
+        const sizeOrder = {
+            'XXS': 1, 'XS': 2, 'S': 3, 'M': 4, 'L': 5, 'XL': 6, 'XXL': 7, 'XXXL': 8,
+            'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7
+        };
+
+        return [...sizes].sort((a, b) => {
+            const sizeA = a?.toString().trim();
+            const sizeB = b?.toString().trim();
+
+            if (!sizeA && !sizeB) return 0;
+            if (!sizeA) return 1;
+            if (!sizeB) return -1;
+
+            const numA = parseFloat(sizeA);
+            const numB = parseFloat(sizeB);
+
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+            }
+
+            if (isNaN(numA) && isNaN(numB)) {
+                const orderA = sizeOrder[sizeA] || sizeOrder[sizeA.toUpperCase()] || 999;
+                const orderB = sizeOrder[sizeB] || sizeOrder[sizeB.toUpperCase()] || 999;
+
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return sizeA.localeCompare(sizeB);
+            }
+
+            if (!isNaN(numA) && isNaN(numB)) return -1;
+            if (isNaN(numA) && !isNaN(numB)) return 1;
+
+            return 0;
+        });
+    };
+
     const getAvailableOptions = () => {
         if (selectedSize && !selectedColor) {
             return {
-                availableSizes,
+                availableSizes: sortSizes(availableSizes),
                 availableColors: availableColors.filter(color => {
                     return product.product_variant.some(v => {
                         if (color.id === null) {
@@ -179,24 +219,29 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
         }
 
         if (selectedColor && !selectedSize) {
+            const filteredSizes = [...new Set(product.product_variant
+                ?.filter(v => {
+                    let colorMatch = false;
+                    if (selectedColor.startsWith('custom_')) {
+                        const colorName = selectedColor.replace('custom_', '');
+                        colorMatch = v.color_name === colorName && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === selectedColor;
+                    }
+                    return colorMatch && v.size;
+                })
+                .map(v => v.size))] || [];
+
             return {
-                availableSizes: [...new Set(product.product_variant
-                    ?.filter(v => {
-                        let colorMatch = false;
-                        if (selectedColor.startsWith('custom_')) {
-                            const colorName = selectedColor.replace('custom_', '');
-                            colorMatch = v.color_name === colorName && !v.color_id;
-                        } else {
-                            colorMatch = v.color_id === selectedColor;
-                        }
-                        return colorMatch && v.size;
-                    })
-                    .map(v => v.size))] || [],
+                availableSizes: sortSizes(filteredSizes),
                 availableColors
             };
         }
 
-        return { availableSizes, availableColors };
+        return {
+            availableSizes: sortSizes(availableSizes),
+            availableColors
+        };
     };
 
     const { availableSizes: displaySizes, availableColors: displayColors } = getAvailableOptions();

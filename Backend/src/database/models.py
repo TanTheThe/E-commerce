@@ -93,6 +93,7 @@ class Order(SQLModel, table=True):
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     payment_method: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="vnpay"), default="vnpay")
     payment_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+    special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", default=None, nullable=True)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -106,6 +107,9 @@ class Order(SQLModel, table=True):
         back_populates="order", sa_relationship_kwargs={"lazy": "noload"}
     )
     payments: List["Payment"] = Relationship(back_populates="order", sa_relationship_kwargs={"lazy": "noload"})
+    special_offer: Optional["Special_Offer"] = Relationship(
+        back_populates="orders", sa_relationship_kwargs={'lazy': 'noload'}
+    )
 
 
 class Order_Detail(SQLModel, table=True):
@@ -334,19 +338,15 @@ class Special_Offer(SQLModel, table=True):
 
     products: List["Product"] = Relationship(back_populates="special_offer", sa_relationship_kwargs={"lazy": "noload"})
     user_special_offer: List["UserSpecialOffer"] = Relationship(
-        back_populates="special_offer",
-        sa_relationship_kwargs={'lazy': 'noload'}
+        back_populates="special_offer", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    orders: List["Order"] = Relationship(
+        back_populates="special_offer", sa_relationship_kwargs={"lazy": "noload"}
     )
 
 
 class UserSpecialOffer(SQLModel, table=True):
     __tablename__ = 'user_special_offer'
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "special_offer_id",
-            name="uq_user_special_offer"
-        ),
-    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -359,11 +359,6 @@ class UserSpecialOffer(SQLModel, table=True):
 
     user_id: uuid.UUID = Field(foreign_key="user.id")
     special_offer_id: uuid.UUID = Field(foreign_key="special_offer.id")
-    is_used: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    created_at: datetime = Field(
-        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
-    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     used_at: Optional[datetime] = Field(default=None)
 
     user: Optional["User"] = Relationship(back_populates="user_special_offer", sa_relationship_kwargs={'lazy': 'noload'})

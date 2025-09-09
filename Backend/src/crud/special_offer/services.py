@@ -129,9 +129,6 @@ class SpecialOfferService:
         subquery = (
             select(UserSpecialOffer.special_offer_id)
             .where(UserSpecialOffer.user_id == user_id)
-            .where(UserSpecialOffer.deleted_at.is_(None))
-            .where(UserSpecialOffer.is_used == False)
-            .where(UserSpecialOffer.used_at.is_(None))
         )
 
         condition_offers.append(Special_Offer.id.in_(subquery))
@@ -276,7 +273,6 @@ class SpecialOfferService:
             UserSpecialOffer(
                 special_offer_id=data.special_offer_id,
                 user_id=user_id,
-                created_at=datetime.now()
             )
             for user_id in existing_user_ids
         ]
