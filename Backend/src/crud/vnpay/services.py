@@ -120,16 +120,23 @@ class VNPayService:
         vnp_response_code = input_data.get("vnp_ResponseCode")
         vnp_transaction_no = input_data.get("vnp_TransactionNo")
         order_desc = input_data.get("vnp_OrderInfo")
+        print(f"Processing order: {order_code}, amount: {amount}")
+        print(f"Response code: {vnp_response_code}")
 
         async with session.begin():
+            print("Starting transaction...")
             condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
             joins = [
                 selectinload(Order.order_detail)
             ]
+
+            print("Fetching order...")
             order = await order_repository.get_order(condition_order, session, joins)
 
             if not order:
                 raise OrderException.not_found()
+            
+            print(f"Found order: {order.id}, total_price: {order.total_price}")
             
             if order.total_price != amount:
                 return OrderException.order_not_match()
@@ -137,6 +144,7 @@ class VNPayService:
             condition_payment = and_(Payment.order_id == order.id)
             existing_payment = await vnpay_repository.get_payment(condition_payment, session)
             if existing_payment:
+                print("Payment already exists, returning existing data")
                 return {
                     "order_id": str(existing_payment.order_id),
                     "order_code": order_code,
@@ -150,6 +158,8 @@ class VNPayService:
             
             is_success = vnp_response_code == "00"
             payment_status = "success" if is_success else "failed"
+
+            print("is_succes:", is_success)
 
             order.payment_status = payment_status
             session.add(order)
