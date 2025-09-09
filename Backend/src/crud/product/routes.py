@@ -116,6 +116,18 @@ async def get_products_latest(limit_per_category: int = 12, session: AsyncSessio
         }
     )
 
+@product_customer_router.get('/related')
+async def get_products_related(product_id: str, price_range: float = 0.4, limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+    products = await product_service.get_related_products_service(product_id, session, limit_per_category, price_range)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin của các sản phẩm",
+            "content": products
+        }
+    )
+
 @product_customer_router.get('/top-discount')
 async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
     products = await product_service.get_top_discount_service(session, limit)

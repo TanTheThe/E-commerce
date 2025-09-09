@@ -120,92 +120,88 @@ class VNPayService:
         vnp_response_code = input_data.get("vnp_ResponseCode")
         vnp_transaction_no = input_data.get("vnp_TransactionNo")
         order_desc = input_data.get("vnp_OrderInfo")
-        print(f"Processing order: {order_code}, amount: {amount}")
-        print(f"Response code: {vnp_response_code}")
 
-        async with session.begin():
-            print("Starting transaction...")
-            condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
-            joins = [
-                selectinload(Order.order_detail)
-            ]
+        condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
+        joins = [
+            selectinload(Order.order_detail)
+        ]
 
-            print("Fetching order...")
-            order = await order_repository.get_order(condition_order, session, joins)
+        order = await order_repository.get_order(condition_order, session, joins)
 
-            if not order:
-                raise OrderException.not_found()
-            
-            print(f"Found order: {order.id}, total_price: {order.total_price}")
-            
-            if order.total_price != amount:
-                return OrderException.order_not_match()
-            
-            condition_payment = and_(Payment.order_id == order.id)
-            existing_payment = await vnpay_repository.get_payment(condition_payment, session)
-            if existing_payment:
-                print("Payment already exists, returning existing data")
-                return {
-                    "order_id": str(existing_payment.order_id),
-                    "order_code": order_code,
-                    "amount": existing_payment.amount,
-                    "order_info": existing_payment.order_info,
-                    "transaction_no": existing_payment.transaction_no,
-                    "response_code": existing_payment.response_code,
-                    "status": existing_payment.status,
-                    "already_processed": True
-                }
-            
-            is_success = vnp_response_code == "00"
-            payment_status = "success" if is_success else "failed"
+        if not order:
+            raise OrderException.not_found()
 
-            print("is_succes:", is_success)
+        if order.total_price != amount:
+            raise OrderException.order_not_match()
 
-            order.payment_status = payment_status
-            session.add(order)
-
-            if is_success:
-                variant_ids = {od.product_variant_id for od in order.order_detail}
-                variant_map = await order_service.get_variants_with_product_offers(variant_ids, session)
-
-                order_offer = None
-                if order.special_offer_id:
-                    conditions_offer = and_(
-                        Special_Offer.id == order.special_offer_id,
-                        Special_Offer.deleted_at.is_(None)
-                    )
-                    order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
-
-                _, _, _, product_offers_to_update = await order_service.calculate_order_totals(
-                    order.order_detail, variant_map, session
-                )
-
-                await order_service.process_inventory_and_offers(
-                    order.order_detail, variant_map, product_offers_to_update, order_offer, session
-                )
-
-            payment_dict = {
-                "order_id": order.id,
-                "payment_gateway": "vnpay",
-                "transaction_no": vnp_transaction_no,
-                "amount": amount,
-                "response_code": vnp_response_code,
-                "order_info": order_desc,
-                "status": payment_status
-            }
-
-            payment = await vnpay_repository.create_payment(payment_dict, session)
-
+        condition_payment = and_(Payment.order_id == order.id)
+        existing_payment = await vnpay_repository.get_payment(condition_payment, session)
+        if existing_payment:
             return {
-                "order_id": str(payment.order_id),
+                "order_id": str(existing_payment.order_id),
                 "order_code": order_code,
-                "amount": payment.amount,
-                "order_info": payment.order_info,
-                "transaction_no": payment.transaction_no,
-                "response_code": payment.response_code,
-                "status": payment.status,
-                "already_processed": False
+                "amount": existing_payment.amount,
+                "order_info": existing_payment.order_info,
+                "transaction_no": existing_payment.transaction_no,
+                "response_code": existing_payment.response_code,
+                "status": existing_payment.status,
+                "already_processed": True
             }
+
+        is_success = vnp_response_code == "00"
+        payment_status = "success" if is_success else "failed"
+
+        order.payment_status = payment_status
+        session.add(order)
+
+        if is_success:
+            variant_ids = {od.product_variant_id for od in order.order_detail}
+            variant_map = await order_service.get_variants_with_product_offers(variant_ids, session)
+
+            order_offer = None
+            if order.special_offer_id:
+                conditions_offer = and_(
+                    Special_Offer.id == order.special_offer_id,
+                    Special_Offer.deleted_at.is_(None)
+                )
+                order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
+
+            _, _, _, product_offers_to_update = await order_service.calculate_order_totals(
+                order.order_detail, variant_map, session
+            )
+
+            await order_service.update_offers_usage(
+                product_offers_to_update, order_offer, order.user_id, session
+            )
+
+            await order_service.update_inventory_batch(order.order_detail, variant_map, session)
+
+            await order_service.update_product_stats(order.order_detail, variant_map, session)
+
+        payment_dict = {
+            "order_id": order.id,
+            "payment_gateway": "vnpay",
+            "transaction_no": vnp_transaction_no,
+            "amount": amount,
+            "response_code": vnp_response_code,
+            "order_info": order_desc,
+            "status": payment_status
+        }
+
+        payment = await vnpay_repository.create_payment(payment_dict, session)
+
+        await session.commit()
+
+        return {
+            "order_id": str(payment.order_id),
+            "order_code": order_code,
+            "amount": payment.amount,
+            "order_info": payment.order_info,
+            "transaction_no": payment.transaction_no,
+            "response_code": payment.response_code,
+            "status": payment.status,
+            "already_processed": False
+        }
 
 
     async def handle_ipn(self, input_data: dict, session: AsyncSession):
@@ -234,26 +230,19 @@ class VNPayService:
     
 
     async def handle_return(self, input_data: dict, request, session: AsyncSession):
-        print("=== HANDLE_RETURN START ===")
         order_code = input_data.get("vnp_TxnRef")
-        print(f"Order code: {order_code}")
 
         if not input_data:
-            print("ERROR: No input data")
             raise ValueError("Invalid request data")
 
         if not order_code:
-            print("ERROR: No order code")
             raise ValueError("Missing order code")
         
         if not self.validate_response(Config.VNPAY_HASH_SECRET_KEY, input_data):
-            print("ERROR: Invalid signature")
             raise ValueError("Invalid signature")
         
         try:
-            print("Calling process_payment_completion...")
             result = await self.process_payment_completion(input_data, session)
-            print(f"process_payment_completion result: {result}")
 
             session_id = str(uuid.uuid4())
             self.payment_results_cache[session_id] = {
@@ -261,12 +250,10 @@ class VNPayService:
                 "timestamp": datetime.now(),
                 "expires_at": datetime.now() + timedelta(minutes=10)  # Expires in 10 minutes
             }
-            print(f"Created session_id: {session_id}")
 
             self._cleanup_expired_results()
 
             final_result = {"session_id": session_id, **result}
-            print(f"Final result: {final_result}")
             return final_result
             
         except Exception as e:

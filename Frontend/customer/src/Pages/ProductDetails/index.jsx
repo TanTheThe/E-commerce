@@ -9,6 +9,7 @@ import ProductsSlider from '../../components/ProductsSlider'
 import ProductDetailsComponent from "../../components/ProductDetails";
 import { getDataApi } from "../../utils/api";
 import ReviewDetailModal from "../../components/Review/reviewDetailModal";
+import RelatedSection from "../../components/Related";
 
 const ProductDetails = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -375,10 +376,7 @@ const ProductDetails = () => {
                     )}
                 </div>
 
-                <div className="container pt-8">
-                    <h2 className="text-[20px] font-[600]">Sản phẩm liên quan</h2>
-                    <ProductsSlider items={6} />
-                </div>
+                <RelatedSection productId={id} />
             </section>
             <ReviewDetailModal
                 reviewId={selectedReviewId}

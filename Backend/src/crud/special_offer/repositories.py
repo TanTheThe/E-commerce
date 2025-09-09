@@ -25,9 +25,7 @@ class SpecialOfferRepository:
         new_special_offer = UserSpecialOffer(
             **user_special_offer_data
         )
-        new_special_offer.created_at = datetime.now()
         session.add(new_special_offer)
-        await session.commit()
 
         return new_special_offer
 

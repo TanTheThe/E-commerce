@@ -328,6 +328,7 @@ class ProductService:
                 "name": product.product_name,
                 "images": product.images,
                 "avg_rating": product.avg_rating,
+                "total_sold": product.total_sold,
                 "original_price": original_price,
                 "discounted_price": discounted_price,
                 "categories": product.categories
@@ -428,6 +429,7 @@ class ProductService:
                 "id": str(product[0].id),
                 "name": product[0].name,
                 "images": product[0].images,
+                "total_sold": product[0].total_sold,
                 "categories": [
                     {
                         "id": str(category.id),
@@ -443,6 +445,120 @@ class ProductService:
             product_list.append(product_data)
 
         return product_list
+
+
+    async def get_related_products_service(self, product_id: str, session: AsyncSession, limit_per_category: int = 12,
+                                           price_range: float = 0.4):
+        condition_product = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
+        joins_product = [
+            selectinload(Product.categories).load_only(Categories.id),
+            selectinload(Product.product_variant).load_only(
+                Product_Variant.id,
+                Product_Variant.price,
+                Product_Variant.deleted_at
+            )
+        ]
+        current_product_tuple = await product_repository.get_product(condition_product, session, joins_product)
+        current_product = current_product_tuple[0]
+
+        if not current_product:
+            return []
+
+        active_variants = [
+            variant for variant in current_product.product_variant if variant.deleted_at is None
+        ]
+        current_price = 0
+        if active_variants:
+            prices = [variant.price for variant in active_variants if variant.price is not None]
+            if prices:
+                current_price = min(prices)
+
+        min_price = current_price * (1 - price_range)
+        max_price = current_price * (1 + price_range)
+
+        condition = [
+            Product.deleted_at.is_(None),
+            Product.status == "active",
+            Product.id != product_id,
+            Product.categories.any(Categories.id.in_([c.id for c in current_product.categories]))
+        ]
+        order_by = desc(Product.created_at)
+
+        joins = [
+            selectinload(Product.categories).options(
+                joinedload(Categories.parent)
+            ).load_only(
+                Categories.id,
+                Categories.name,
+                Categories.parent_id,
+                Categories.deleted_at
+            ),
+
+            selectinload(Product.product_variant).load_only(
+                Product_Variant.id,
+                Product_Variant.price,
+                Product_Variant.deleted_at
+            ),
+
+            selectinload(Product.special_offer).load_only(
+                Special_Offer.id,
+                Special_Offer.discount,
+                Special_Offer.type
+            ),
+        ]
+
+        products, _ = await product_repository.get_all_product(condition, session, joins, skip=0,
+                                                               limit=limit_per_category, order_by_clause=order_by)
+
+        product_list = []
+        for product in products:
+            p = product[0]
+
+            valid_categories = [cat for cat in p.categories if cat.deleted_at is None]
+            active_variants = [v for v in p.product_variant if v.deleted_at is None]
+            prices = [v.price for v in active_variants if v.price is not None]
+
+            if not prices:
+                continue
+
+            price_min = min(prices)
+
+            if price_min < min_price or price_min > max_price:
+                continue
+
+            offer = p.special_offer
+            offer_type = offer.type if offer else None
+            offer_discount = offer.discount if offer else None
+
+            original_price = price_min
+            discounted_price = original_price
+
+            if offer_type and offer_discount is not None:
+                if offer_type == "percent":
+                    raw_discounted_price = original_price * (1 - offer_discount / 100)
+                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+                elif offer_type == "fixed":
+                    raw_discounted_price = max(0, original_price - offer_discount)
+                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+
+            product_data = {
+                "id": str(p.id),
+                "name": p.name,
+                "images": p.images,
+                "total_sold": p.total_sold,
+                "categories": [
+                    {"id": str(category.id), "name": category.name}
+                    for category in valid_categories
+                ],
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "avg_rating": p.avg_rating,
+            }
+
+            product_list.append(product_data)
+
+        return product_list
+
 
     async def get_top_discount_service(self, session: AsyncSession, limit: int = 12):
         products = await product_repository.get_top_discount(session, limit)
@@ -463,6 +579,7 @@ class ProductService:
                 "name": product.product_name,
                 "images": product.images,
                 "avg_rating": product.avg_rating,
+                "total_sold": product.total_sold,
                 "original_price": original_price,
                 "discounted_price": discounted_price,
                 "categories": product.categories

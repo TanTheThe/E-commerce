@@ -102,17 +102,12 @@ async def payment_ipn(request: Request, session: AsyncSession = Depends(get_sess
 async def payment_return(request: Request,
                          session: AsyncSession = Depends(get_session)):
     try:
-        print(f"=== PAYMENT_RETURN CALLED ===")
-        print(f"Query params: {dict(request.query_params)}")
-
         payment_result = await vnpay_service.handle_return(dict(request.query_params), request, session)
-        print(f"Payment result: {payment_result}")
 
         payment_data = json.dumps(payment_result)
         encoded_data = base64.urlsafe_b64encode(payment_data.encode()).decode()
 
         frontend_url = f"http://{Config.DOMAIN_CLIENT}/payment-return?data={encoded_data}"
-        print(f"Redirecting to: {frontend_url}")
 
         return RedirectResponse(url=frontend_url, status_code=302)
 

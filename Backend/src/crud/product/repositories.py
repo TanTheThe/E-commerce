@@ -156,14 +156,15 @@ class ProductRepository:
                 ).label("categories"),
                 Special_Offer.discount.label("discount"),
                 Special_Offer.type.label("type_offer"),
-                Product.avg_rating.label("avg_rating")
+                Product.avg_rating.label("avg_rating"),
+                Product.total_sold.label("total_sold")
             )
             .join(Categories_Product, Categories_Product.product_id == Product.id)
             .join(Categories, Categories_Product.categories_id == Categories.id)
             .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
             .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
             .where(conditions)
-            .group_by(Product.id, Product.name, Product.images, Product.popularity_score, Special_Offer.discount, Special_Offer.type, Product.avg_rating)
+            .group_by(Product.id, Product.name, Product.images, Product.popularity_score, Special_Offer.discount, Special_Offer.type, Product.avg_rating, Product.total_sold)
             .order_by(desc(Product.popularity_score))
             .limit(limit_per_category)
         )
@@ -188,14 +189,15 @@ class ProductRepository:
                     )
                 ).label("categories"),
                 Special_Offer.discount.label("discount"),
-                Product.avg_rating.label("avg_rating")
+                Product.avg_rating.label("avg_rating"),
+                Product.total_sold.label("total_sold")
             )
             .join(Categories_Product, Categories_Product.product_id == Product.id)
             .join(Categories, Categories_Product.categories_id == Categories.id)
             .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
             .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
             .where(Special_Offer.discount.isnot(None), Special_Offer.type == "percent")
-            .group_by(Product.id, Product.name, Product.images, Special_Offer.discount, Product.avg_rating)
+            .group_by(Product.id, Product.name, Product.images, Special_Offer.discount, Product.avg_rating, Product.total_sold)
             .order_by(desc(Special_Offer.discount))
             .limit(limit)
         )

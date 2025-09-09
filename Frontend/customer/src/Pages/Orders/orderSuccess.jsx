@@ -200,7 +200,7 @@ const OrderSuccessPage = () => {
 
                         <div className="mt-4 text-center">
                             <button
-                                onClick={() => navigate('/orders?tab=pending')}
+                                onClick={() => navigate(`/order-detail/${orderId}`)}
                                 className="px-6 py-3 bg-[#ff5252] text-white font-medium rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer inline-flex items-center gap-2"
                             >
                                 <FiEye />
@@ -321,7 +321,7 @@ const OrderSuccessPage = () => {
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
                     <button
-                        onClick={() => navigate('/orders')}
+                        onClick={() => navigate('/my-orders')}
                         className="px-8 py-3 bg-[#ff5252] text-white font-medium rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer"
                     >
                         {isFromSuccessRoute ? 'Theo dõi đơn hàng' : 'Quay lại đơn hàng'}
