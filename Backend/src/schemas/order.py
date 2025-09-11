@@ -39,3 +39,12 @@ class OrderFilterModel(BaseModel):
     sort_by_total_price: Optional[str] = None
     sort_by_created_at: Optional[str] = None
     status: Optional[str] = None
+
+class CancelOrderRequest(BaseModel):
+    reason: str
+    reason_detail: Optional[str] = None
+
+class ProcessCancellationRequest(BaseModel):
+    action: str # handle_cancellation
+    admin_note: Optional[str] = None
+    reject_reason: Optional[str] = None

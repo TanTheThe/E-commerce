@@ -90,15 +90,24 @@ class Order(SQLModel, table=True):
     total_price: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     discount: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True, server_default=text("0")), default=0)
     note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
     payment_method: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="vnpay"), default="vnpay")
     payment_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+
     special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", default=None, nullable=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    user_id: uuid.UUID = Field(foreign_key="user.id")
+
     Address: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
+
+    cancellation_reason: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True), default=None)
+    cancellation_status: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True), default=None)
+    cancellation_requested_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True), default=None)
 
     user: Optional["User"] = Relationship(back_populates="order", sa_relationship_kwargs={'lazy': 'noload'})
     order_detail: List["Order_Detail"] = Relationship(back_populates="order",
@@ -110,6 +119,8 @@ class Order(SQLModel, table=True):
     special_offer: Optional["Special_Offer"] = Relationship(
         back_populates="orders", sa_relationship_kwargs={'lazy': 'noload'}
     )
+    notifications: List["Notification"] = Relationship(back_populates="order",
+                                                       sa_relationship_kwargs={"lazy": "noload"})
 
 
 class Order_Detail(SQLModel, table=True):
@@ -490,5 +501,73 @@ class Payment(SQLModel, table=True):
     )
 
     order: Optional["Order"] = Relationship(back_populates="payments", sa_relationship_kwargs={"lazy": "noload"})
+    payment_refunds: List["PaymentRefund"] = Relationship(back_populates="payment", sa_relationship_kwargs={"lazy": "noload"})
+
+
+class PaymentRefund(SQLModel, table=True):
+    __tablename__ = "payment_refund"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+
+    payment_id: uuid.UUID = Field(foreign_key="payment.id", nullable=False)
+    refund_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # e.g. "01" (Hoàn toàn), "02" (Một phần)
+    refund_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    refund_reason: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    transaction_no: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # từ VNPAY trả về
+    response_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now,
+    )
+
+    payment: Optional["Payment"] = Relationship(back_populates="payment_refunds", sa_relationship_kwargs={"lazy": "noload"})
+
+
+class Notification(SQLModel, table=True):
+    __tablename__ = 'notification'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+
+    # Loại người nhận thông báo ('admin', 'customer')
+    recipient_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # id nếu customer nhận, null nếu admin
+    recipient_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True))
+
+    # Giống bên trên, nhưng mà là người gửi.
+    sender_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    sender_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True))
+
+    type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    title: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    message: str = Field(sa_column=Column(pg.TEXT, nullable=False))
+
+    # Thông báo liên quan đến 1 đơn hàng cụ thể
+    order_id: Optional[uuid.UUID] = Field(foreign_key="order.id", nullable=True)
+
+    # Đánh dấu thông báo đã đọc hay chưa.
+    is_read: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
+    read_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    # Dành cho notification yêu cầu action (như approve cancel request)
+    action_type: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    action_data: Optional[str] = Field(sa_column=Column(pg.JSON, nullable=True))
+
+    # Đánh dấu notification đã được xử lý (cho những notification cần action)
+    is_processed: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
+    processed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+
+    order: Optional["Order"] = Relationship(back_populates="notifications", sa_relationship_kwargs={"lazy": "noload"})
 
     

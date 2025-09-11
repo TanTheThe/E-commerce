@@ -60,3 +60,73 @@ class OrderException:
                 "error_code": "order_006",
             },
         )
+
+    @staticmethod
+    def order_already_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Đơn hàng này đã được hủy trước đó",
+                "error_code": "order_007",
+            },
+        )
+
+    @staticmethod
+    def order_cant_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Không thể hủy đơn hàng",
+                "error_code": "order_008",
+            },
+        )
+
+    @staticmethod
+    def error_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": "Có lỗi xảy ra trong quá trình hủy đơn hàng",
+                "error_code": "order_009",
+            },
+        )
+
+    @staticmethod
+    def not_request_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đơn hàng không có yêu cầu hủy",
+                "error_code": "order_010",
+            },
+        )
+
+    @staticmethod
+    def not_accept_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể chấp nhận hủy đơn hàng",
+                "error_code": "order_011",
+            },
+        )
+
+    @staticmethod
+    def reason_reject_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Cần cung cấp lý do từ chối",
+                "error_code": "order_012",
+            },
+        )
+
+    @staticmethod
+    def action_invalid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Action không hợp lệ",
+                "error_code": "order_013",
+            },
+        )

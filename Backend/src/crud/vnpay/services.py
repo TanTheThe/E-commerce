@@ -1,9 +1,10 @@
 from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, or_, select
+from sqlmodel import and_
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
-from src.crud.order.services import OrderService
+from src.crud.order.services.create_order import CreateOrderService
+from src.crud.order.services.services import OrderService
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from src.crud.vnpay.utils import hmacsha512
 from src.config import Config
@@ -14,13 +15,13 @@ from src.errors.order import OrderException
 from src.database.models import Order, Payment, Special_Offer
 import urllib.parse
 import httpx
-import json
 import uuid
 
 order_repository = OrderRepository()
 vnpay_repository = VNPayRepository()
 order_service = OrderService()
 special_offer_repository = SpecialOfferRepository()
+create_order_service = CreateOrderService()
 
 class VNPayService:
     def __init__(self):
@@ -156,7 +157,7 @@ class VNPayService:
 
         if is_success:
             variant_ids = {od.product_variant_id for od in order.order_detail}
-            variant_map = await order_service.get_variants_with_product_offers(variant_ids, session)
+            variant_map = await create_order_service.get_variants_with_product_offers(variant_ids, session)
 
             order_offer = None
             if order.special_offer_id:
@@ -166,17 +167,17 @@ class VNPayService:
                 )
                 order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
 
-            _, _, _, product_offers_to_update = await order_service.calculate_order_totals(
+            _, _, _, product_offers_to_update = await create_order_service.calculate_order_totals(
                 order.order_detail, variant_map, session
             )
 
-            await order_service.update_offers_usage(
+            await create_order_service.update_offers_usage(
                 product_offers_to_update, order_offer, order.user_id, session
             )
 
-            await order_service.update_inventory_batch(order.order_detail, variant_map, session)
+            await create_order_service.update_inventory_batch(order.order_detail, variant_map, session)
 
-            await order_service.update_product_stats(order.order_detail, variant_map, session)
+            await create_order_service.update_product_stats(order.order_detail, variant_map, session)
 
         payment_dict = {
             "order_id": order.id,
@@ -314,39 +315,4 @@ class VNPayService:
         async with httpx.AsyncClient() as client:
             response = await client.post(Config.VNPAY_API_URL, json=data)
         return response.json() if response.status_code == 200 else {"error": f"Request failed {response.status_code}"}
-    
-    async def refund_transaction(self, TransactionType: str, order_id: str, amount: str, order_desc: str, trans_date: str, ipaddr: str):
-        vnp_TmnCode = Config.VNPAY_TMN_CODE
-        vnp_RequestId = "req_" + datetime.now().strftime("%Y%m%d%H%M%S")
-        vnp_Version = "2.1.0"
-        vnp_Command = "refund"
-        vnp_TransactionNo = "0"
-        vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
-        vnp_CreateBy = "user01"
 
-        hash_data = "|".join([
-            vnp_RequestId, vnp_Version, vnp_Command, vnp_TmnCode, TransactionType, order_id,
-            amount, vnp_TransactionNo, trans_date, vnp_CreateBy, vnp_CreateDate, ipaddr, order_desc
-        ])
-        secure_hash = hmacsha512(Config.VNPAY_HASH_SECRET_KEY, hash_data)
-
-        data = {
-            "vnp_RequestId": vnp_RequestId,
-            "vnp_TmnCode": vnp_TmnCode,
-            "vnp_Command": vnp_Command,
-            "vnp_TxnRef": order_id,
-            "vnp_Amount": amount,
-            "vnp_OrderInfo": order_desc,
-            "vnp_TransactionDate": trans_date,
-            "vnp_CreateDate": vnp_CreateDate,
-            "vnp_IpAddr": ipaddr,
-            "vnp_TransactionType": TransactionType,
-            "vnp_TransactionNo": vnp_TransactionNo,
-            "vnp_CreateBy": vnp_CreateBy,
-            "vnp_Version": vnp_Version,
-            "vnp_SecureHash": secure_hash,
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(Config.VNPAY_API_URL, json=data)
-        return response.json() if response.status_code == 200 else {"error": f"Request failed {response.status_code}"}

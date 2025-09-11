@@ -1,9 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload, load_only
 from src.database.models import Order, OrderStatusHistory
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, distinct
+from sqlmodel import select, desc, and_, func, distinct, update
 from datetime import datetime
 
 
@@ -106,3 +106,12 @@ class OrderRepository:
         await session.commit()
 
         return data_need_update
+
+    async def update_order_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
+                                      session: AsyncSession, get_result_back: bool = False):
+        stmt = (
+            update(Order)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)

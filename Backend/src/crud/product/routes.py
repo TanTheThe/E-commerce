@@ -1,5 +1,9 @@
 from fastapi import APIRouter, status, Depends, Query
-from src.crud.product.services import ProductService
+from src.crud.product.services.create_product import CreateProductService
+from src.crud.product.services.get_all_products import GetAllProductsService
+from src.crud.product.services.get_detail_product import GetDetailProductService
+from src.crud.product.services.search_product import SearchProductService
+from src.crud.product.services.services import ProductService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
@@ -15,14 +19,18 @@ product_customer_router = APIRouter(prefix="/product")
 product_common_router = APIRouter(prefix="/product")
 
 product_service = ProductService()
+create_product_service = CreateProductService()
+get_all_products_service = GetAllProductsService()
 access_token_bearer = AccessTokenBearer()
+search_product_service = SearchProductService()
+get_detail_product_service = GetDetailProductService()
 
 
 @product_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
 async def create_product(product_data: ProductCreateModel,
                          token_details: dict = Depends(access_token_bearer),
                          session: AsyncSession = Depends(get_session)):
-    product_dict = await product_service.create_product(product_data, session)
+    product_dict = await create_product_service.create_product(product_data, session)
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={
@@ -54,7 +62,7 @@ async def get_all_products_customer(category_id: str,
         rating=rating
     )
 
-    products = await product_service.get_all_products_customer_service(category_id, filter_data, session, skip, limit)
+    products = await get_all_products_service.get_all_products_customer_service(category_id, filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -77,8 +85,8 @@ async def get_products_popular(parent_category_id: str, limit_per_category: int 
     )
 
 @product_customer_router.get('/search')
-async def search_product(search: str, session: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 10, ):
-    products = await product_service.search_product_service(search, session, skip, limit)
+async def search_product(search: str, session: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 10):
+    products = await search_product_service.search_product_service(search, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -192,7 +200,7 @@ async def get_all_product_admin(search: Optional[str] = None,
         rating=rating
     )
 
-    product_list_dict = await product_service.get_all_product_admin_service(filter_data, session, skip, limit,
+    product_list_dict = await get_all_products_service.get_all_product_admin_service(filter_data, session, skip, limit,
                                                                             include_status=True)
 
     return JSONResponse(
@@ -222,7 +230,7 @@ async def get_products_offer(categories_id: str, session: AsyncSession = Depends
 
 @product_customer_router.get('/{id}')
 async def get_detail_product_customer(id: str, session: AsyncSession = Depends(get_session)):
-    product_dict = await product_service.get_detail_product_customer_service(id, session)
+    product_dict = await get_detail_product_service.get_detail_product_customer_service(id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -237,7 +245,7 @@ async def get_detail_product_customer(id: str, session: AsyncSession = Depends(g
 async def get_detail_product_admin(id: str,
                                    token_details: dict = Depends(access_token_bearer),
                                    session: AsyncSession = Depends(get_session)):
-    product_dict = await product_service.get_detail_product_admin_service(id, session)
+    product_dict = await get_detail_product_service.get_detail_product_admin_service(id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

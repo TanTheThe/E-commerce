@@ -182,35 +182,3 @@ async def query(
         "response_json": response_json,
         "current_year": datetime.now().year
     })
-
-
-@vnpay_customer_router.get("/refund", response_class=HTMLResponse)
-async def refund_form(request: Request):
-    return templates.TemplateResponse("payment/refund.html", {
-        "request": request,
-        "title": "Hoàn tiền giao dịch",
-        "current_year": datetime.now().year
-    })
-
-
-@vnpay_customer_router.post("/refund", response_class=HTMLResponse)
-async def refund(
-        request: Request,
-        TransactionType: str = Form(...),
-        order_id: str = Form(...),
-        amount: str = Form(...),
-        order_desc: str = Form(...),
-        trans_date: str = Form(...),
-        session: AsyncSession = Depends(get_session)
-):
-    # dependencies=[Depends(customer_role_middleware)]
-    # token_details: dict = Depends(access_token_bearer),
-    response_json = await vnpay_service.refund_transaction(
-        TransactionType, order_id, amount, order_desc, trans_date, get_client_ip(request)
-    )
-    return templates.TemplateResponse("payment/refund.html", {
-        "request": request,
-        "title": "Kết quả hoàn tiền giao dịch",
-        "response_json": response_json,
-        "current_year": datetime.now().year
-    })

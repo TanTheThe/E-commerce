@@ -2,6 +2,8 @@ from fastapi import APIRouter
 
 from src.crud.cart.routes import cart_admin_router, cart_customer_router, cart_common_router
 from src.crud.color.routes import color_admin_router, color_customer_router, color_common_router
+from src.crud.notification.routes import notification_admin_router, notification_customer_router, \
+    notification_common_router
 from src.crud.size.routes import size_admin_router, size_customer_router, size_common_router
 from src.crud.user.routes import user_admin_router, user_common_router, user_customer_router
 from src.crud.authentication.routes import auth_admin_router, auth_customer_router, auth_common_router
@@ -29,6 +31,7 @@ admin_router.include_router(color_admin_router)
 admin_router.include_router(size_admin_router)
 admin_router.include_router(cart_admin_router)
 admin_router.include_router(vnpay_admin_router)
+admin_router.include_router(notification_admin_router)
 
 customer_router = APIRouter(prefix="/customer", tags=["user-customer"])
 customer_router.include_router(user_customer_router)
@@ -43,6 +46,7 @@ customer_router.include_router(color_customer_router)
 customer_router.include_router(size_customer_router)
 customer_router.include_router(cart_customer_router)
 customer_router.include_router(vnpay_customer_router)
+customer_router.include_router(notification_customer_router)
 
 public_router = APIRouter(prefix="/general", tags=["user-common"])
 public_router.include_router(user_common_router)
@@ -57,3 +61,4 @@ public_router.include_router(color_common_router)
 public_router.include_router(size_common_router)
 public_router.include_router(cart_common_router)
 public_router.include_router(vnpay_common_router)
+public_router.include_router(notification_common_router)
