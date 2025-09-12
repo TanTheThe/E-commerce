@@ -12,6 +12,7 @@ import EvaluateModal from "../Evaluate/evaluateModal";
 import AdditionalEvaluateModal from "../Evaluate/additionalEvalModal";
 import ViewEvaluationModal from "../Evaluate/viewEvalModal";
 import toast from "react-hot-toast";
+import CancelOrderModal from "./cancelOrder";
 
 const Orders = () => {
     const navigate = useNavigate();
@@ -39,6 +40,12 @@ const Orders = () => {
     const [additionalForm, setAdditionalForm] = useState({
         additional_comment: '',
         additional_image: null
+    });
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [cancelForm, setCancelForm] = useState({
+        reason: '',
+        reason_detail: ''
     });
 
     const tabs = [
@@ -173,6 +180,38 @@ const Orders = () => {
         setSelectedVariant(variant);
         resetAdditionalForm();
         setShowAdditionalModal(true);
+    };
+
+    const handleOpenCancelModal = (orderItem) => {
+        setSelectedOrder(orderItem);
+        setCancelForm({ reason: '', reason_detail: '' });
+        setShowCancelModal(true);
+    };
+
+    const handleCancelOrder = async () => {
+        try {
+            const submitData = {
+                reason: cancelForm.reason,
+                reason_detail: cancelForm.reason_detail || null
+            };
+
+            const res = await postDataApi(`/customer/order/${selectedOrder.order.order_id}/cancel`, submitData);
+
+            if (res.success) {
+                toast.success(res.message);
+                setShowCancelModal(false);
+
+                const currentTab = tabs.find(tab => tab.key === activeTab);
+                if (currentTab) {
+                    fetchOrders(currentTab.status, pagination.skip, pagination.limit);
+                }
+            } else {
+                toast.error(res.message || 'Có lỗi xảy ra khi hủy đơn hàng');
+            }
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            toast.error('Có lỗi xảy ra khi hủy đơn hàng');
+        }
     };
 
     const handleOpenView = async (variant) => {
@@ -467,13 +506,38 @@ const Orders = () => {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {orderItem.order.has_pending_cancellation && (
+                                                    <div className="mt-2">
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                            🔄 Đang chờ duyệt hủy đơn
+                                                        </span>
+                                                        {orderItem.order.cancellation_reason && (
+                                                            <p className="text-xs text-gray-600 mt-1">
+                                                                Lý do: {orderItem.order.cancellation_reason}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <button
-                                                onClick={() => navigate(`/order-detail/${orderItem.order.order_id}`)}
-                                                className="px-6 py-2 bg-[#ff5252] text-white rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer"
-                                            >
-                                                Xem chi tiết
-                                            </button>
+
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => navigate(`/order-detail/${orderItem.order.order_id}`)}
+                                                    className="px-6 py-2 bg-[#ff5252] text-white rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer"
+                                                >
+                                                    Xem chi tiết
+                                                </button>
+
+                                                {orderItem.order.can_show_cancel_button && (
+                                                    <button
+                                                        onClick={() => handleOpenCancelModal(orderItem)}
+                                                        className="px-6 py-2 border-2 border-red-500 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors cursor-pointer"
+                                                    >
+                                                        Hủy đơn hàng
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -535,6 +599,15 @@ const Orders = () => {
                 isOpen={showViewModal}
                 onClose={() => setShowViewModal(false)}
                 evaluationData={evaluationData}
+            />
+
+            <CancelOrderModal
+                isOpen={showCancelModal}
+                onClose={() => setShowCancelModal(false)}
+                selectedOrder={selectedOrder}
+                onSubmit={handleCancelOrder}
+                cancelForm={cancelForm}
+                setCancelForm={setCancelForm}
             />
         </div>
     );

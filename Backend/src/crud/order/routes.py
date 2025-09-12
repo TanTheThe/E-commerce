@@ -78,6 +78,42 @@ async def get_total_revenue(token_details: dict = Depends(access_token_bearer),
         }
     )
 
+@order_admin_router.get("/cancellation-requests", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
+async def get_cancellation_requests(skip: int = 0, limit: int = 20,
+                                    status_filter: str = "pending",
+                                    token_details: dict = Depends(access_token_bearer),
+                                    session: AsyncSession = Depends(get_session)):
+    if status_filter == "pending":
+        orders, total = await cancel_order_service.get_cancellation_requests(session, skip=skip, limit=limit)
+    else:
+        orders, total = await cancel_order_service.get_orders_by_status(session, "cancelled", skip, limit)
+
+    orders_data = []
+    for order in orders:
+        orders_data.append({
+            "id": str(order.id),
+            "code": order.code,
+            "total_price": order.total_price,
+            "status": order.status,
+            "cancellation_status": order.cancellation_status,
+            "cancellation_reason": order.cancellation_reason,
+            "cancellation_requested_at": str(order.cancellation_requested_at),
+            "first_name": order.user.first_name if order.user else None,
+            "last_name": order.user.last_name if order.user else None,
+            "created_at": str(order.created_at)
+        })
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": f"Danh sách yêu cầu hủy đơn ({status_filter})",
+            "content": {
+                "data": orders_data,
+                "total": total
+            }
+        }
+    )
+
 @order_customer_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(customer_role_middleware)])
 async def create_order(order_data: OrderCreateModel,
                        token_details: dict = Depends(access_token_bearer),
@@ -160,42 +196,6 @@ async def get_all_order_admin(skip: int = 0, limit: int = 10,
         content={
             "message": "Thông tin các đơn hàng",
             "content": order_dict
-        }
-    )
-
-@order_admin_router.get("/cancellation-requests", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_cancellation_requests(skip: int = 0, limit: int = 20,
-                                    status_filter: str = "pending",
-                                    token_details: dict = Depends(access_token_bearer),
-                                    session: AsyncSession = Depends(get_session)):
-    if status_filter == "pending":
-        orders, total = await cancel_order_service.get_cancellation_requests(session, skip=skip, limit=limit)
-    else:
-        orders, total = await cancel_order_service.get_orders_by_status(session, "cancelled", skip, limit)
-
-    orders_data = []
-    for order in orders:
-        orders_data.append({
-            "id": str(order.id),
-            "code": order.code,
-            "total_price": order.total_price,
-            "status": order.status,
-            "cancellation_status": order.cancellation_status,
-            "cancellation_reason": order.cancellation_reason,
-            "cancellation_requested_at": order.cancellation_requested_at,
-            "first_name": order.user.first_name if order.user else None,
-            "last_name": order.user.last_name if order.user else None,
-            "created_at": str(order.created_at)
-        })
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": f"Danh sách yêu cầu hủy đơn ({status_filter})",
-            "content": {
-                "data": orders_data,
-                "total": total
-            }
         }
     )
 

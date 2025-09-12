@@ -113,7 +113,6 @@ class VNPayService:
         return self.get_payment_url(
             Config.VNPAY_PAYMENT_URL, Config.VNPAY_HASH_SECRET_KEY, request_data
         )
-    
 
     async def process_payment_completion(self, input_data: dict, session: AsyncSession):
         order_code = input_data.get("vnp_TxnRef")
@@ -122,11 +121,20 @@ class VNPayService:
         vnp_transaction_no = input_data.get("vnp_TransactionNo")
         order_desc = input_data.get("vnp_OrderInfo")
 
-        condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
-        joins = [
-            selectinload(Order.order_detail)
-        ]
+        vnp_txn_ref = input_data.get("vnp_TxnRef")
+        vnp_bank_tran_no = input_data.get("vnp_BankTranNo")
+        vnp_bank_code = input_data.get("vnp_BankCode")
+        vnp_card_type = input_data.get("vnp_CardType")
+        vnp_transaction_status = input_data.get("vnp_TransactionStatus")
+        vnp_pay_date_raw = input_data.get("vnp_PayDate")
+        vnp_tmn_code = input_data.get("vnp_TmnCode")
 
+        vnp_pay_date = None
+        if vnp_pay_date_raw:
+            vnp_pay_date = datetime.strptime(vnp_pay_date_raw, "%Y%m%d%H%M%S")
+
+        condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
+        joins = [selectinload(Order.order_detail)]
         order = await order_repository.get_order(condition_order, session, joins)
 
         if not order:
@@ -182,7 +190,14 @@ class VNPayService:
         payment_dict = {
             "order_id": order.id,
             "payment_gateway": "vnpay",
+            "txn_ref": vnp_txn_ref,
             "transaction_no": vnp_transaction_no,
+            "bank_tran_no": vnp_bank_tran_no,
+            "bank_code": vnp_bank_code,
+            "card_type": vnp_card_type,
+            "transaction_status": vnp_transaction_status,
+            "tmn_code": vnp_tmn_code,
+            "pay_date": vnp_pay_date,
             "amount": amount,
             "response_code": vnp_response_code,
             "order_info": order_desc,

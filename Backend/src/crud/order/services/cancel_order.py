@@ -61,6 +61,9 @@ class CancelOrderService:
         if not order:
             OrderException.not_found()
 
+        if order.cancellation_status == "requested":
+            OrderException.already_cancelled()
+
         can_cancel, reason = await self.can_cancel_order(order)
         if not can_cancel:
             OrderException.order_cant_cancelled()
@@ -211,7 +214,8 @@ class CancelOrderService:
             refund_type="01",  # Full refund
             refund_amount=payment.amount,
             refund_reason="Order cancelled",
-            status="pending"
+            status="pending",
+            created_at=datetime.now(),
         )
 
         session.add(refund)
@@ -219,17 +223,21 @@ class CancelOrderService:
 
         refund_response = await payment_refund_service.refund_transaction(
             TransactionType="02",
-            order_id=str(order.id),
+            order_id=str(order.code),
             amount=str(payment.amount * 100),  # VNPAY expects amount * 100
             order_desc=f"Refund for order {order.code}",
-            trans_date=payment.created_at.strftime("%Y%m%d%H%M%S"),
-            ipaddr=get_client_ip(request)
+            trans_date=payment.pay_date.strftime("%Y%m%d%H%M%S") if payment.pay_date else payment.created_at.strftime("%Y%m%d%H%M%S"),
+            ipaddr=get_client_ip(request),
+            transaction_no=payment.transaction_no,
         )
 
-        if refund_response.get("vnp_ResponseCode") == "00":
+        if refund_response.get("vnp_ResponseCode") == "00" and refund_response.get("vnp_TxnRef") == payment.txn_ref:
             refund.status = "success"
             refund.transaction_no = refund_response.get("vnp_TransactionNo")
             refund.response_code = refund_response.get("vnp_ResponseCode")
+            refund.txn_ref = refund_response.get("vnp_TxnRef")
+            refund.bank_code = refund_response.get("vnp_BankCode")
+            refund.transaction_status = refund_response.get("vnp_TransactionStatus")
 
             order.payment_status = "refunded"
         else:
@@ -340,52 +348,53 @@ class CancelOrderService:
             OrderException.not_request_cancelled()
 
         message = ""
-        try:
-            if data.action == "handle_cancellation":
-                success = await self.cancel_order_by_admin(session, order_id, request)
+        # try:
+        #
+        #
+        # except Exception as e:
+        #     await session.rollback()
+        #     OrderException.error_cancelled()
+        if data.action == "handle_cancellation":
+            success = await self.cancel_order_by_admin(session, order_id, request)
 
-                if success:
-                    await notification_service.create_cancellation_approved_notification(
-                        session=session,
-                        order_id=order_id,
-                        customer_id=str(order.user_id),
-                        order_code=order.code,
-                        admin_note=data.admin_note
-                    )
+            if success:
+                await notification_service.create_cancellation_approved_notification(
+                    session=session,
+                    order_id=order_id,
+                    customer_id=str(order.user_id),
+                    order_code=order.code,
+                    admin_note=data.admin_note
+                )
 
-                    message = f"Đã chấp thuận hủy đơn hàng #{order.code}"
-                else:
-                    OrderException.not_accept_cancelled()
-            elif data.action == "reject":
-                if not data.reject_reason:
-                    OrderException.reason_reject_cancelled()
-
-                success = await self.reject_cancellation(session, order_id, data.reject_reason)
-
-                if success:
-                    await notification_service.create_cancellation_rejected_notification(
-                        session=session,
-                        order_id=order_id,
-                        customer_id=str(order.user_id),
-                        order_code=order.code,
-                        reject_reason=data.reject_reason
-                    )
-
-                    message = f"Đã từ chối hủy đơn hàng #{order.code}"
-                else:
-                    OrderException.not_accept_cancelled()
+                message = f"Đã chấp thuận hủy đơn hàng #{order.code}"
             else:
-                OrderException.action_invalid()
+                OrderException.not_accept_cancelled()
+        elif data.action == "reject":
+            if not data.reject_reason:
+                OrderException.reason_reject_cancelled()
 
-            await session.commit()
+            success = await self.reject_cancellation(session, order_id, data.reject_reason)
 
-            return message, {
-                "order_id": order_id,
-                "order_code": order.code,
-                "action": data.action
-            }
+            if success:
+                await notification_service.create_cancellation_rejected_notification(
+                    session=session,
+                    order_id=order_id,
+                    customer_id=str(order.user_id),
+                    order_code=order.code,
+                    reject_reason=data.reject_reason
+                )
 
-        except Exception as e:
-            await session.rollback()
-            OrderException.error_cancelled()
+                message = f"Đã từ chối hủy đơn hàng #{order.code}"
+            else:
+                OrderException.not_accept_cancelled()
+        else:
+            OrderException.action_invalid()
+
+        await session.commit()
+
+        return message, {
+            "order_id": order_id,
+            "order_code": order.code,
+            "action": data.action
+        }
 

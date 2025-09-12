@@ -4,12 +4,12 @@ from datetime import datetime
 import httpx
 
 class PaymentRefundService:
-    async def refund_transaction(self, TransactionType: str, order_id: str, amount: str, order_desc: str, trans_date: str, ipaddr: str):
+    async def refund_transaction(self, TransactionType: str, order_id: str, amount: str, order_desc: str, trans_date: str, ipaddr: str, transaction_no: str):
         vnp_TmnCode = Config.VNPAY_TMN_CODE
         vnp_RequestId = "req_" + datetime.now().strftime("%Y%m%d%H%M%S")
         vnp_Version = "2.1.0"
         vnp_Command = "refund"
-        vnp_TransactionNo = "0"
+        vnp_TransactionNo = transaction_no
         vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
         vnp_CreateBy = "user01"
 
@@ -35,6 +35,8 @@ class PaymentRefundService:
             "vnp_Version": vnp_Version,
             "vnp_SecureHash": secure_hash,
         }
+
+        print("42778948923", data)
 
         async with httpx.AsyncClient() as client:
             response = await client.post(Config.VNPAY_API_URL, json=data)

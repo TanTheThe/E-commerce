@@ -130,3 +130,33 @@ class OrderException:
                 "error_code": "order_013",
             },
         )
+
+    @staticmethod
+    def already_cancelled():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đơn hàng đã được gửi yêu cầu hủy trước đó",
+                "error_code": "order_014",
+            },
+        )
+
+    @staticmethod
+    def cant_update_cancel_order():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không được thay đổi trạng thái đơn hàng đang có yêu cầu hủy",
+                "error_code": "order_015",
+            },
+        )
+
+    @staticmethod
+    def cant_reverse_cancel_order():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không được phép thay đổi trạng thái đơn hàng đã hủy",
+                "error_code": "order_016",
+            },
+        )

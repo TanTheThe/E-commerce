@@ -7,11 +7,11 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
     const [isUpdating, setIsUpdating] = useState(false);
 
     const statusOptions = [
-        { value: "pending", label: "pending", color: "bg-red-500", description: "Đơn hàng đang chờ xử lý" },
-        { value: "confirmed", label: "confirmed", color: "bg-amber-500", description: "Đơn hàng đã được xác nhận và đang xử lý" },
-        { value: "shipping", label: "shipped", color: "bg-violet-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
-        { value: "delivered", label: "delivered", color: "bg-green-700", description: "Đơn hàng đã được giao thành công" },
-        { value: "cancelled", label: "cancelled", color: "bg-gray-500", description: "Đơn hàng đã bị hủy" }
+        { value: "pending", label: "Pending", color: "bg-red-500", description: "Đơn hàng đang chờ xử lý" },
+        { value: "confirmed", label: "Confirmed", color: "bg-amber-500", description: "Đơn hàng đã được xác nhận và đang xử lý" },
+        { value: "shipping", label: "Shipping", color: "bg-violet-500", description: "Đơn hàng đã được giao cho đơn vị vận chuyển" },
+        { value: "delivered", label: "Delivered", color: "bg-green-700", description: "Đơn hàng đã được giao thành công" },
+        { value: "cancelled", label: "Cancelled", color: "bg-gray-500", description: "Đơn hàng đã bị hủy" }
     ];
 
     const getStatusColorStyle = (status) => {

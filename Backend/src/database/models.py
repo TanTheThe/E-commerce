@@ -489,12 +489,21 @@ class Payment(SQLModel, table=True):
     order_id: uuid.UUID = Field(foreign_key="order.id", nullable=False)
 
     payment_gateway: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # vnpay, momo, paypal...
+
+    txn_ref: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True)) # vnp_TxnRef
     transaction_no: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))   # vnp_TransactionNo
+    bank_tran_no: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True)) # vnp_BankTranNo
+    bank_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_BankCode
+    card_type: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_CardType
+
     amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))           # vnp_Amount / 100
-    response_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=True))     # vnp_ResponseCode
     order_info: str = Field(sa_column=Column(pg.VARCHAR, nullable=True))        # vnp_OrderInfo
+
+    response_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_ResponseCode
+    transaction_status: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_TransactionStatus
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="success"), default="success")
 
+    pay_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     created_at: datetime = Field(
         sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
         default=datetime.now,
@@ -512,10 +521,16 @@ class PaymentRefund(SQLModel, table=True):
     )
 
     payment_id: uuid.UUID = Field(foreign_key="payment.id", nullable=False)
+
     refund_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # e.g. "01" (Hoàn toàn), "02" (Một phần)
     refund_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     refund_reason: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+
+    txn_ref: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_TxnRef
+    bank_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_BankCode
+
     transaction_no: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # từ VNPAY trả về
+    transaction_status: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_TransactionStatus
     response_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
 

@@ -182,7 +182,7 @@ class OrderService:
     async def get_all_order_customer(self, user_id: str, status_order: str, session: AsyncSession, skip: int = 0,
                                      limit: int = 10):
         condition = [Order.user_id == user_id, Order.status == status_order, Order.deleted_at.is_(None)]
-        if status_order == 'Delivered':
+        if status_order == 'delivered':
             joins = [selectinload(Order.order_detail).selectinload(Order_Detail.evaluate)]
         else:
             joins = [selectinload(Order.order_detail)]
@@ -214,7 +214,7 @@ class OrderService:
                     "order_detail_id": str(od.id)
                 }
 
-                if status_order == 'Delivered':
+                if status_order == 'delivered':
                     has_evaluation = od.evaluate is not None and od.evaluate.deleted_at is None
                     variant_info["has_evaluation"] = has_evaluation
 
@@ -228,6 +228,9 @@ class OrderService:
 
                 product_map[pid]["variants"].append(variant_info)
 
+            can_show_cancel_button = self.can_show_cancel_button(order)
+            has_pending_cancellation = order.cancellation_status == "requested"
+
             order_response.append({
                 "order": {
                     "order_id": str(order.id),
@@ -236,11 +239,27 @@ class OrderService:
                     "created_at": str(order.created_at),
                     "discount": order.discount,
                     "total_price": order.total_price,
+                    "can_show_cancel_button": can_show_cancel_button,
+                    "has_pending_cancellation": has_pending_cancellation,
+                    "cancellation_status": order.cancellation_status,
+                    "cancellation_reason": order.cancellation_reason if has_pending_cancellation else None
                 },
                 "order_detail": list(product_map.values())
             })
 
         return {"total": total, "data": order_response}
+
+    def can_show_cancel_button(self, order: Order) -> bool:
+        if order.status in ["cancelled", "delivered", "shipping"]:
+            return False
+
+        if order.cancellation_status == "requested":
+            return False
+
+        if order.status in ["pending", "confirmed"]:
+            return True
+
+        return False
 
     async def get_all_order_admin(self, session: AsyncSession, filter_data: OrderFilterModel, skip: int = 0,
                                   limit: int = 10):
@@ -312,13 +331,18 @@ class OrderService:
     async def update_status(self, order_id, status, session: AsyncSession):
         condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
         joins = [
-            load_only(Order.status),
             selectinload(Order.order_detail).load_only(Order_Detail.product_id),
         ]
         order_to_update = await order_repository.get_order(condition, session, joins)
 
         if order_to_update is None:
             OrderException.not_found()
+
+        if order_to_update.cancellation_status == "requested":
+            OrderException.cant_update_cancel_order()
+
+        if order_to_update.cancellation_status == "approved":
+            OrderException.cant_reverse_cancel_order()
 
         status_dict = status.model_dump()
         order_after_update = await order_repository.update_order(order_to_update, status_dict, session)
