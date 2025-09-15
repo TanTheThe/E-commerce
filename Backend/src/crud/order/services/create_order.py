@@ -19,7 +19,7 @@ from sqlalchemy import update
 from src.errors.address import AddressException
 from src.errors.product import ProductException
 from src.errors.special_offer import SpecialOfferException
-from src.schemas.order import OrderCreateModel
+from src.schemas.order import OrderCreateModel, PaymentStatusOrderType
 import time
 import uuid
 from src.errors.authentication import AuthException
@@ -175,6 +175,39 @@ class CreateOrderService:
         except Exception as e:
             raise
 
+    def calculate_discount_percent(self, order_offer, order_discount, sub_total):
+        if not order_offer or order_discount == 0:
+            return 0
+        
+        if order_offer.type == "percent":
+            return order_offer.discount
+        elif order_offer.type == "fixed":
+            if sub_total > 0:
+                return round((order_discount / sub_total) * 100, 2)
+            return 0
+        
+        return 0
+    
+    def create_special_offer_snapshot(self, order_offer):
+        if not order_offer:
+            return None
+            
+        return {
+            "id": str(order_offer.id),
+            "code": order_offer.code,
+            "name": order_offer.name,
+            "discount": order_offer.discount,
+            "condition": order_offer.condition,
+            "type": order_offer.type,
+            "total_quantity": order_offer.total_quantity,
+            "scope": order_offer.scope,
+            "used_quantity": order_offer.used_quantity,
+            "start_time": order_offer.start_time.isoformat() if order_offer.start_time else None,
+            "end_time": order_offer.end_time.isoformat() if order_offer.end_time else None,
+            "created_at": order_offer.created_at.isoformat() if order_offer.created_at else None,
+            "updated_at": order_offer.updated_at.isoformat() if order_offer.updated_at else None
+        }
+
     async def update_offers_usage(self, product_offers_to_update, order_offer, customer_id, session):
         try:
             if product_offers_to_update:
@@ -283,10 +316,13 @@ class CreateOrderService:
 
             order_discount = await self.apply_order_offer(order_offer, sub_total)
 
+            discount_percent = self.calculate_discount_percent(order_offer, order_discount, sub_total)
+            special_offer_snapshot = self.create_special_offer_snapshot(order_offer)
+
             total_discount = product_discount + order_discount
             total_price = sub_total - order_discount
 
-            payment_status = "success" if order_data.payment_method == "direct" else "pending"
+            payment_status = PaymentStatusOrderType.SUCCESS if order_data.payment_method == "direct" else PaymentStatusOrderType.PENDING
 
             address_dict = {
                 "line": address.line,
@@ -302,13 +338,15 @@ class CreateOrderService:
                 "sub_total": sub_total,
                 "total_price": total_price,
                 "discount": order_discount,
+                "discount_percent": discount_percent,
                 "status": "pending",
                 "note": order_data.note,
                 "payment_method": order_data.payment_method,
                 "payment_status": payment_status,
                 "user_id": customer_id,
                 "special_offer_id": order_data.special_offer_id,
-                "Address": address_dict
+                "address_snapshot": address_dict,
+                "special_offer_snapshot": special_offer_snapshot
             }
 
             new_order = await order_repository.create_order(new_order_dict, session)
@@ -335,6 +373,7 @@ class CreateOrderService:
                 "product_discount": product_discount,
                 "order_discount": order_discount,
                 "total_discount": total_discount,
+                "discount_percent": discount_percent,
                 "note": new_order.note,
                 "order_offer": {
                     "id": str(order_offer.id),

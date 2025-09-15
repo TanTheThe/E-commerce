@@ -31,7 +31,6 @@ class SpecialOfferRepository:
 
     async def bulk_create_user_special_offer(self, user_offers: list[UserSpecialOffer], session: AsyncSession):
         session.add_all(user_offers)
-        await session.commit()
         return user_offers
 
     async def get_all_special_offer(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0,

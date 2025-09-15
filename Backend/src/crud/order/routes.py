@@ -231,7 +231,7 @@ async def cancel_order(order_id: str, request: CancelOrderRequest,
         }
     )
 
-@order_admin_router.put("/status/{order_id}", status_code=status.HTTP_201_CREATED,
+@order_admin_router.put("/status/{order_id}", status_code=status.HTTP_200_OK,
                         dependencies=[Depends(admin_role_middleware)])
 async def update_status(order_id: str,
                         status_update: StatusUpdateModel,
@@ -244,5 +244,24 @@ async def update_status(order_id: str,
         content={
             "message": "Cập nhật trạng thái đơn hàng thành công",
             "content": order_after_update.status
+        }
+    )
+
+@order_customer_router.put("/confirm-received/{order_id}", status_code=status.HTTP_200_OK,
+                        dependencies=[Depends(customer_role_middleware)])
+async def confirm_order_received(order_id: str,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    order_after_confirm = await order_service.confirm_order_received(order_id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Xác nhận đã nhận hàng thành công",
+            "content": {
+                "order_id": str(order_after_confirm.id),
+                "status": order_after_confirm.status,
+                "received_at": str(order_after_confirm.received_at)
+            }
         }
     )

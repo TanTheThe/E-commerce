@@ -36,8 +36,6 @@ class PaymentRefundService:
             "vnp_SecureHash": secure_hash,
         }
 
-        print("42778948923", data)
-
         async with httpx.AsyncClient() as client:
             response = await client.post(Config.VNPAY_API_URL, json=data)
         return response.json() if response.status_code == 200 else {"error": f"Request failed {response.status_code}"}

@@ -221,6 +221,22 @@ class CartService:
             "unit_price": cart_item.price,
             "selected": False
         }
+    
+    async def get_cart_items_count_service(self, user_id: str, session: AsyncSession):
+        condition_check_user_cart = [Cart.user_id == user_id, Cart.deleted_at.is_(None)]
+        cart = await cart_repository.get_cart(condition_check_user_cart, session)
+
+        if not cart:
+            CartException.cart_not_found()
+
+        count = await cart_repository.get_count_cart_item(cart.id, session)
+
+        return {
+            "count_cart_items": count
+        }
+
+        
+
 
     async def remove_items_from_cart(self, user_id: str, data: CartItemsDeleteModel, session: AsyncSession):
         item_ids = data.item_ids

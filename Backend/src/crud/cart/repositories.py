@@ -58,6 +58,17 @@ class CartRepository:
         result = await session.exec(statement)
 
         return result.all()
+    
+    async def get_count_cart_item(self, card_id, session: AsyncSession):
+        statement = select(
+            func.coalesce(func.sum(Cart_Item.quantity), 0).label("total_quantity")
+        ).where(
+            Cart_Item.cart_id == card_id,
+            Cart_Item.deleted_at.is_(None)
+        )
+
+        result = await session.exec(statement)
+        return result.one_or_none()
 
     async def get_cart_with_paginated_items(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
                                             joins: list = None, skip: int = 0, limit: int = 10):

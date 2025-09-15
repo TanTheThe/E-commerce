@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Search from "../Search";
 import Button from "@mui/material/Button";
@@ -8,18 +8,24 @@ import IconButton from "@mui/material/IconButton";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart"
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { IoIosGitCompare, IoIosLogOut, IoMdHeartEmpty } from "react-icons/io";
-import { FaRegHeart, FaRegUser } from "react-icons/fa";
+import { FaRegBell, FaRegHeart, FaRegUser } from "react-icons/fa";
 import { Tooltip } from "@mui/material";
 import Navigation from "./Navigation";
 import { MyContext } from "../../App";
 
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { IoBagCheckOutline } from "react-icons/io5";
+import { IoBagCheckOutline, IoNotifications } from "react-icons/io5";
 import { getDataApi, fetchWithAutoRefresh, postDataApi } from "../../utils/api";
 
 
 const Header = () => {
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
+    const notificationOpen = Boolean(notificationAnchorEl);
+
     const context = useContext(MyContext)
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
@@ -29,6 +35,75 @@ const Header = () => {
     };
     const handleClose = () => {
         setAnchorEl(null)
+    };
+
+    const fetchUnreadCount = async () => {
+        try {
+            const res = await getDataApi("/customer/notification/unread-count");
+            if (res.success) {
+                setUnreadCount(res.data.unread_count);
+            }
+        } catch (error) {
+            console.error("Error fetching unread count:", error);
+        }
+    };
+
+    const fetchCartItemsCount = async () => {
+        try {
+            const res = await getDataApi("/customer/cart/count");
+            if (res.success) {
+                context.setCartItemsCount(res.data.count_cart_items);
+            }
+        } catch (error) {
+            console.error("Error fetching cart items count:", error);
+            context.setCartItemsCount(0);
+        }
+    };
+
+    const fetchNotifications = async (unreadOnly = false) => {
+        try {
+            setLoadingNotifications(true);
+            const res = await getDataApi(`/customer/notification/?unread_only=${unreadOnly}&skip=0&limit=10`);
+            if (res.success) {
+                setNotifications(res.data.data || []);
+            }
+        } catch (error) {
+            console.error("Error fetching notifications:", error);
+        } finally {
+            setLoadingNotifications(false);
+        }
+    };
+
+    const markAsRead = async (notificationIds) => {
+        try {
+            const res = await postDataApi("/customer/notification/mark-read", {
+                notification_ids: notificationIds
+            });
+            if (res.success) {
+                fetchUnreadCount();
+                fetchNotifications();
+            }
+        } catch (error) {
+            console.error("Error marking as read:", error);
+        }
+    };
+
+    const handleNotificationClick = (event) => {
+        setNotificationAnchorEl(event.currentTarget);
+        if (notifications.length === 0) {
+            fetchNotifications();
+        }
+    };
+
+    const handleNotificationClose = () => {
+        setNotificationAnchorEl(null);
+    };
+
+    const handleMarkAllAsRead = () => {
+        const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+        if (unreadIds.length > 0) {
+            markAsRead(unreadIds);
+        }
     };
 
     const logout = async () => {
@@ -42,11 +117,22 @@ const Header = () => {
         }
     }
 
+    const updateCartCount = useCallback(() => {
+        if (context.isLogin) {
+            fetchCartItemsCount();
+        }
+    }, [context.isLogin]);
+
+    useEffect(() => {
+        if (context.setUpdateCartCount) {
+            context.setUpdateCartCount(updateCartCount);
+        }
+    }, [updateCartCount, context.setUpdateCartCount]);
+
     useEffect(() => {
         const fetchCategories = async () => {
             try {
                 const res = await getDataApi("/customer/categories/all");
-                console.log(res);
 
                 if (res.success) {
                     context.setCategories(res.data.data);
@@ -56,7 +142,19 @@ const Header = () => {
             }
         };
         fetchCategories();
-    }, []);
+
+        if (context.isLogin) {
+            fetchUnreadCount();
+            fetchCartItemsCount();
+
+            const interval = setInterval(() => {
+                fetchUnreadCount();
+                fetchCartItemsCount();
+            }, 30000);
+
+            return () => clearInterval(interval);
+        }
+    }, [context.isLogin]);
 
     return (
         <header className="bg-white">
@@ -178,15 +276,121 @@ const Header = () => {
 
                             }
 
-                            <li>
-                                <Tooltip title="Compare" placement="top">
-                                    <IconButton aria-label="compare">
-                                        <Badge badgeContent={4} color="secondary">
-                                            <IoIosGitCompare />
-                                        </Badge>
-                                    </IconButton>
-                                </Tooltip>
-                            </li>
+                            {context.isLogin && (
+                                <li>
+                                    <Tooltip title="Thông báo" placement="bottom">
+                                        <IconButton
+                                            aria-label="notifications"
+                                            onClick={handleNotificationClick}
+                                            className="relative"
+                                        >
+                                            <Badge badgeContent={unreadCount} color="secondary">
+                                                <FaRegBell />
+                                            </Badge>
+                                        </IconButton>
+                                    </Tooltip>
+
+                                    <Menu
+                                        anchorEl={notificationAnchorEl}
+                                        open={notificationOpen}
+                                        onClose={handleNotificationClose}
+                                        slotProps={{
+                                            paper: {
+                                                elevation: 0,
+                                                sx: {
+                                                    overflow: 'visible',
+                                                    filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                                                    mt: 1.5,
+                                                    width: 350,
+                                                    maxHeight: 400,
+                                                    '&::before': {
+                                                        content: '""',
+                                                        display: 'block',
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        right: 14,
+                                                        width: 10,
+                                                        height: 10,
+                                                        bgcolor: 'background.paper',
+                                                        transform: 'translateY(-50%) rotate(45deg)',
+                                                        zIndex: 0,
+                                                    },
+                                                },
+                                            },
+                                        }}
+                                        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                                        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                                    >
+                                        <div className="p-3 border-b">
+                                            <div className="flex justify-between items-center">
+                                                <h6 className="text-sm font-medium">Thông báo</h6>
+                                                {unreadCount > 0 && (
+                                                    <button
+                                                        onClick={handleMarkAllAsRead}
+                                                        className="text-xs text-blue-600 hover:underline"
+                                                    >
+                                                        Đánh dấu tất cả đã đọc
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="max-h-80 overflow-y-auto">
+                                            {loadingNotifications ? (
+                                                <div className="p-4 text-center">
+                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                                                </div>
+                                            ) : notifications.length === 0 ? (
+                                                <div className="p-4 text-center text-gray-500">
+                                                    <p className="text-sm">Không có thông báo nào</p>
+                                                </div>
+                                            ) : (
+                                                notifications.map((notification) => (
+                                                    <MenuItem
+                                                        key={notification.id}
+                                                        className={`!p-3 !border-b border-gray-100 !whitespace-normal ${!notification.is_read ? 'bg-blue-50' : ''}`}
+                                                        onClick={() => {
+                                                            if (!notification.is_read) {
+                                                                markAsRead([notification.id]);
+                                                            }
+                                                            handleNotificationClose();
+                                                        }}
+                                                    >
+                                                        <div className="w-full">
+                                                            <div className="flex items-start gap-2">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-medium text-gray-900 mb-1">
+                                                                        {notification.title}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-600 line-clamp-2">
+                                                                        {notification.message}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-400 mt-1">
+                                                                        {new Date(notification.created_at).toLocaleDateString('vi-VN')}
+                                                                    </p>
+                                                                </div>
+                                                                {!notification.is_read && (
+                                                                    <div className="w-2 h-2 bg-blue-600 rounded-full mt-1 flex-shrink-0"></div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </MenuItem>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        <div className="p-3 border-t">
+                                            <Link
+                                                to="/notifications"
+                                                className="text-xs text-blue-600 hover:underline block text-center"
+                                                onClick={handleNotificationClose}
+                                            >
+                                                Xem tất cả thông báo
+                                            </Link>
+                                        </div>
+                                    </Menu>
+                                </li>
+                            )}
 
                             <li>
                                 <Tooltip title="Wishlist">
@@ -200,7 +404,7 @@ const Header = () => {
                             <li>
                                 <Tooltip title="Cart">
                                     <IconButton aria-label="cart" onClick={() => context.setOpenCartPanel(true)}>
-                                        <Badge badgeContent={4} color="secondary">
+                                        <Badge badgeContent={context.cartItemsCount} color="secondary">
                                             <MdOutlineShoppingCart />
                                         </Badge>
                                     </IconButton>

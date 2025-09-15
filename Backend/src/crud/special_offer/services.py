@@ -1,5 +1,6 @@
 from src.crud.product.repositories import ProductRepository
 from src.crud.user.repositories import UserRepository
+from src.crud.notification.services import NotificationService
 from src.database.models import Special_Offer, Product, User, UserSpecialOffer
 from src.errors.authentication import AuthException
 from src.errors.special_offer import SpecialOfferException
@@ -16,6 +17,7 @@ from sqlalchemy.orm import noload
 special_offer_repository = SpecialOfferRepository()
 product_repository = ProductRepository()
 user_repository = UserRepository()
+notification_service = NotificationService()
 
 
 class SpecialOfferService:
@@ -277,6 +279,17 @@ class SpecialOfferService:
             for user_id in existing_user_ids
         ]
         await special_offer_repository.bulk_create_user_special_offer(user_offers, session=session)
+
+        for user_id in existing_user_ids:
+            await notification_service.create_assign_special_offer_notification(
+                session=session,
+                special_offer_id=str(data.special_offer_id),
+                special_offer_name=special_offer.name,
+                customer_id=str(user_id),
+                admin_note=data.admin_note  # Nếu có admin_note trong data
+            )
+
+        await session.commit()
 
         return {
             "special_offer_id": str(data.special_offer_id),

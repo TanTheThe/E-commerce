@@ -54,3 +54,4 @@ class SetOfferToProduct(BaseModel):
 class AssignOfferToUsers(BaseModel):
     special_offer_id: uuid.UUID
     user_ids: List[uuid.UUID]
+    admin_note: Optional[str] = None

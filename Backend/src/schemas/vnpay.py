@@ -7,3 +7,8 @@ class PaymentRequest(BaseModel):
     order_desc: str
     bank_code: str = ""
     language: str = ""
+
+class PaymentStatusType:
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"

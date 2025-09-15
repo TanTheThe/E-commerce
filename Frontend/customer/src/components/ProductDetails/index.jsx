@@ -1,12 +1,13 @@
 import { Rating } from "@mui/material";
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import Button from "@mui/material/Button"
 import QtyBox from "../../components/QtyBox";
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { FaRegHeart } from "react-icons/fa";
 import { IoGitCompareOutline } from "react-icons/io5";
-import { postDataApi } from "../../utils/api";
+import { getDataApi, postDataApi } from "../../utils/api";
 import toast from "react-hot-toast";
+import { MyContext } from "../../App";
 
 const ProductDetailsComponent = ({ product, onProductUpdated }) => {
     const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
@@ -15,6 +16,8 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
     const [quantity, setQuantity] = useState(1);
     const [isAddingToCart, setIsAddingToCart] = useState(false);
     const [animatingImage, setAnimatingImage] = useState(null);
+
+    const context = useContext(MyContext)
 
     if (!product) {
         return (
@@ -327,6 +330,15 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                     if (sourceElement && targetElement) {
                         createFlyingAnimation(sourceElement, targetElement, selectedColorObj.image);
                     }
+                }
+
+                try {
+                    const cartCountRes = await getDataApi("/customer/cart/count");
+                    if (cartCountRes.success) {
+                        context.setCartItemsCount(cartCountRes.data.count_cart_items);
+                    }
+                } catch (error) {
+                    console.error("Error updating cart count:", error);
                 }
 
                 toast.success(response.message || 'Đã thêm vào giỏ hàng');

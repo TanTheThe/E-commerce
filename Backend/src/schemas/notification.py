@@ -34,6 +34,7 @@ class NotificationType:
     ORDER_CONFIRMED = "order_confirmed"
     ORDER_DELIVERED = "order_delivered"
     ORDER_SHIPPING = "order_shipping"
+    SPECIAL_OFFER_ASSIGNED = "special_offer_assigned"
 
 
 class ActionType:

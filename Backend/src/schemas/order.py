@@ -48,3 +48,14 @@ class ProcessCancellationRequest(BaseModel):
     action: str # handle_cancellation
     admin_note: Optional[str] = None
     reject_reason: Optional[str] = None
+
+class CancellationStatusType:
+    REQUESTED = "requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class PaymentStatusOrderType:
+    PENDING = "pending"
+    REFUNDED = "refunded"
+    SUCCESS = "success"
+    FAILED = "failed"

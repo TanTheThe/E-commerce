@@ -6,3 +6,8 @@ class PaymentRefundModel(BaseModel):
     refund_amount: int
     refund_reason: str
     status: str
+
+class PaymentRefundStatusType:
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"

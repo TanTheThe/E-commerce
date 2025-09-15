@@ -16,7 +16,7 @@ from src.crud.color.repositories import ColorRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, func, or_, asc, desc, update, select
 from src.errors.order import OrderException
-from src.schemas.order import OrderFilterModel
+from src.schemas.order import OrderFilterModel, CancellationStatusType
 
 order_repository = OrderRepository()
 special_offer_repository = SpecialOfferRepository()
@@ -61,7 +61,7 @@ class OrderService:
             "phone": user.phone,
         } if user else None
 
-        address = order.Address
+        address = order.address_snapshot
         address_response = {
             "line": address.get("line"),
             "street": address.get("street"),
@@ -127,7 +127,7 @@ class OrderService:
             "phone": user.phone,
         } if user else None
 
-        address = order.Address
+        address = order.address_snapshot
         address_response = {
             "line": address["line"],
             "street": address["street"],
@@ -229,7 +229,7 @@ class OrderService:
                 product_map[pid]["variants"].append(variant_info)
 
             can_show_cancel_button = self.can_show_cancel_button(order)
-            has_pending_cancellation = order.cancellation_status == "requested"
+            has_pending_cancellation = order.cancellation_status == CancellationStatusType.REQUESTED
 
             order_response.append({
                 "order": {
@@ -253,7 +253,7 @@ class OrderService:
         if order.status in ["cancelled", "delivered", "shipping"]:
             return False
 
-        if order.cancellation_status == "requested":
+        if order.cancellation_status == CancellationStatusType.REQUESTED:
             return False
 
         if order.status in ["pending", "confirmed"]:
@@ -338,13 +338,17 @@ class OrderService:
         if order_to_update is None:
             OrderException.not_found()
 
-        if order_to_update.cancellation_status == "requested":
+        if order_to_update.cancellation_status == CancellationStatusType.REQUESTED:
             OrderException.cant_update_cancel_order()
 
-        if order_to_update.cancellation_status == "approved":
+        if order_to_update.cancellation_status == CancellationStatusType.APPROVED:
             OrderException.cant_reverse_cancel_order()
 
         status_dict = status.model_dump()
+
+        if status_dict.get("status") == "delivered":
+            status_dict["delivered_at"] = datetime.now()
+            
         order_after_update = await order_repository.update_order(order_to_update, status_dict, session)
 
         history_entry = OrderStatusHistory(
@@ -355,6 +359,49 @@ class OrderService:
         session.add(history_entry)
 
         await session.commit()
+        return order_after_update
+    
+
+    async def confirm_order_received(self, order_id: str, session: AsyncSession):
+        condition = and_(Order.id == order_id, Order.deleted_at.is_(None))
+        joins = [
+            selectinload(Order.order_detail).load_only(Order_Detail.product_id),
+        ]
+        
+        order_to_update = await order_repository.get_order(condition, session, joins)
+        if order_to_update is None:
+            OrderException.not_found()
+        
+        if order_to_update.cancellation_status == CancellationStatusType.REQUESTED:
+            OrderException.cant_update_cancel_order()
+        if order_to_update.cancellation_status == CancellationStatusType.APPROVED:
+            OrderException.cant_reverse_cancel_order()
+        
+        if order_to_update.status != "delivered":
+            raise OrderException.invalid_status_transition(
+                f"Không thể xác nhận nhận hàng. Đơn hàng phải ở trạng thái 'Đã giao hàng', hiện tại là '{order_to_update.status}'"
+            )
+        
+        if order_to_update.status == "received":
+            raise OrderException.already_received(
+                "Đơn hàng đã được xác nhận nhận hàng trước đó"
+            )
+        
+        update_data = {
+            "status": "received",
+            "received_at": datetime.now()
+        }
+        
+        order_after_update = await order_repository.update_order(order_to_update, update_data, session)
+        
+        history_entry = OrderStatusHistory(
+            order_id=order_id,
+            status=order_after_update.status,
+            created_at=datetime.now(),
+        )
+        session.add(history_entry)
+        await session.commit()
+        
         return order_after_update
 
     async def count_new_orders(self, to_date, from_date, session: AsyncSession):
@@ -367,7 +414,7 @@ class OrderService:
         return len(orders)
 
     async def get_total_sales(self, today, seven_days_ago, session: AsyncSession):
-        condition = and_(Order.created_at >= seven_days_ago, Order.status == "Delivered")
+        condition = and_(Order.created_at >= seven_days_ago, Order.status == "delivered")
         column_expr = func.coalesce(func.sum(Order.sub_total), 0)
         total_sales = await order_repository.get_statistics(column_expr, condition, session)
 
@@ -377,7 +424,7 @@ class OrderService:
         return total_sales
 
     async def get_total_revenue(self, today, seven_days_ago, session: AsyncSession):
-        condition = and_(Order.created_at >= seven_days_ago, Order.status == "Delivered")
+        condition = and_(Order.created_at >= seven_days_ago, Order.status == "delivered")
         column_expr = func.coalesce(func.sum(Order.total_price), 0)
         total_revenue = await order_repository.get_statistics(column_expr, condition, session)
 

@@ -20,7 +20,9 @@ from src.crud.color.repositories import ColorRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, func, or_, asc, desc, update, select
 from src.errors.order import OrderException
-from src.schemas.order import CancelOrderRequest, ProcessCancellationRequest
+from src.schemas.order import CancelOrderRequest, ProcessCancellationRequest, CancellationStatusType, PaymentStatusOrderType
+from src.schemas.vnpay import PaymentStatusType
+from src.schemas.payment_refund import PaymentRefundStatusType
 
 order_repository = OrderRepository()
 special_offer_repository = SpecialOfferRepository()
@@ -61,7 +63,7 @@ class CancelOrderService:
         if not order:
             OrderException.not_found()
 
-        if order.cancellation_status == "requested":
+        if order.cancellation_status == CancellationStatusType.REQUESTED:
             OrderException.already_cancelled()
 
         can_cancel, reason = await self.can_cancel_order(order)
@@ -127,8 +129,6 @@ class CancelOrderService:
             await session.rollback()
             OrderException.error_cancelled()
 
-
-
     async def can_cancel_order(self, order: Order) -> Tuple[bool, str]:
         if order.status == "cancelled":
             return False, "Đơn hàng đã được hủy trước đó"
@@ -150,7 +150,7 @@ class CancelOrderService:
         await order_repository.update_order_some_field(condition, {
             "status": "cancelled",
             "cancellation_reason": reason,
-            "cancellation_status": "approved",  # Auto approved for pending
+            "cancellation_status": CancellationStatusType.APPROVED,  # Auto approved for pending
             "cancellation_requested_at": datetime.now(),
             "updated_at": datetime.now()
         }, session)
@@ -203,7 +203,7 @@ class CancelOrderService:
                 )
 
     async def process_refund(self, session: AsyncSession, order: Order, request: Request):
-        condition_payment = and_(Payment.order_id == order.id, Payment.status == "success")
+        condition_payment = and_(Payment.order_id == order.id, Payment.status == PaymentStatusType.SUCCESS)
         payment = await vnpay_repository.get_payment(condition_payment, session)
 
         if not payment:
@@ -214,7 +214,7 @@ class CancelOrderService:
             refund_type="01",  # Full refund
             refund_amount=payment.amount,
             refund_reason="Order cancelled",
-            status="pending",
+            status=PaymentRefundStatusType.PENDING,
             created_at=datetime.now(),
         )
 
@@ -232,16 +232,16 @@ class CancelOrderService:
         )
 
         if refund_response.get("vnp_ResponseCode") == "00" and refund_response.get("vnp_TxnRef") == payment.txn_ref:
-            refund.status = "success"
+            refund.status = PaymentRefundStatusType.SUCCESS
             refund.transaction_no = refund_response.get("vnp_TransactionNo")
             refund.response_code = refund_response.get("vnp_ResponseCode")
             refund.txn_ref = refund_response.get("vnp_TxnRef")
             refund.bank_code = refund_response.get("vnp_BankCode")
             refund.transaction_status = refund_response.get("vnp_TransactionStatus")
 
-            order.payment_status = "refunded"
+            order.payment_status = PaymentStatusOrderType.REFUNDED
         else:
-            refund.status = "failed"
+            refund.status = PaymentRefundStatusType.FAILED
             refund.response_code = refund_response.get("vnp_ResponseCode")
 
         session.add(refund)
@@ -258,7 +258,7 @@ class CancelOrderService:
         condition = and_(Order.id == order_id)
         await order_repository.update_order_some_field(condition, {
             "cancellation_reason": cancellation_reason,
-            "cancellation_status": "requested",  # Auto approved for pending
+            "cancellation_status": CancellationStatusType.REQUESTED,  # Auto approved for pending
             "cancellation_requested_at": datetime.now(),
             "updated_at": datetime.now()
         }, session)
@@ -266,7 +266,7 @@ class CancelOrderService:
         return True
 
     async def get_cancellation_requests(self, session: AsyncSession, skip: int = 0, limit: int = 20):
-        condition = [Order.cancellation_status == "requested", Order.deleted_at.is_(None)]
+        condition = [Order.cancellation_status == CancellationStatusType.REQUESTED, Order.deleted_at.is_(None)]
         joins = [selectinload(Order.user), selectinload(Order.order_detail)]
         order_by = [desc(Order.cancellation_requested_at)]
 
@@ -300,14 +300,14 @@ class CancelOrderService:
         condition_update = and_(Order.id == order_id)
         await order_repository.update_order_some_field(condition_update, {
             "status": "cancelled",
-            "cancellation_status": "approved",
+            "cancellation_status": CancellationStatusType.APPROVED,
             "updated_at": datetime.now()
         }, session)
 
         await self.restore_special_offer_usage(session, order_id)
         await self.restore_product_quantities(session, order_id)
 
-        if order.payment_status == "success":
+        if order.payment_status == PaymentStatusOrderType.SUCCESS:
             await self.process_refund(session, order, request)
 
         return True
@@ -324,7 +324,7 @@ class CancelOrderService:
 
         condition = and_(Order.id == order_id)
         await order_repository.update_order_some_field(condition, {
-            "cancellation_status": "rejected",
+            "cancellation_status": CancellationStatusType.REJECTED,
             "cancellation_reason": new_reason,
             "updated_at": datetime.now()
         }, session)
@@ -344,7 +344,7 @@ class CancelOrderService:
         if not order:
             OrderException.not_found()
 
-        if order.cancellation_status != "requested":
+        if order.cancellation_status != CancellationStatusType.REQUESTED:
             OrderException.not_request_cancelled()
 
         message = ""

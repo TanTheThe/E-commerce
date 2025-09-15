@@ -32,7 +32,7 @@ def upgrade() -> None:
     sa.Column('response_code', sa.VARCHAR(), nullable=True),
     sa.Column('status', sa.VARCHAR(), server_default='pending', nullable=False),
     sa.Column('created_at', postgresql.TIMESTAMP(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-    sa.ForeignKeyConstraint(['payment_id'], ['payment.py.id'], ),
+    sa.ForeignKeyConstraint(['payment_id'], ['payment.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.add_column('order', sa.Column('cancellation_reason', sa.VARCHAR(), nullable=True))

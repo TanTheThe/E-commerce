@@ -186,6 +186,27 @@ class NotificationService:
         }
 
         return await notification_repository.create_notification(notification_data, session)
+    
+    async def create_assign_special_offer_notification(self, session: AsyncSession, special_offer_id: str, special_offer_name: str, 
+                                                       customer_id: str, admin_note: Optional[str] = None):
+        message = f"Bạn vừa nhận được khuyến mãi #{special_offer_name} từ cửa hàng."
+        if admin_note:
+            message += f" Ghi chú: {admin_note}"
+
+        notification_data = {
+            "recipient_type": RecipientType.CUSTOMER,
+            "recipient_id": customer_id,
+            "sender_type": RecipientType.ADMIN,
+            "sender_id": None,
+            "type": NotificationType.SPECIAL_OFFER_ASSIGNED,
+            "title": f"Vừa nhận được khuyến mãi #{special_offer_name}",
+            "message": message,
+            "special_offer_id": special_offer_id,
+            "action_type": None,
+            "action_data": None
+        }
+
+        return await notification_repository.create_notification(notification_data, session)
 
     # Đánh dấu notification đã được xử lý
     async def mark_as_processed(self, session: AsyncSession, notification_id: str):

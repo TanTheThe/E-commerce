@@ -89,6 +89,7 @@ class Order(SQLModel, table=True):
     sub_total: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     total_price: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
     discount: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True, server_default=text("0")), default=0)
+    discount_percent: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True, server_default=text("0")), default=0)
     note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
 
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
@@ -100,10 +101,13 @@ class Order(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
 
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
-    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    delivered_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    received_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
-    Address: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
+    address_snapshot: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
+    special_offer_snapshot: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
 
     cancellation_reason: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True), default=None)
     cancellation_status: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True), default=None)
@@ -354,6 +358,7 @@ class Special_Offer(SQLModel, table=True):
     orders: List["Order"] = Relationship(
         back_populates="special_offer", sa_relationship_kwargs={"lazy": "noload"}
     )
+    notifications: List["Notification"] = Relationship(back_populates="special_offer", sa_relationship_kwargs={"lazy": "noload"})
 
 
 class UserSpecialOffer(SQLModel, table=True):
@@ -533,6 +538,7 @@ class PaymentRefund(SQLModel, table=True):
     transaction_status: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # vnp_TransactionStatus
     response_code: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+    note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
 
     created_at: datetime = Field(
         sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
@@ -565,6 +571,7 @@ class Notification(SQLModel, table=True):
 
     # Thông báo liên quan đến 1 đơn hàng cụ thể
     order_id: Optional[uuid.UUID] = Field(foreign_key="order.id", nullable=True)
+    special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", nullable=True)
 
     # Đánh dấu thông báo đã đọc hay chưa.
     is_read: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
@@ -584,5 +591,46 @@ class Notification(SQLModel, table=True):
     )
 
     order: Optional["Order"] = Relationship(back_populates="notifications", sa_relationship_kwargs={"lazy": "noload"})
+    special_offer: Optional["Special_Offer"] = Relationship(back_populates="notifications", sa_relationship_kwargs={"lazy": "noload"})
+
+class ReturnOrder(SQLModel, table=True):
+    __tablename__ = "return_order"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+    order_id: uuid.UUID = Field(foreign_key="order.id", nullable=False)
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+
+    reason: str = Field(sa_column=Column(pg.VARCHAR, nullable=False)) 
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"))  
+    note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    images: List[str] = Field(sa_column=Column(JSONB, nullable=False))
+
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")))
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    rejected_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    refunded_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    order: Optional["Order"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    user: Optional["User"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    return_items: List["ReturnItem"] = Relationship(back_populates="return_order", sa_relationship_kwargs={"lazy": "noload"})
+
+class ReturnItem(SQLModel, table=True):
+    __tablename__ = "return_item"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+    return_order_id: uuid.UUID = Field(foreign_key="return_order.id", nullable=False)
+    order_detail_id: uuid.UUID = Field(foreign_key="order_detail.id", nullable=False)
+
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    refund_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")))
+
+    return_order: Optional["ReturnOrder"] = Relationship(back_populates="return_items", sa_relationship_kwargs={"lazy": "noload"})
+    order_detail: Optional["Order_Detail"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
 
     

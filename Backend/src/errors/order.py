@@ -160,3 +160,54 @@ class OrderException:
                 "error_code": "order_016",
             },
         )
+    
+    @staticmethod
+    def only_delivered_can_return():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ có thể hoàn trả đơn hàng đã giao thành công",
+                "error_code": "order_017",
+            },
+        )
+    
+    @staticmethod
+    def only_payment_success_can_return():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ có thể hoàn trả đơn hàng đã thanh toán thành công",
+                "error_code": "order_018",
+            },
+        )
+    
+    @staticmethod
+    def not_found_delivered_at():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể xác định thời gian giao hàng",
+                "error_code": "order_019",
+            },
+        )
+    
+    @staticmethod
+    def overdue_return_order():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đã quá thời hạn hoàn trả (7 ngày kể từ khi giao hàng)",
+                "error_code": "order_020",
+            },
+        )
+    
+    @staticmethod
+    def product_not_include_order():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Sản phẩm không thuộc đơn hàng này",
+                "error_code": "order_021",
+            },
+        )
+    

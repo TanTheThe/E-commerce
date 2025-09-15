@@ -36,6 +36,8 @@ import OrderSuccessPage from './Pages/Orders/orderSuccess'
 import OrderTrackingPage from './Pages/Orders/orderTracking'
 import VNPayPayment from './Pages/Payment'
 import PaymentReturn from './Pages/Payment/paymentReturn'
+import CartPanel from './components/CartPanel'
+import { Drawer } from '@mui/material'
 
 
 const MyContext = createContext()
@@ -52,14 +54,35 @@ function App() {
   const [selectedVoucher, setSelectedVoucher] = useState(null);
   const [selectedAddress, setSelectedAddress] = useState(null);
 
+  const [cartItemsCount, setCartItemsCount] = useState(0);
+
   const { isLogin, setIsLogin, userData, setUserData, isLoading, checkLogin } = useAuth();
 
   const handleCloseProductDetailsModal = () => {
     setOpenProductDetailsModal(false);
   };
 
+  const updateCartCount = async () => {
+    try {
+      const res = await getDataApi("/customer/cart/count");
+      if (res.success) {
+        setCartItemsCount(res.data.count_cart_items);
+      }
+    } catch (error) {
+      console.error("Error updating cart count:", error);
+    }
+  };
+
   const toggleCartPanel = (newOpen) => () => {
+    if (!newOpen && openCartPanel) {
+      updateCartCount();
+    }
     setOpenCartPanel(newOpen);
+  };
+
+  const handleCloseCartPanel = async () => {
+    await updateCartCount();
+    setOpenCartPanel(false);
   };
 
   const openAlertBox = (status, msg) => {
@@ -106,6 +129,7 @@ function App() {
     setCheckoutTotal(newTotal);
   };
 
+
   const values = {
     setOpenProductDetailsModal,
     setOpenCartPanel,
@@ -130,6 +154,9 @@ function App() {
     setSelectedVoucher,
     selectedAddress,
     setSelectedAddress,
+    cartItemsCount,
+    setCartItemsCount,
+    handleCloseCartPanel
   }
 
   return (
@@ -137,6 +164,14 @@ function App() {
       <BrowserRouter>
         <MyContext.Provider value={values}>
           <Header />
+          <Drawer open={openCartPanel} onClose={handleCloseCartPanel} anchor='right' className='cartPanel'>
+            <div className='flex items-center justify-between py-3 px-4 gap-3 border-b border-[rgba(0,0,0,0.1)] overflow-hidden'>
+              <h4>Shopping Cart</h4>
+              <IoCloseSharp className='text-[20px] hover:text-[#e53e3e] cursor-pointer' onClick={handleCloseCartPanel} />
+            </div>
+
+            <CartPanel />
+          </Drawer>
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
             <Route path={"/category/:categoryId"} exact={true} element={<ProductListing />} />

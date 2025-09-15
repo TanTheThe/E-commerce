@@ -13,6 +13,7 @@ from src.crud.order.repositories import OrderRepository
 from src.crud.vnpay.repositories import VNPayRepository
 from src.errors.order import OrderException
 from src.database.models import Order, Payment, Special_Offer
+from src.schemas.order import PaymentStatusOrderType
 import urllib.parse
 import httpx
 import uuid
@@ -90,7 +91,7 @@ class VNPayService:
         if not order:
             OrderException.not_found()
 
-        if order.payment_status == "success":
+        if order.payment_status == PaymentStatusOrderType.SUCCESS:
             OrderException.order_already_paid()
 
         request_data: Dict[str, Any] = {
@@ -158,7 +159,7 @@ class VNPayService:
             }
 
         is_success = vnp_response_code == "00"
-        payment_status = "success" if is_success else "failed"
+        payment_status = PaymentStatusOrderType.SUCCESS if is_success else PaymentStatusOrderType.FAILED
 
         order.payment_status = payment_status
         session.add(order)

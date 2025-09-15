@@ -85,4 +85,8 @@ class FilterUserInputModel(BaseModel):
     customer_status: Optional[str] = None
     sort_by_created_at: Optional[str] = None
 
+class CustomerStatusType:
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
 

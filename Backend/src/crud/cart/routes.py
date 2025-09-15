@@ -47,6 +47,20 @@ async def get_all_cart(session: AsyncSession = Depends(get_session),
         }
     )
 
+@cart_customer_router.get('/count')
+async def get_cart_items_count(session: AsyncSession = Depends(get_session),
+                               token_details: dict = Depends(access_token_bearer)):
+    user_id = token_details['user']['id']
+    count = await cart_service.get_cart_items_count_service(user_id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin số lượng trong giỏ hàng",
+            "content": count
+        }
+    )
+
 
 @cart_customer_router.delete("/", dependencies=[Depends(customer_role_middleware)])
 async def remove_cart_items(data: CartItemsDeleteModel,
