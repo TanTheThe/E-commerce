@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
@@ -28,7 +30,7 @@ color_service = ColorService()
 
 
 class GetAllProductsService:
-    async def get_all_products_customer_service(self, category_id: str, filter_data: ProductFilterModel,
+    async def get_all_products_customer(self, category_id: str, filter_data: ProductFilterModel,
                                                 session: AsyncSession, skip: int = 0, limit: int = 16):
         condition_cate = and_(Categories.id == category_id, Categories.deleted_at.is_(None))
         category = await categories_repository.get_category(condition_cate, session)
@@ -62,13 +64,19 @@ class GetAllProductsService:
             selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
+                Product_Variant.quantity,
                 Product_Variant.deleted_at
             ),
 
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.discount,
-                Special_Offer.type
+                Special_Offer.type,
+                Special_Offer.used_quantity,
+                Special_Offer.total_quantity,
+                Special_Offer.start_time,
+                Special_Offer.end_time,
+                Special_Offer.deleted_at
             ),
         ]
 
@@ -81,17 +89,19 @@ class GetAllProductsService:
             valid_categories = [cat for cat in product[0].categories if cat.deleted_at is None]
 
             active_variants = [
-                variant for variant in product[0].product_variant if variant.deleted_at is None
+                variant for variant in product[0].product_variant
+                if variant.deleted_at is None and variant.quantity > 0
             ]
 
-            offer = product[0].special_offer
-            offer_discount = offer.discount if offer else None
+            if not active_variants:
+                continue
 
-            price_min = 0
-            if active_variants:
-                prices = [variant.price for variant in active_variants if variant.price is not None]
-                if prices:
-                    price_min = min(prices)
+            offer = product[0].special_offer
+            valid_offer = self._is_offer_valid(offer)
+            offer_discount = offer.discount if valid_offer else None
+
+            prices = [variant.price for variant in active_variants if variant.price is not None]
+            price_min = min(prices) if prices else 0
 
             original_price = price_min
             discounted_price = original_price
@@ -116,15 +126,31 @@ class GetAllProductsService:
                 ],
                 "original_price": original_price,
                 "discounted_price": discounted_price,
-                "avg_rating": product[0].avg_rating
+                "avg_rating": product[0].avg_rating,
             }
 
             product_list.append(product_data)
 
         return {
             "data": product_list,
-            "total": total[0]
+            "total": len(product_list)
         }
+
+    def _is_offer_valid(self, offer: Special_Offer) -> bool:
+        if not offer:
+            return False
+
+        if offer.deleted_at is not None:
+            return False
+
+        now = datetime.now()
+        if offer.start_time > now or offer.end_time < now:
+            return False
+
+        if offer.used_quantity >= offer.total_quantity:
+            return False
+
+        return True
 
     async def get_category_ids_for_filter(self, category: Categories, session: AsyncSession):
         if category.parent_id is None:
@@ -137,7 +163,7 @@ class GetAllProductsService:
         else:
             return [str(category.id)]
 
-    async def get_all_product_admin_service(self, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0,
+    async def get_all_product_admin(self, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0,
                                             limit: int = 10,
                                             include_status: bool = True):
 
@@ -154,12 +180,20 @@ class GetAllProductsService:
             selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
+                Product_Variant.quantity,
                 Product_Variant.deleted_at
             ),
 
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
                 Special_Offer.name,
+                Special_Offer.discount,
+                Special_Offer.type,
+                Special_Offer.used_quantity,
+                Special_Offer.total_quantity,
+                Special_Offer.start_time,
+                Special_Offer.end_time,
+                Special_Offer.deleted_at
             ),
         ]
 
@@ -169,26 +203,36 @@ class GetAllProductsService:
 
         product_list = []
         for product in products:
-            valid_categories = [cat for cat in product[0].categories if cat.deleted_at is None]
+            p = product[0]
+
+            valid_categories = [cat for cat in p.categories if cat.deleted_at is None]
 
             active_variants = [
-                variant for variant in product[0].product_variant if variant.deleted_at is None
+                variant for variant in p.product_variant
+                if (variant.deleted_at is None and
+                    variant.price is not None and variant.price >= 0 and
+                    variant.quantity is not None and variant.quantity >= 0)
             ]
+
             variant_count = len(active_variants)
 
             price_range = None
             if active_variants:
-                prices = [variant.price for variant in active_variants if variant.price is not None]
+                prices = [variant.price for variant in active_variants if
+                          variant.price is not None and variant.price > 0]
                 if prices:
                     price_range = {
                         "min": min(prices),
                         "max": max(prices)
                     }
 
+            offer = p.special_offer
+            offer_status = self._get_offer_status(offer)
+
             product_data = {
-                "id": str(product[0].id),
-                "name": product[0].name,
-                "images": product[0].images,
+                "id": str(p.id),
+                "name": p.name,
+                "images": p.images if p.images else [],
                 "categories": [
                     {
                         "id": str(category.id),
@@ -197,14 +241,17 @@ class GetAllProductsService:
                     }
                     for category in valid_categories
                 ],
-                "created_at": str(product[0].created_at),
+                "created_at": str(p.created_at) if p.created_at else "",
                 "variant_count": variant_count,
                 "price_range": price_range,
-                "avg_rating": product[0].avg_rating,
-                "offer_name": product[0].special_offer.name if product[0].special_offer else None,
+                "avg_rating": p.avg_rating if p.avg_rating is not None else 0,
+                "offer_name": offer.name if offer else None,
+                "offer_valid": offer_status["is_valid"] if offer else None,
+                "offer_invalid_reason": offer_status["reason"] if offer and not offer_status["is_valid"] else None,
             }
+
             if include_status:
-                product_data["status"] = product[0].status
+                product_data["status"] = p.status if p.status else "inactive"
 
             product_list.append(product_data)
 
@@ -212,6 +259,26 @@ class GetAllProductsService:
             "data": product_list,
             "total": total[0]
         }
+
+    def _get_offer_status(self, offer: Special_Offer) -> dict:
+        if not offer:
+            return {"is_valid": True, "reason": None}
+
+        if offer.deleted_at is not None:
+            return {"is_valid": False, "reason": "offer_deleted"}
+
+        now = datetime.now()
+
+        if offer.start_time > now:
+            return {"is_valid": False, "reason": "not_started"}
+
+        if offer.end_time < now:
+            return {"is_valid": False, "reason": "expired"}
+
+        if offer.used_quantity >= offer.total_quantity:
+            return {"is_valid": False, "reason": "sold_out"}
+
+        return {"is_valid": True, "reason": None}
 
     async def filter_product(self, filter_data: ProductFilterModel, session: AsyncSession):
         filters = [Product.deleted_at.is_(None)]
@@ -234,7 +301,8 @@ class GetAllProductsService:
                 select(func.min(Product_Variant.price))
                 .where(
                     Product_Variant.product_id == Product.id,
-                    Product_Variant.deleted_at.is_(None)
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0
                 )
                 .correlate(Product)
                 .scalar_subquery()
@@ -250,6 +318,7 @@ class GetAllProductsService:
                                 Special_Offer.scope == "product",
                                 Special_Offer.start_time <= func.now(),
                                 Special_Offer.end_time >= func.now(),
+                                Special_Offer.used_quantity < Special_Offer.total_quantity,
                                 Special_Offer.deleted_at.is_(None)
                             )
                         )
@@ -277,7 +346,8 @@ class GetAllProductsService:
                 Product.product_variant.any(
                     and_(
                         Product_Variant.color_id.in_(filter_data.colors),
-                        Product_Variant.deleted_at.is_(None)
+                        Product_Variant.deleted_at.is_(None),
+                        Product_Variant.quantity > 0
                     )
                 )
             )
@@ -287,7 +357,8 @@ class GetAllProductsService:
                 Product.product_variant.any(
                     and_(
                         Product_Variant.size.in_(filter_data.sizes),
-                        Product_Variant.deleted_at.is_(None)
+                        Product_Variant.deleted_at.is_(None),
+                        Product_Variant.quantity > 0
                     )
                 )
             )
@@ -304,6 +375,16 @@ class GetAllProductsService:
 
             filters.append(or_(*rating_conditions))
 
+        filters.append(
+            exists().where(
+                and_(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0
+                )
+            )
+        )
+
         order_by_clause = await self.filter_sort_product(filter_data.sort_by, session)
         return filters, order_by_clause
 
@@ -311,11 +392,15 @@ class GetAllProductsService:
         if not sort_by or sort_by == SortBy.newest:
             return desc(Product.created_at)
 
+
         elif sort_by == SortBy.price_asc:
             min_price_subquery = (
                 select(func.min(Product_Variant.price))
-                .where(Product_Variant.product_id == Product.id)
-                .where(Product_Variant.deleted_at.is_(None))
+                .where(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0
+                )
                 .scalar_subquery()
             )
             return asc(min_price_subquery)
@@ -323,8 +408,11 @@ class GetAllProductsService:
         elif sort_by == SortBy.price_desc:
             min_price_subquery = (
                 select(func.min(Product_Variant.price))
-                .where(Product_Variant.product_id == Product.id)
-                .where(Product_Variant.deleted_at.is_(None))
+                .where(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0
+                )
                 .scalar_subquery()
             )
             return desc(min_price_subquery)
@@ -336,13 +424,20 @@ class GetAllProductsService:
             return desc(Product.name)
 
         elif sort_by == SortBy.best_seller:
-            pass
+            return desc(Product.total_sold)
 
         elif sort_by == SortBy.sale_desc:
             discount_subquery = (
                 select(func.coalesce(Special_Offer.discount, 0))
-                .where(Special_Offer.id == Product.special_offer_id)
-                .where(Special_Offer.deleted_at.is_(None))
+                .where(
+                    and_(
+                        Special_Offer.id == Product.special_offer_id,
+                        Special_Offer.start_time <= func.now(),
+                        Special_Offer.end_time >= func.now(),
+                        Special_Offer.used_quantity < Special_Offer.total_quantity,
+                        Special_Offer.deleted_at.is_(None)
+                    )
+                )
                 .scalar_subquery()
             )
             return desc(discount_subquery)

@@ -1,5 +1,5 @@
-from typing import Optional, List
-from sqlalchemy import ColumnElement
+from typing import Optional, List, Dict, Any
+from sqlalchemy import ColumnElement, update
 from sqlalchemy.orm import noload, load_only
 
 from src.database.models import Color, Notification
@@ -61,3 +61,15 @@ class NotificationRepository:
         statement = select(Notification).where(*conditions)
         result = await session.exec(statement)
         return result.all()
+
+
+    async def update_notification(self, condition: List[Optional[ColumnElement[bool]]], values: Dict[str, Any], session: AsyncSession):
+        stmt = (
+            update(Notification)
+            .where(*condition)
+            .values(**values)
+        )
+        result = await session.exec(stmt)
+        await session.commit()
+
+        return result.rowcount

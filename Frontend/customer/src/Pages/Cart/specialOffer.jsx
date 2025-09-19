@@ -29,7 +29,7 @@ const SpecialOffersOrder = () => {
                 const offersData = response.data.content?.data || response.data.data || [];
                 setOffers(offersData);
             } else {
-                toast.error(response.message || 'Không thể tải vouchers');
+                toast.error(response.data.detail.message || 'Không thể tải vouchers');
             }
         } catch (error) {
             console.error('Error fetching offers:', error);

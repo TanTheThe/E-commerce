@@ -151,8 +151,6 @@ const Orders = () => {
                 status: newStatus
             });
 
-            console.log(res);
-
             if (res.success) {
                 setOrders(prevOrders =>
                     prevOrders.map(order =>

@@ -29,7 +29,7 @@ class EvaluateService:
         if str(customer_id) != str(order_detail.order.user_id):
             EvaluateException.user_not_allowed_to_review()
 
-        if order_detail.order.status != 'Delivered':
+        if order_detail.order.status not in ("delivered", "received"):
             EvaluateException.order_not_delivered()
 
         existing_eval = await evaluate_repository.get_by_order_detail_id(evaluate_data.order_detail_id, session)

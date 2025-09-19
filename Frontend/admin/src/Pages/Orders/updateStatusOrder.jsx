@@ -106,7 +106,7 @@ const OrderStatusUpdateModal = ({ open, onClose, order, onUpdateStatus }) => {
                                 className="w-3 h-3 rounded-full mr-2"
                                 style={getStatusColorStyle(order?.status)}
                             ></div>
-                            <span className="text-sm font-medium">{order?.status}</span>
+                            <span className="text-sm font-medium capitalize">{order?.status}</span>
                         </div>
                     </div>
                 </div>

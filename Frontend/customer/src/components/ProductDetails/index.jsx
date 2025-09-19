@@ -206,23 +206,8 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
     };
 
     const getAvailableOptions = () => {
-        if (selectedSize && !selectedColor) {
-            return {
-                availableSizes: sortSizes(availableSizes),
-                availableColors: availableColors.filter(color => {
-                    return product.product_variant.some(v => {
-                        if (color.id === null) {
-                            return v.size === selectedSize && v.color_name === color.name && !v.color_id;
-                        } else {
-                            return v.size === selectedSize && v.color_id === color.id;
-                        }
-                    });
-                })
-            };
-        }
-
-        if (selectedColor && !selectedSize) {
-            const filteredSizes = [...new Set(product.product_variant
+        const filteredSizes = selectedColor
+            ? [...new Set(product.product_variant
                 ?.filter(v => {
                     let colorMatch = false;
                     if (selectedColor.startsWith('custom_')) {
@@ -233,21 +218,76 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                     }
                     return colorMatch && v.size;
                 })
-                .map(v => v.size))] || [];
+                .map(v => v.size))] || []
+            : availableSizes;
 
-            return {
-                availableSizes: sortSizes(filteredSizes),
-                availableColors
-            };
-        }
+        const sizeStockInfo = {};
+        filteredSizes.forEach(size => {
+            if (selectedColor) {
+                const variant = product.product_variant.find(v => {
+                    const sizeMatch = v.size === size;
+                    let colorMatch = false;
+                    if (selectedColor.startsWith('custom_')) {
+                        const colorName = selectedColor.replace('custom_', '');
+                        colorMatch = v.color_name === colorName && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === selectedColor;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+                sizeStockInfo[size] = variant ? variant.quantity === 0 : true;
+            } else {
+                sizeStockInfo[size] = false;
+            }
+        });
+
+        const processedColors = availableColors.map(color => {
+            if (selectedSize) {
+                const variant = product.product_variant.find(v => {
+                    const sizeMatch = v.size === selectedSize;
+                    let colorMatch = false;
+                    if (color.id === null) {
+                        colorMatch = v.color_name === color.name && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === color.id;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+                return {
+                    ...color,
+                    isOutOfStock: variant ? variant.quantity === 0 : true
+                };
+            } else {
+                return {
+                    ...color,
+                    isOutOfStock: false
+                };
+            }
+        });
+
+        const filteredColors = selectedSize
+            ? processedColors.filter(color => {
+                return product.product_variant.some(v => {
+                    const sizeMatch = v.size === selectedSize;
+                    let colorMatch = false;
+                    if (color.id === null) {
+                        colorMatch = v.color_name === color.name && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === color.id;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+            })
+            : processedColors;
 
         return {
-            availableSizes: sortSizes(availableSizes),
-            availableColors
+            availableSizes: sortSizes(filteredSizes),
+            availableColors: filteredColors,
+            sizeStockInfo
         };
     };
 
-    const { availableSizes: displaySizes, availableColors: displayColors } = getAvailableOptions();
+    const { availableSizes: displaySizes, availableColors: displayColors, sizeStockInfo } = getAvailableOptions();
 
     const createFlyingAnimation = (sourceElement, targetElement, imageUrl) => {
         const sourceRect = sourceElement.getBoundingClientRect();
@@ -343,7 +383,7 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
 
                 toast.success(response.message || 'Đã thêm vào giỏ hàng');
             } else {
-                toast.error(response.message || 'Có lỗi xảy ra');
+                toast.error(response.data.detail.message || 'Có lỗi xảy ra');
             }
         } catch (error) {
             console.error('Add to cart error:', error);
@@ -435,15 +475,20 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                 <div className="flex items-center gap-3 pt-3">
                     <span className="text-[16px]">Kích thước:</span>
                     <div className="flex items-center gap-1 actions">
-                        {displaySizes.map((size) => (
-                            <Button
-                                key={size}
-                                className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''}`}
-                                onClick={() => handleSizeSelect(size)}
-                            >
-                                {size}
-                            </Button>
-                        ))}
+                        {displaySizes.map((size) => {
+                            const isOutOfStock = sizeStockInfo[size] || false;
+                            return (
+                                <Button
+                                    key={size}
+                                    className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''} ${isOutOfStock ? 'cursor-not-allowed opacity-50' : ''
+                                        }`}
+                                    onClick={() => !isOutOfStock && handleSizeSelect(size)}
+                                    disabled={isOutOfStock}
+                                >
+                                    {size}
+                                </Button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -456,9 +501,10 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                             <div
                                 key={color.id}
                                 data-color-id={getColorIdentifier(color)}
-                                className={`flex items-center gap-2 p-2 border rounded cursor-pointer ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'
+                                className={`flex items-center gap-2 p-2 border rounded ${color.isOutOfStock ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                    } ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'
                                     }`}
-                                onClick={() => handleColorSelect(color)}
+                                onClick={() => !color.isOutOfStock && handleColorSelect(color)}
                             >
                                 <img
                                     src={color.image}

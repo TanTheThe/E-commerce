@@ -13,6 +13,7 @@ import AdditionalEvaluateModal from "../Evaluate/additionalEvalModal";
 import ViewEvaluationModal from "../Evaluate/viewEvalModal";
 import toast from "react-hot-toast";
 import CancelOrderModal from "./cancelOrder";
+import ReturnModal from "./returnModal";
 
 const Orders = () => {
     const navigate = useNavigate();
@@ -46,6 +47,13 @@ const Orders = () => {
     const [cancelForm, setCancelForm] = useState({
         reason: '',
         reason_detail: ''
+    });
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [returnForm, setReturnForm] = useState({
+        reason: '',
+        note: '',
+        images: [],
+        return_items: []
     });
 
     const tabs = [
@@ -84,7 +92,7 @@ const Orders = () => {
             bgColor: 'bg-green-50',
             borderColor: 'border-green-200',
             status: 'delivered'
-        }
+        },
     ];
 
     const fetchOrders = async (status, skip = 0, limit = 10) => {
@@ -104,6 +112,121 @@ const Orders = () => {
             console.error('Error fetching orders:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOpenReturnModal = async (orderItem) => {
+        try {
+            const response = await getDataApi(`/customer/return-order/check-eligibility/${orderItem.order.order_id}`);
+
+            if (response.success && response.data.eligible) {
+                setSelectedOrder(orderItem);
+                setReturnForm({
+                    reason: '',
+                    note: '',
+                    return_items: orderItem.order_detail.flatMap(detail =>
+                        detail.variants ? detail.variants.map(variant => ({
+                            order_detail_id: variant.order_detail_id,
+                            quantity: variant.quantity,
+                            selected: false,
+                            images: [],
+                            product_name: detail.name,
+                            product_image: detail.variant_image,
+                            price_after_discount: detail.price_after_discount,
+                            size: variant.size,
+                            color_name: variant.color_name
+                        })) : [{
+                            order_detail_id: detail.order_detail_id,
+                            quantity: detail.quantity,
+                            selected: false,
+                            images: [],
+                            product_name: detail.name,
+                            product_image: detail.variant_image,
+                            price_after_discount: detail.price_after_discount,
+                            size: detail.size,
+                            color_name: detail.color_name
+                        }]
+                    )
+                });
+                setShowReturnModal(true);
+            } else {
+                toast.error(response.data.detail.message || 'Đơn hàng này không đủ điều kiện để trả hàng');
+            }
+        } catch (error) {
+            console.error('Error checking return eligibility:', error);
+            toast.error('Có lỗi xảy ra khi kiểm tra điều kiện trả hàng');
+        }
+    };
+
+    const handleSubmitReturn = async () => {
+        try {
+            const selectedItems = returnForm.return_items.filter(item => item.selected);
+
+            if (selectedItems.length === 0) {
+                toast.error('Vui lòng chọn ít nhất một sản phẩm để trả hàng');
+                return;
+            }
+
+            const itemsWithoutEnoughImages = selectedItems.filter(item => !item.images || item.images.length < 5);
+            if (itemsWithoutEnoughImages.length > 0) {
+                toast.error('Mỗi sản phẩm cần ít nhất 5 ảnh');
+                return;
+            }
+
+            const submitData = {
+                reason: returnForm.reason,
+                note: returnForm.note,
+                return_items: selectedItems.map(item => ({
+                    order_detail_id: item.order_detail_id,
+                    quantity: item.quantity,
+                    images: item.images.map(img => img.base64)
+                }))
+            };
+
+            const res = await postDataApi(`/customer/return-order/${selectedOrder.order.order_id}`, submitData);
+
+            if (res.success) {
+                toast.success(res.message);
+                setShowReturnModal(false);
+
+                returnForm.return_items.forEach(item => {
+                    if (item.images) {
+                        item.images.forEach(img => {
+                            if (img.url) URL.revokeObjectURL(img.url);
+                        });
+                    }
+                });
+
+                const currentTab = tabs.find(tab => tab.key === activeTab);
+                if (currentTab) {
+                    fetchOrders(currentTab.status, pagination.skip, pagination.limit);
+                }
+            } else {
+                toast.error(res.data.detail.message || 'Có lỗi xảy ra khi tạo yêu cầu trả hàng');
+            }
+        } catch (error) {
+            console.error('Error submitting return request:', error);
+            toast.error('Có lỗi xảy ra khi tạo yêu cầu trả hàng');
+        }
+    };
+
+    const handleConfirmReceived = async (orderId) => {
+        try {
+            const response = await putDataApi(`/customer/order/confirm-received/${orderId}`);
+
+            if (response.success) {
+                toast.success(response.message);
+
+                const currentTab = tabs.find(tab => tab.key === activeTab);
+                if (currentTab) {
+                    fetchOrders(currentTab.status, pagination.skip, pagination.limit);
+                }
+            } else {
+                toast.error(response.data.detail.message || 'Có lỗi xảy ra khi xác nhận nhận hàng');
+            }
+        } catch (error) {
+            console.error('Error confirming order received:', error);
+            toast.error('Có lỗi xảy ra khi xác nhận nhận hàng');
         }
     };
 
@@ -206,7 +329,7 @@ const Orders = () => {
                     fetchOrders(currentTab.status, pagination.skip, pagination.limit);
                 }
             } else {
-                toast.error(res.message || 'Có lỗi xảy ra khi hủy đơn hàng');
+                toast.error(res.data.detail.message || 'Có lỗi xảy ra khi hủy đơn hàng');
             }
         } catch (error) {
             console.error('Error cancelling order:', error);
@@ -529,6 +652,34 @@ const Orders = () => {
                                                     Xem chi tiết
                                                 </button>
 
+                                                {activeTab === 'delivered' && orderItem.order.status === 'delivered' && (
+                                                    <button
+                                                        onClick={() => handleConfirmReceived(orderItem.order.order_id)}
+                                                        className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors cursor-pointer"
+                                                    >
+                                                        Đã nhận hàng
+                                                    </button>
+                                                )}
+
+                                                {activeTab === 'delivered' && orderItem.order.status === 'received' && (
+                                                    <>
+                                                        {orderItem.order.has_return_orders ? (
+                                                            <div className="px-6 py-2 bg-yellow-100 text-yellow-800 rounded-lg border border-yellow-200">
+                                                                <span className="text-sm font-medium">
+                                                                    📦 Đơn hàng hiện đang trong quá trình hoàn trả
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleOpenReturnModal(orderItem)}
+                                                                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors cursor-pointer"
+                                                            >
+                                                                Trả hàng
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
+
                                                 {orderItem.order.can_show_cancel_button && (
                                                     <button
                                                         onClick={() => handleOpenCancelModal(orderItem)}
@@ -608,6 +759,15 @@ const Orders = () => {
                 onSubmit={handleCancelOrder}
                 cancelForm={cancelForm}
                 setCancelForm={setCancelForm}
+            />
+
+            <ReturnModal
+                isOpen={showReturnModal}
+                onClose={() => setShowReturnModal(false)}
+                selectedOrder={selectedOrder}
+                onSubmit={handleSubmitReturn}
+                returnForm={returnForm}
+                setReturnForm={setReturnForm}
             />
         </div>
     );

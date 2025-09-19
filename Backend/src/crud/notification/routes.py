@@ -142,6 +142,22 @@ async def mark_customer_notifications_read(request: MarkAsReadRequest,
         }
     )
 
+@notification_customer_router.post("/mark-all-read", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
+async def mark_all_customer_notifications_read(token_details: dict = Depends(access_token_bearer),
+                                             session: AsyncSession = Depends(get_session)):
+    user_id = token_details['user']['id']
+    count = await notification_service.mark_all_as_read(session, user_id)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": f"Đã đánh dấu tất cả thông báo đã đọc",
+            "content": {
+                "marked_count": count
+            }
+        }
+    )
+
 
 
 

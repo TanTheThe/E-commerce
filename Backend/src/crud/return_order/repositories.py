@@ -1,8 +1,8 @@
-from typing import Optional, List
-from sqlalchemy import ColumnElement
+from typing import Optional, List, Dict, Any
+from sqlalchemy import ColumnElement, update
 from sqlalchemy.orm import noload, load_only
 
-from src.database.models import Color, Notification
+from src.database.models import Color, Notification, ReturnOrder
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func, desc, or_
 from datetime import datetime
@@ -19,45 +19,36 @@ class ReturnOrderRepository:
         return new_notification
 
 
-    async def get_all_notifications(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
+    async def get_all_return_orders(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
                                    joins: list = None, skip: int = 0, limit: int = 30):
-        count_stmt = select(func.count(Notification.id)).where(*conditions)
+        count_stmt = select(func.count(ReturnOrder.id)).where(*conditions)
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(Notification).options(
+        statement = select(ReturnOrder).options(
             *joins if joins else []
-        ).where(*conditions).offset(skip).limit(limit).order_by(desc(Notification.created_at))
+        ).where(*conditions).offset(skip).limit(limit).order_by(desc(ReturnOrder.created_at))
 
         result = await session.exec(statement)
-        notifications = result.all()
+        return_orders = result.all()
 
-        return notifications, total
+        return return_orders, total
 
 
     async def get_return_order(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, joins: list = None):
-        statement = select(Notification).options(
+        statement = select(ReturnOrder).options(
             *joins if joins else []
         ).where(*conditions)
         result = await session.exec(statement)
 
         return result.one_or_none()
 
+    async def update_return_order(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
+                                      session: AsyncSession):
+        stmt = (
+            update(ReturnOrder)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)
 
-    async def get_notifications_by_ids(self, session: AsyncSession, notification_ids: List[str], user_id: Optional[str] = None):
-        conditions = [Notification.id.in_(notification_ids)]
-
-        if user_id:
-            conditions.append(
-                or_(
-                    Notification.recipient_type == "admin",
-                    and_(
-                        Notification.recipient_type == "customer",
-                        Notification.recipient_id == user_id
-                    )
-                )
-            )
-
-        statement = select(Notification).where(*conditions)
-        result = await session.exec(statement)
-        return result.all()

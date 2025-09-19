@@ -127,7 +127,7 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
                 onSuccess?.();
                 onClose();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi khi gắn offer cho người dùng");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi khi gắn offer cho người dùng");
             }
         } catch (error) {
             console.error('Error assigning offer to users:', error);

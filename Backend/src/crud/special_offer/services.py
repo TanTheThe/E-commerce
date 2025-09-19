@@ -234,6 +234,9 @@ class SpecialOfferService:
         if not (special_offer.start_time <= now <= special_offer.end_time):
             SpecialOfferException.expired_or_not_started()
 
+        if special_offer.used_quantity >= special_offer.total_quantity:
+            SpecialOfferException.insufficient_quantity()
+
         condition_product = Product.id.in_(data.product_id)
         await product_repository.update_product_some_field(
             condition_product,

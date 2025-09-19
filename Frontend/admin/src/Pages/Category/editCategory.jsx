@@ -104,7 +104,7 @@ const EditCategory = ({ open, onClose, category, onSuccess, availableSizes = [] 
                 onSuccess?.();
                 onClose();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi xảy ra khi cập nhật danh mục");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi xảy ra khi cập nhật danh mục");
             }
         } catch (err) {
             console.error(err);

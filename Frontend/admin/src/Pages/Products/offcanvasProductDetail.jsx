@@ -34,7 +34,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                     </Button>
                 </div>
 
-                <div className="p-4 h-full overflow-y-auto pb-24">
+                <div className="p-4 h-full overflow-y-auto pb-30">
                     {product && (
                         <>
                             <div className="mb-6">
@@ -188,7 +188,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                     )}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)] p-4">
+                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)] p-3">
                     <div className="flex justify-end">
                         <Button
                             className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"

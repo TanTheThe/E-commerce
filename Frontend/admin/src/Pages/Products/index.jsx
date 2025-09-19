@@ -203,6 +203,46 @@ const Products = () => {
         }
     };
 
+    const renderOfferStatusForTable = (product) => {
+        if (!product.offer_name) {
+            return (
+                <span className="text-gray-400 text-xs font-[Montserrat]">
+                    Không có ưu đãi
+                </span>
+            );
+        }
+
+        const isValid = product.offer_valid;
+        const reason = product.offer_invalid_reason;
+
+        const getReasonText = (reason) => {
+            const reasonMap = {
+                'offer_deleted': 'Offer đã bị xóa',
+                'not_started': 'Chưa bắt đầu',
+                'expired': 'Đã hết hạn',
+                'sold_out': 'Đã hết lượt'
+            };
+            return reasonMap[reason] || reason;
+        };
+
+        return (
+            <div className="flex flex-col gap-1">
+                <span className="text-[14px] font-[500] font-[Montserrat] text-gray-600">
+                    {product.offer_name}
+                </span>
+                {isValid ? (
+                    <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded font-[Montserrat]">
+                        Đang hoạt động
+                    </span>
+                ) : (
+                    <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded font-[Montserrat]">
+                        {getReasonText(reason)}
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     const handleProductUpdated = () => {
         setPage(0);
         fetchProducts();
@@ -307,7 +347,7 @@ const Products = () => {
                 setSelectedProductIds([]);
                 fetchProducts();
             } else {
-                context.openAlertBox("error", response?.data?.detail || "Xóa thất bại");
+                context.openAlertBox("error", response.data.detail.message || "Xóa thất bại");
             }
         } catch (error) {
             console.error(error);
@@ -558,17 +598,7 @@ const Products = () => {
                                                 </TableCell>
 
                                                 <TableCell style={{ minWidth: 150 }}>
-                                                    <div className="flex flex-col gap-1">
-                                                        {product.offer_name ? (
-                                                            <span className="text-[14px] font-[500] font-[Montserrat] text-gray-600">
-                                                                {product.offer_name}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-400 text-xs font-[Montserrat]">
-                                                                Không có ưu đãi
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    {renderOfferStatusForTable(product)}
                                                 </TableCell>
 
                                                 <TableCell style={{ minWidth: 120 }}>

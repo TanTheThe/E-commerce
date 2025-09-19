@@ -11,3 +11,4 @@ class PaymentRefundStatusType:
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
+    MANUAL_REQUIRED = "manual_required"

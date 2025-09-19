@@ -33,7 +33,6 @@ import ResetPasswordOtp from './Pages/ResetPasswordOtp'
 import EmailToChangePass from './Pages/EmailToChangePass'
 import useAuth from './Pages/Login/auth'
 import OrderSuccessPage from './Pages/Orders/orderSuccess'
-import OrderTrackingPage from './Pages/Orders/orderTracking'
 import VNPayPayment from './Pages/Payment'
 import PaymentReturn from './Pages/Payment/paymentReturn'
 import CartPanel from './components/CartPanel'
@@ -192,10 +191,6 @@ function App() {
             <Route path={"/send-mail"} element={<EmailToChangePass />} />
             <Route path={"/order-success/:orderId"} exact={true} element={<OrderSuccessPage />} />
             <Route path={"/order-detail/:orderId"} exact={true} element={<OrderSuccessPage />} />
-            <Route path="/order-tracking/pending" element={<OrderTrackingPage status="pending" />} />
-            <Route path="/order-tracking/confirmed" element={<OrderTrackingPage status="confirmed" />} />
-            <Route path="/order-tracking/shipping" element={<OrderTrackingPage status="shipping" />} />
-            <Route path="/order-tracking/delivered" element={<OrderTrackingPage status="delivered" />} />
           </Routes>
           <Footer />
         </MyContext.Provider>

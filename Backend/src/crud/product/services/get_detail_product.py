@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
@@ -27,7 +29,7 @@ color_service = ColorService()
 
 class GetDetailProductService:
     async def get_detail_product(self, product_id: str, session: AsyncSession):
-        condition = and_(Product.id == product_id, Product.deleted_at.is_(None))
+        condition = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
         joins = [
             selectinload(Product.categories_product).options(
                 joinedload(Categories_Product.categories).load_only(
@@ -60,7 +62,12 @@ class GetDetailProductService:
                 Special_Offer.id,
                 Special_Offer.discount,
                 Special_Offer.type,
-                Special_Offer.name
+                Special_Offer.name,
+                Special_Offer.used_quantity,
+                Special_Offer.total_quantity,
+                Special_Offer.start_time,
+                Special_Offer.end_time,
+                Special_Offer.deleted_at
             ),
         ]
 
@@ -72,70 +79,107 @@ class GetDetailProductService:
         product = product_obj[0]
         product_dict = product.model_dump()
 
-        product_dict["categories"] = [
-            {
-                "id": str(cp.categories.id),
-                "name": cp.categories.name,
-                "parent_id": str(cp.categories.parent_id) if cp.categories.parent_id else None
-            }
-            for cp in product.categories_product
-            if cp.categories
-        ]
+        valid_categories = []
+        for cp in product.categories_product:
+            if cp.categories and cp.categories.deleted_at is None:
+                valid_categories.append({
+                    "id": str(cp.categories.id),
+                    "name": cp.categories.name,
+                    "parent_id": str(cp.categories.parent_id) if cp.categories.parent_id else None
+                })
+
+        if not valid_categories:
+            ProductException.invalid_categories()
+
+        product_dict["categories"] = valid_categories
 
         offer = product.special_offer
-        offer_type = offer.type if offer else None
-        offer_discount = offer.discount if offer else None
+        valid_offer = self._is_offer_valid(offer)
 
-        offer = product.special_offer
+        offer_type = offer.type if valid_offer else None
+        offer_discount = offer.discount if valid_offer else None
+
         product_dict["offer"] = {
-            "id": str(offer.id) if offer else None,
-            "type": offer.type if offer else None,
-            "discount": offer.discount if offer else None,
-            "name": offer.name if offer else None
+            "id": str(offer.id) if valid_offer else None,
+            "type": offer.type if valid_offer else None,
+            "discount": offer.discount if valid_offer else None,
+            "name": offer.name if valid_offer else None
         }
 
-        product_dict["product_variant"] = []
+        valid_variants = []
         for variant in product.product_variant:
-            if variant.deleted_at is None:
-                original_price = variant.price
-                discounted_price = original_price
+            if variant.deleted_at is not None:
+                continue
 
-                if offer_type and offer_discount is not None:
-                    if offer_type == "percent":
-                        raw_discounted_price = original_price * (1 - offer_discount / 100)
-                        discounted_price = int(round(raw_discounted_price / 1000) * 1000)
-                    elif offer_type == "fixed":
-                        raw_discounted_price = max(0, original_price - offer_discount)
-                        discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+            if variant.price is None or variant.price < 0:
+                continue
 
-                variant_data = {
-                    "id": str(variant.id),
-                    "size": variant.size,
-                    "image": variant.image,
-                    "original_price": original_price,
-                    "discounted_price": discounted_price,
-                    "quantity": variant.quantity,
-                    "sku": variant.sku
-                }
+            if variant.quantity is None or variant.quantity < 0:
+                continue
 
-                if variant.color:
-                    variant_data.update({
-                        "color_id": str(variant.color.id),
-                        "color_name": variant.color.name,
-                        "color_code": variant.color.code
-                    })
-                else:
-                    variant_data.update({
-                        "color_id": None,
-                        "color_name": variant.color_name,
-                        "color_code": variant.color_code
-                    })
+            original_price = variant.price
+            discounted_price = original_price
 
-                product_dict["product_variant"].append(variant_data)
+            if offer_type and offer_discount is not None:
+                if offer_type == "percent":
+                    raw_discounted_price = original_price * (1 - offer_discount / 100)
+                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+                elif offer_type == "fixed":
+                    raw_discounted_price = max(0, original_price - offer_discount)
+                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+
+            if discounted_price < 0:
+                discounted_price = 0
+
+            variant_data = {
+                "id": str(variant.id),
+                "size": variant.size,
+                "image": variant.image,
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "quantity": variant.quantity,
+                "sku": variant.sku
+            }
+
+            if variant.color:
+                variant_data.update({
+                    "color_id": str(variant.color.id),
+                    "color_name": variant.color.name,
+                    "color_code": variant.color.code
+                })
+            else:
+                variant_data.update({
+                    "color_id": None,
+                    "color_name": variant.color_name,
+                    "color_code": variant.color_code
+                })
+
+            valid_variants.append(variant_data)
+
+        if not valid_variants:
+            return None
+
+        product_dict["product_variant"] = valid_variants
 
         return product_dict
 
-    async def get_detail_product_admin_service(self, product_id: str, session: AsyncSession):
+    def _is_offer_valid(self, offer: Special_Offer) -> bool:
+        if not offer:
+            return False
+
+        if offer.deleted_at is not None:
+            return False
+
+        now = datetime.now()
+        if offer.start_time > now or offer.end_time < now:
+            return False
+
+        if offer.used_quantity >= offer.total_quantity:
+            return False
+
+        return True
+
+    async def get_detail_product_admin(self, product_id: str, session: AsyncSession):
         product = await self.get_detail_product(product_id, session)
 
         if product is None:
@@ -171,7 +215,7 @@ class GetDetailProductService:
 
         return product_dict
 
-    async def get_detail_product_customer_service(self, product_id: str, session: AsyncSession):
+    async def get_detail_product_customer(self, product_id: str, session: AsyncSession):
         product = await self.get_detail_product(product_id, session)
 
         if product is None:

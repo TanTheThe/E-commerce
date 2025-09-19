@@ -210,4 +210,54 @@ class OrderException:
                 "error_code": "order_021",
             },
         )
+
+    @staticmethod
+    def invalid_current_status():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Trạng thái hiện tại không hợp lệ",
+                "error_code": "order_022",
+            },
+        )
+
+    @staticmethod
+    def status_already_set():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể đổi sang trạng thái đã định",
+                "error_code": "order_023",
+            },
+        )
+
+    @staticmethod
+    def invalid_status_transition(current_status, new_status):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không được phép thay đổi trạng thái từ {current_status} sang {new_status}",
+                "error_code": "order_024",
+            },
+        )
+
+    @staticmethod
+    def current_status_cant_pick_up(current_status):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xác nhận nhận hàng. Đơn hàng phải ở trạng thái 'Đã giao hàng', hiện tại là '{current_status}",
+                "error_code": "order_025",
+            },
+        )
+
+    @staticmethod
+    def already_received():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng đã được xác nhận nhận hàng trước đó",
+                "error_code": "order_026",
+            },
+        )
     

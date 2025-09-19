@@ -77,7 +77,7 @@ const CartPage = () => {
                     setSelectedAddress(defaultAddress);
                 }
             } else {
-                toast.error(response.message || 'Không thể tải danh sách địa chỉ');
+                toast.error(response.data.detail.message || 'Không thể tải danh sách địa chỉ');
             }
         } catch (error) {
             console.error('Error fetching addresses:', error);
@@ -130,7 +130,7 @@ const CartPage = () => {
                     setSelectedAddress(response.data);
                 }
             } else {
-                toast.error(response.data?.message || 'Không thể tạo địa chỉ mới');
+                toast.error(response.data.detail.message || 'Không thể tạo địa chỉ mới');
             }
         } catch (error) {
             console.error('Error creating address:', error);
@@ -229,7 +229,7 @@ const CartPage = () => {
                     navigate(`/payment/${orderCode}`);
                 }
             } else {
-                toast.error(response.data?.message || 'Đặt hàng thất bại!');
+                toast.error(response.data.detail.message || 'Đặt hàng thất bại!');
             }
 
         } catch (error) {

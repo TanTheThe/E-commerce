@@ -4,7 +4,6 @@ from sqlmodel import and_
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
 from src.crud.order.services.create_order import CreateOrderService
-from src.crud.order.services.services import OrderService
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from src.crud.vnpay.utils import hmacsha512
 from src.config import Config
@@ -20,7 +19,6 @@ import uuid
 
 order_repository = OrderRepository()
 vnpay_repository = VNPayRepository()
-order_service = OrderService()
 special_offer_repository = SpecialOfferRepository()
 create_order_service = CreateOrderService()
 

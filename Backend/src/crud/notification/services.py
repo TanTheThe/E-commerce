@@ -186,8 +186,8 @@ class NotificationService:
         }
 
         return await notification_repository.create_notification(notification_data, session)
-    
-    async def create_assign_special_offer_notification(self, session: AsyncSession, special_offer_id: str, special_offer_name: str, 
+
+    async def create_assign_special_offer_notification(self, session: AsyncSession, special_offer_id: str, special_offer_name: str,
                                                        customer_id: str, admin_note: Optional[str] = None):
         message = f"Bạn vừa nhận được khuyến mãi #{special_offer_name} từ cửa hàng."
         if admin_note:
@@ -208,6 +208,103 @@ class NotificationService:
 
         return await notification_repository.create_notification(notification_data, session)
 
+    # Gửi thông báo hoàn trả đơn hàng
+    async def create_return_request_notification(self, session: AsyncSession, return_order_id: str, customer_id: str, order_code: str, order_id: str):
+        action_data = {
+            "return_order_id": return_order_id,
+            "customer_id": customer_id,
+            "requested_at": datetime.now().isoformat()
+        }
+
+        notification_data = {
+            "recipient_type": RecipientType.ADMIN,
+            "recipient_id": None,
+            "sender_type": RecipientType.CUSTOMER,
+            "sender_id": customer_id,
+            "type": NotificationType.RETURN_ORDER_REQUEST,
+            "title": f"Yêu cầu hoàn trả đơn hàng #{order_code}",
+            "message": f"Khách hàng yêu cầu hoàn trả đơn hàng #{order_code}. Vui lòng kiểm tra và xử lý.",
+            "order_id": order_id,
+            "return_order_id": return_order_id,
+            "action_type": ActionType.HANDLE_RETURN,
+            "action_data": json.dumps(action_data)
+        }
+
+        return await notification_repository.create_notification(notification_data, session)
+
+    async def create_return_approved_notification(self, session: AsyncSession, return_order_id: str, customer_id: str, order_code: str,
+                                                  order_id: str, admin_note: Optional[str] = None):
+        message = f"Yêu cầu hoàn trả đơn hàng #{order_code} đã được chấp thuận."
+        if admin_note:
+            message += f" Ghi chú: {admin_note}"
+
+        notification_data = {
+            "recipient_type": RecipientType.CUSTOMER,
+            "recipient_id": customer_id,
+            "sender_type": RecipientType.ADMIN,
+            "sender_id": None,
+            "type": NotificationType.RETURN_ORDER_APPROVED,
+            "title": f"Yêu cầu hoàn trả đơn hàng #{order_code} đã được chấp thuận",
+            "message": message,
+            "order_id": order_id,
+            "return_order_id": return_order_id,
+            "action_type": None,
+            "action_data": None
+        }
+
+        return await notification_repository.create_notification(notification_data, session)
+
+    async def create_return_rejected_notification(self, session: AsyncSession, return_order_id: str, customer_id: str, order_code: str,
+                                                        order_id: str, reject_reason: str):
+        notification_data = {
+            "recipient_type": RecipientType.CUSTOMER,
+            "recipient_id": customer_id,
+            "sender_type": RecipientType.ADMIN,
+            "sender_id": None,
+            "type": NotificationType.ORDER_CANCELLATION_REJECTED,
+            "title": f"Yêu cầu hoàn trả đơn hàng #{order_code} bị từ chối",
+            "message": f"Yêu cầu hoàn trả đơn hàng #{order_code} không được chấp thuận. Lý do: {reject_reason}",
+            "order_id": order_id,
+            "return_order_id": return_order_id,
+            "action_type": None,
+            "action_data": None
+        }
+
+        return await notification_repository.create_notification(notification_data, session)
+
+    async def create_return_completed_notification(self, session: AsyncSession, return_order_id: str, order_code: str,
+                                                   customer_id: str, stock_restored: bool, order_id: str):
+        if stock_restored:
+            message = f"Yêu cầu hoàn trả đơn hàng #{order_code} đã được xử lý thành công. Sản phẩm đã được hoàn trả về kho và số tiền hoàn lại sẽ được xử lý trong thời gian sớm nhất."
+            action_status = "completed_with_stock_restore"
+        else:
+            message = f"Yêu cầu hoàn trả đơn hàng #{order_code} đã được xử lý thành công. Số tiền hoàn lại sẽ được xử lý trong thời gian sớm nhất."
+            action_status = "completed_without_stock_restore"
+
+        action_data = {
+            "return_order_id": return_order_id,
+            "customer_id": customer_id,
+            "stock_restored": stock_restored,
+            "action_status": action_status,
+            "completed_at": datetime.now().isoformat()
+        }
+
+        notification_data = {
+            "recipient_type": RecipientType.CUSTOMER,
+            "recipient_id": customer_id,
+            "sender_type": RecipientType.ADMIN,
+            "sender_id": None,
+            "type": NotificationType.RETURN_ORDER_COMPLETED,
+            "title": f"Hoàn trả đơn hàng #{order_code} đã xử lý xong",
+            "message": message,
+            "order_id": order_id,
+            "return_order_id": return_order_id,
+            "action_type": None,
+            "action_data": json.dumps(action_data)
+        }
+
+        return await notification_repository.create_notification(notification_data, session)
+
     # Đánh dấu notification đã được xử lý
     async def mark_as_processed(self, session: AsyncSession, notification_id: str):
         condition = [Notification.id == notification_id]
@@ -223,7 +320,7 @@ class NotificationService:
         return True
 
     async def mark_as_read(self, session: AsyncSession, notification_ids: List[str], user_id: Optional[str] = None):
-        conditions = [Notification.id.in_(notification_ids)]
+        conditions = [Notification.id.in_(notification_ids), Notification.is_read == False]
         if user_id:
             conditions.append(
                 or_(
@@ -235,16 +332,22 @@ class NotificationService:
                 )
             )
 
-        notifications, _ = await notification_repository.get_all_notifications(conditions, session, None, 0, 1000)
+        return await notification_repository.update_notification(conditions,
+                                                                 {"is_read": True, "read_at": datetime.now()}, session)
 
-        marked_count = 0
-        for notification in notifications:
-            if not notification.is_read:
-                notification.is_read = True
-                notification.read_at = datetime.now()
-                session.add(notification)
-                marked_count += 1
+    async def mark_all_as_read(self, session: AsyncSession, user_id: str):
+        conditions = [
+            Notification.is_read == False,
+            or_(
+                Notification.recipient_type == "admin",
+                and_(
+                    Notification.recipient_type == "customer",
+                    Notification.recipient_id == user_id
+                )
+            )
+        ]
 
-        await session.commit()
-        return len(notifications)
+        return await notification_repository.update_notification(conditions, {"is_read": True, "read_at": datetime.now()}, session)
+
+
 

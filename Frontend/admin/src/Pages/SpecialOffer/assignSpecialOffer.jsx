@@ -55,7 +55,7 @@ const AssignOfferToProducts = ({ open, onClose, offer, onSuccess }) => {
             if (res.success === true) {
                 setCategories(res.data.data || []);
             } else {
-                console.error("Failed to fetch categories:", res.message);
+                console.error("Failed to fetch categories:", res.data.detail.message);
                 setCategories([]);
             }
         } catch (error) {
@@ -92,6 +92,49 @@ const AssignOfferToProducts = ({ open, onClose, offer, onSuccess }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const renderOfferStatus = (currentOffer) => {
+        if (!currentOffer.id) {
+            return null;
+        }
+
+        const getOfferColor = () => {
+            if (currentOffer.is_valid) {
+                return 'success';
+            } else {
+                return 'error';
+            }
+        };
+
+        const getReasonText = (reason) => {
+            const reasonMap = {
+                'offer_deleted': 'Offer đã bị xóa',
+                'not_started': 'Chưa bắt đầu',
+                'expired': 'Đã hết hạn',
+                'sold_out': 'Đã hết lượt'
+            };
+            return reasonMap[reason] || reason;
+        };
+
+        return (
+            <Box sx={{ mt: 1 }}>
+                <Chip
+                    label={
+                        currentOffer.is_valid
+                            ? `${currentOffer.type === 'percent' ? currentOffer.discount + '%' : currentOffer.discount + 'đ'} `
+                            : `${currentOffer.type === 'percent' ? currentOffer.discount + '%' : currentOffer.discount + 'đ'} - ${getReasonText(currentOffer.reason)}`
+                    }
+                    size="small"
+                    color={getOfferColor()}
+                    variant={currentOffer.is_valid ? "filled" : "outlined"}
+                    sx={{
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold'
+                    }}
+                />
+            </Box>
+        );
     };
 
     const handleProductSelect = (productId, isSelected) => {
@@ -143,7 +186,7 @@ const AssignOfferToProducts = ({ open, onClose, offer, onSuccess }) => {
                 onSuccess?.();
                 onClose();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi khi gắn offer");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi khi gắn offer");
             }
         } catch (error) {
             console.error('Error assigning offer:', error);
@@ -293,6 +336,9 @@ const AssignOfferToProducts = ({ open, onClose, offer, onSuccess }) => {
                                                                         <Typography variant="caption" color="textSecondary">
                                                                             ID: {product.id}
                                                                         </Typography>
+
+                                                                        {renderOfferStatus(product.current_offer)}
+
                                                                         <Box sx={{ mt: 1 }}>
                                                                             {product.categories.map((cat) => (
                                                                                 <Chip

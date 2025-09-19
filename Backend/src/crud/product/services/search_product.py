@@ -5,7 +5,7 @@ from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories
+from src.database.models import Product, Categories, Product_Variant
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import or_
 from src.crud.product.repositories import ProductRepository
@@ -123,7 +123,15 @@ class SearchProductService:
         name_conditions.append(Product.name.ilike(f"%{search}%"))
         conditions.append(or_(*name_conditions))
 
-        joins_products = [selectinload(Product.categories)]
+        joins_products = [
+            selectinload(Product.categories),
+            selectinload(Product.product_variant).load_only(
+                Product_Variant.id,
+                Product_Variant.quantity,
+                Product_Variant.deleted_at
+            )
+        ]
+
         products, _ = await product_repository.get_all_product(
             conditions,
             session,
@@ -131,6 +139,15 @@ class SearchProductService:
             skip=skip,
             limit=limit
         )
+
+        valid_products = []
+        for product in products:
+            active_variants = [
+                variant for variant in product.product_variant
+                if variant.deleted_at is None and variant.quantity > 0
+            ]
+            if active_variants:
+                valid_products.append(product)
 
         ranked_products = await self.rank_products(products, search, search_words)
 
@@ -179,7 +196,7 @@ class SearchProductService:
 
         return sorted(ranked, key=lambda x: x[1], reverse=True)
 
-    async def search_product_service(self, search: str, session: AsyncSession, skip: int = 0, limit: int = 10):
+    async def search_product(self, search: str, session: AsyncSession, skip: int = 0, limit: int = 10):
         search_normalized = await self.normalize_search_query(search)
         search_words = search_normalized.split()
 

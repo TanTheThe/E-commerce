@@ -143,7 +143,7 @@ class CreateOrderService:
                     "price": discounted_price,
                     "product_id": variant.product_id,
                     "product_variant_id": variant.id,
-                    "Product": product_dict
+                    "product_snapshot": product_dict
                 }
 
                 order_detail_objs.append(Order_Detail(**order_detail_dict))

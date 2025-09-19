@@ -3,8 +3,12 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, status, Depends, Query
 from starlette.requests import Request
 from src.crud.order.services.cancel_order import CancelOrderService
+from src.crud.order.services.confirm_order_received import ConfirmOrderReceivedService
 from src.crud.order.services.create_order import CreateOrderService
-from src.crud.order.services.services import OrderService
+from src.crud.order.services.get_all_orders import GetAllOrdersService
+from src.crud.order.services.get_detail_order import GetDetailOrderService
+from src.crud.order.services.statistics_order import StatisticsOrderService
+from src.crud.order.services.update_status import UpdateStatusOrderService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
@@ -17,9 +21,13 @@ order_admin_router = APIRouter(prefix="/order")
 order_customer_router = APIRouter(prefix="/order")
 order_common_router = APIRouter(prefix="/order")
 
-order_service = OrderService()
+get_all_order_service = GetAllOrdersService()
 cancel_order_service = CancelOrderService()
 create_order_service = CreateOrderService()
+get_detail_order_service = GetDetailOrderService()
+update_status_order_service = UpdateStatusOrderService()
+confirm_order_received_service = ConfirmOrderReceivedService()
+statistics_order_service = StatisticsOrderService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -30,7 +38,7 @@ async def count_new_orders(from_date: Optional[datetime] = Query(default=None),
                            session: AsyncSession = Depends(get_session)):
     to_date = to_date or datetime.utcnow()
     from_date = from_date or (to_date - timedelta(days=7))
-    count_orders = await order_service.count_new_orders(to_date, from_date, session)
+    count_orders = await statistics_order_service.count_new_orders(to_date, from_date, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -48,7 +56,7 @@ async def get_total_sales(token_details: dict = Depends(access_token_bearer),
     today = datetime.utcnow()
     seven_days_ago = today - timedelta(days=7)
 
-    total_sales = await order_service.get_total_sales(today, seven_days_ago, session)
+    total_sales = await statistics_order_service.get_total_sales(today, seven_days_ago, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -66,7 +74,7 @@ async def get_total_revenue(token_details: dict = Depends(access_token_bearer),
     today = datetime.utcnow()
     seven_days_ago = today - timedelta(days=7)
 
-    total_revenue = await order_service.get_total_revenue(today, seven_days_ago, session)
+    total_revenue = await statistics_order_service.get_total_revenue(today, seven_days_ago, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -134,7 +142,7 @@ async def get_all_order_customer(status_order: str, skip: int = 0, limit: int = 
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
-    order_dict = await order_service.get_all_order_customer(customer_id, status_order, session, skip=skip, limit=limit)
+    order_dict = await get_all_order_service.get_all_order_customer(customer_id, status_order, session, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -150,7 +158,7 @@ async def get_detail_order_customer(order_id: str,
                                     token_details: dict = Depends(access_token_bearer),
                                     session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
-    order_dict = await order_service.get_detail_order_customer(order_id, customer_id, session)
+    order_dict = await get_detail_order_service.get_detail_order_customer(order_id, customer_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -165,7 +173,7 @@ async def get_detail_order_customer(order_id: str,
 async def get_detail_order_admin(order_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    order_dict = await order_service.get_detail_order_admin(order_id, session)
+    order_dict = await get_detail_order_service.get_detail_order_admin(order_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -189,7 +197,7 @@ async def get_all_order_admin(skip: int = 0, limit: int = 10,
         sort_by_created_at=sort_by_created_at,
         status=status_filter,
     )
-    order_dict = await order_service.get_all_order_admin(session, filter_data, skip=skip, limit=limit)
+    order_dict = await get_all_order_service.get_all_order_admin(session, filter_data, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -237,7 +245,7 @@ async def update_status(order_id: str,
                         status_update: StatusUpdateModel,
                         token_details: dict = Depends(access_token_bearer),
                         session: AsyncSession = Depends(get_session)):
-    order_after_update = await order_service.update_status(order_id, status_update, session)
+    order_after_update = await update_status_order_service.update_status(order_id, status_update, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -252,7 +260,7 @@ async def update_status(order_id: str,
 async def confirm_order_received(order_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    order_after_confirm = await order_service.confirm_order_received(order_id, session)
+    order_after_confirm = await confirm_order_received_service.confirm_order_received_service(order_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

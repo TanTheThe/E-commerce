@@ -133,7 +133,7 @@ class CancelOrderService:
         if order.status == "cancelled":
             return False, "Đơn hàng đã được hủy trước đó"
 
-        if order.status == "delivered":
+        if order.status in ["delivered", "received"]:
             return False, "Không thể hủy đơn hàng đã hoàn thành"
 
         if order.status == "shipping":
@@ -211,7 +211,7 @@ class CancelOrderService:
 
         refund = PaymentRefund(
             payment_id=payment.id,
-            refund_type="01",  # Full refund
+            refund_type="02",  # Full refund
             refund_amount=payment.amount,
             refund_reason="Order cancelled",
             status=PaymentRefundStatusType.PENDING,
@@ -312,14 +312,14 @@ class CancelOrderService:
 
         return True
 
-    async def reject_cancellation(self, session: AsyncSession, order_id: str, reject_reason: str):
+    async def reject_cancellation(self, session: AsyncSession, order_id: str, reject_reason: str, request: Request):
         condition_get = and_(Order.id == order_id, Order.deleted_at.is_(None))
         order = await order_repository.get_order(condition_get, session)
 
         if not order:
             return False
 
-        current_reason = Order.cancellation_reason or ""
+        current_reason = order.cancellation_reason or ""
         new_reason = f"{current_reason} | Rejected: {reject_reason}"
 
         condition = and_(Order.id == order_id)
@@ -328,6 +328,9 @@ class CancelOrderService:
             "cancellation_reason": new_reason,
             "updated_at": datetime.now()
         }, session)
+
+        if order.payment_status == PaymentStatusOrderType.SUCCESS:
+            await self.process_refund(session, order, request)
 
         return True
 
@@ -373,7 +376,7 @@ class CancelOrderService:
             if not data.reject_reason:
                 OrderException.reason_reject_cancelled()
 
-            success = await self.reject_cancellation(session, order_id, data.reject_reason)
+            success = await self.reject_cancellation(session, order_id, data.reject_reason, request)
 
             if success:
                 await notification_service.create_cancellation_rejected_notification(

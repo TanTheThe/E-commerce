@@ -159,7 +159,7 @@ const CartPanel = () => {
 
                 await fetchCartData(1);
             } else {
-                toast.error(response.message || 'Không thể xóa sản phẩm');
+                toast.error(response.data.detail.message || 'Không thể xóa sản phẩm');
             }
         } catch (error) {
             console.error('Delete items error:', error);
