@@ -8,7 +8,7 @@ from src.errors.cart import CartException
 from src.errors.product import ProductException
 from src.schemas.cart import CartCreateModel, CartItemCreateModel, CartItemsDeleteModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, select, func, or_
+from sqlmodel import and_, select, func, or_, case
 from sqlalchemy.orm import selectinload, joinedload
 import uuid
 import time
@@ -69,16 +69,122 @@ class GetAllCartsService:
                     Product_Variant.color_code,
                     Product_Variant.image,
                     Product_Variant.quantity,
+                    Product_Variant.price,  
                     Product_Variant.deleted_at
                 ),
             ]
             cart.items, total_count = await cart_repository.get_cart_with_paginated_items(
                 condition, session, joins, skip, limit
             )
+
+            await self.check_and_update_cart_prices(cart.items, session)
         else:
             return await self.get_empty_cart_response(user_id, session, skip, limit)
 
         return await self.format_grouped_cart_response(cart, session)
+    
+    async def check_and_update_cart_prices(self, cart_items: list, session: AsyncSession):
+        items_to_update = []
+        
+        for cart_item in cart_items:
+            if cart_item.deleted_at is not None:
+                continue
+                
+            if not cart_item.product or not cart_item.product_variant:
+                continue
+                
+            product = cart_item.product
+            product_variant = cart_item.product_variant
+            
+            if product.deleted_at is not None or product.status != "active":
+                continue
+                
+            if product_variant.deleted_at is not None:
+                continue
+                
+            if product_variant.price is None or product_variant.price < 0:
+                continue
+            
+            current_price = await self.calculate_current_price(product, product_variant)
+            
+            if cart_item.price != current_price:
+                cart_item.price = current_price
+                items_to_update.append(cart_item)
+        
+        if items_to_update:
+            await self.bulk_update_cart_items(items_to_update, session)
+
+    async def calculate_current_price(self, product: Product, product_variant: Product_Variant) -> float:
+        original_price = product_variant.price
+        
+        offer = product.special_offer
+        valid_offer = self._is_offer_valid(offer)
+        
+        if not valid_offer:
+            return original_price
+            
+        offer_type = offer.type
+        offer_discount = offer.discount
+        
+        if offer_type and offer_discount is not None:
+            if offer_type == "percent":
+                raw_discounted_price = original_price * (1 - offer_discount / 100)
+                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+            elif offer_type == "fixed":
+                raw_discounted_price = max(0, original_price - offer_discount)
+                discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+            else:
+                discounted_price = original_price
+        else:
+            discounted_price = original_price
+            
+        return max(0, discounted_price)
+    
+    def _is_offer_valid(self, offer) -> bool:
+        if not offer or offer.deleted_at is not None:
+            return False
+            
+        current_time = datetime.utcnow()
+        
+        if offer.start_time and current_time < offer.start_time:
+            return False
+            
+        if offer.end_time and current_time > offer.end_time:
+            return False
+            
+        if (offer.total_quantity is not None and 
+            offer.used_quantity is not None and 
+            offer.used_quantity >= offer.total_quantity):
+            return False
+            
+        return True
+    
+    def _get_availability_status(self, is_available: bool, is_quantity_sufficient: bool, cart_quantity: int, max_quantity: int) -> str:
+        if not is_available:
+            return "out_of_stock" # Sản phẩm hết hàng hoàn toàn
+        elif not is_quantity_sufficient:
+            return "insufficient" # Sản phẩm có sẵn nhưng không đủ số lượng yêu cầu
+        else:
+            return "available"  # Sản phẩm có sẵn và đủ số lượng
+
+    async def bulk_update_cart_items(self, cart_items: List[Cart_Item], session: AsyncSession) -> bool:
+        price_mapping = {item.id: item.price for item in cart_items}
+        cart_item_ids = list(price_mapping.keys())
+
+        price_case = case(
+            *[(Cart_Item.id == item_id, price) for item_id, price in price_mapping.items()],
+            else_=Cart_Item.price
+        )
+
+        condition = Cart_Item.id.in_(cart_item_ids)
+        await cart_repository.update_cart_item(
+            condition, 
+            {"price": price_case, "updated_at": datetime.now()},
+            session)
+
+        await session.commit()
+
+        return True
 
     async def format_grouped_cart_response(self, cart: Cart, session: AsyncSession):
         products_dict = {}
@@ -157,6 +263,10 @@ class GetAllCartsService:
 
         max_quantity = product_variant.quantity if product_variant.quantity is not None and product_variant.quantity >= 0 else 0
 
+        is_available = max_quantity > 0
+        is_quantity_sufficient = cart_item.quantity <= max_quantity
+        availability_status = self._get_availability_status(is_available, is_quantity_sufficient, cart_item.quantity, max_quantity)
+
         color_name = None
         color_code = None
 
@@ -178,5 +288,8 @@ class GetAllCartsService:
             "quantity": cart_item.quantity,
             "max_quantity": max_quantity,
             "unit_price": cart_item.price,
-            "selected": False
+            "selected": False,
+            "is_available": is_available,
+            "is_quantity_sufficient": is_quantity_sufficient,
+            "availability_status": availability_status
         }

@@ -11,12 +11,13 @@ from src.crud.product.services.get_top_discount import GetTopDiscountService
 from src.crud.product.services.search_product import SearchProductService
 from src.crud.product.services.services import ProductService
 from src.crud.product.services.update_product import UpdateProductService
+from src.crud.product.services.update_product_status import UpdateProductStatusService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.errors.categories import CategoriesException
-from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel
+from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel, ProductStatusUpdateModel, BulkUpdateStatusModel
 from src.dependencies import admin_role_middleware
 from typing import Optional, List
 
@@ -37,6 +38,7 @@ get_latest_products_service = GetLatestProductsService()
 get_related_products_service = GetRelatedProductsService()
 get_top_discount_service = GetTopDiscountService()
 update_product_service = UpdateProductService()
+update_product_status_service = UpdateProductStatusService()
 
 
 @product_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
@@ -266,6 +268,32 @@ async def update_product(id: str, product_data: ProductUpdateModel,
         }
     )
 
+@product_admin_router.put('/{id}/status', dependencies=[Depends(admin_role_middleware)])
+async def update_product_status(id: str, 
+                                status_data: ProductStatusUpdateModel,
+                                token_details: dict = Depends(access_token_bearer),
+                                session: AsyncSession = Depends(get_session)):
+    await update_product_status_service.update_product_status(id, status_data, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Cập nhật trạng thái sản phẩm thành công",
+        }
+    )
+
+@product_admin_router.post('/status/bulk', dependencies=[Depends(admin_role_middleware)])
+async def bulk_update_product_status(bulk_data: BulkUpdateStatusModel,
+                                     token_details: dict = Depends(access_token_bearer),
+                                     session: AsyncSession = Depends(get_session)):
+    await update_product_status_service.bulk_update_product_status(bulk_data, session)
+    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Cập nhật trạng thái các sản phẩm thành công",
+        }
+    )
 
 @product_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def delete_product(id: str, token_details: dict = Depends(access_token_bearer),

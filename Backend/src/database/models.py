@@ -181,6 +181,162 @@ class Categories_Product(SQLModel, table=True):
                                                 sa_relationship_kwargs={'lazy': 'noload'})
 
 
+class Brand(SQLModel, table=True):
+    __tablename__ = "brand"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, 
+            nullable=False, 
+            primary_key=True, 
+            default=uuid.uuid4
+        )
+    )
+
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    logo: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
+        default=True
+    )
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), 
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    products: List["Product"] = Relationship(
+        back_populates="brand", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
+class Product_Material(SQLModel, table=True):
+    __tablename__ = 'product_material'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, 
+            nullable=False, 
+            primary_key=True, 
+            default=uuid.uuid4
+        )
+    )
+    product_id: uuid.UUID = Field(foreign_key="product.id")
+    material_id: uuid.UUID = Field(foreign_key="material.id")
+    percentage: Optional[float] = Field(sa_column=Column(pg.FLOAT, nullable=True))
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), 
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    product: Optional["Product"] = Relationship(
+        back_populates="product_materials", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    material: Optional["Material"] = Relationship(
+        back_populates="product_materials", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
+class Product_Tag(SQLModel, table=True):
+    __tablename__ = 'product_tag'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, 
+            nullable=False, 
+            primary_key=True, 
+            default=uuid.uuid4
+        )
+    )
+    product_id: uuid.UUID = Field(foreign_key="product.id")
+    tag_id: uuid.UUID = Field(foreign_key="tag.id")
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), 
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    product: Optional["Product"] = Relationship(
+        back_populates="product_tags", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    tag: Optional["Tag"] = Relationship(
+        back_populates="product_tags", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
+class Material(SQLModel, table=True):
+    __tablename__ = "material"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, 
+            nullable=False, 
+            primary_key=True, 
+            default=uuid.uuid4
+        )
+    )
+
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
+        default=True
+    )
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), 
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    product_materials: List["Product_Material"] = Relationship(
+        back_populates="material", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    products: List["Product"] = Relationship(
+        back_populates="materials", link_model=Product_Material, sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
+class Tag(SQLModel, table=True):
+    __tablename__ = 'tag'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, 
+            nullable=False, 
+            primary_key=True, 
+            default=uuid.uuid4
+        )
+    )
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
+        default=True
+    )
+    
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), 
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    product_tags: List["Product_Tag"] = Relationship(
+        back_populates="tag", sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    products: List["Product"] = Relationship(
+        back_populates="tags", link_model=Product_Tag, sa_relationship_kwargs={'lazy': 'noload'}
+    )
+
+
 class Product(SQLModel, table=True):
     __tablename__ = 'product'
 
@@ -202,10 +358,13 @@ class Product(SQLModel, table=True):
     review_count: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
     avg_rating: Optional[float] = Field(sa_column=Column(pg.FLOAT, nullable=False, server_default="0"), default=0.0)
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=True, unique=True))
     special_offer_id: Optional[uuid.UUID] = Field(foreign_key="special_offer.id", default=None, nullable=True)
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    brand_id: Optional[uuid.UUID] = Field(foreign_key="brand.id", nullable=True)
 
     order_detail: List["Order_Detail"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
     categories_product: List["Categories_Product"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
@@ -213,6 +372,11 @@ class Product(SQLModel, table=True):
     evaluate: List["Evaluate"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
     categories: List["Categories"] = Relationship(back_populates="products", link_model=Categories_Product, sa_relationship_kwargs={'lazy': 'noload'})
     special_offer: Optional["Special_Offer"] = Relationship(back_populates="products", sa_relationship_kwargs={'lazy': 'noload'})
+    brand: Optional["Brand"] = Relationship(back_populates="products", sa_relationship_kwargs={'lazy': 'noload'})
+    product_materials: List["Product_Material"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    materials: List["Material"] = Relationship(back_populates="products", link_model=Product_Material, sa_relationship_kwargs={'lazy': 'noload'})
+    product_tags: List["Product_Tag"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
+    tags: List["Tag"] = Relationship(back_populates="products", link_model=Product_Tag,sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Product_Variant(SQLModel, table=True):
@@ -268,6 +432,7 @@ class Categories(SQLModel, table=True):
     image: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     parent_id: Optional[uuid.UUID] = Field(foreign_key="categories.id", nullable=True)
     type_size: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=True, unique=True))
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -641,5 +806,12 @@ class ReturnItem(SQLModel, table=True):
 
     return_order: Optional["ReturnOrder"] = Relationship(back_populates="return_items", sa_relationship_kwargs={"lazy": "noload"})
     order_detail: Optional["Order_Detail"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+
+
+
+
+
+
+    
 
     

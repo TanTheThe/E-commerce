@@ -56,3 +56,14 @@ class ProductFilterModel(BaseModel):
     colors: Optional[List[str]] = None
     sizes: Optional[List[str]] = None
     rating: Optional[List[int]] = None
+
+class ProductStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+class ProductStatusUpdateModel(BaseModel):
+    status: ProductStatus
+
+class BulkUpdateStatusModel(BaseModel):
+    product_ids: List[str]
+    status: ProductStatus

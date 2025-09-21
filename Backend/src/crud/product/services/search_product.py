@@ -141,7 +141,8 @@ class SearchProductService:
         )
 
         valid_products = []
-        for product in products:
+        for product_tuple in products:
+            product = product_tuple[0]
             active_variants = [
                 variant for variant in product.product_variant
                 if variant.deleted_at is None and variant.quantity > 0
