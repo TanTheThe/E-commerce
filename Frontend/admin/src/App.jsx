@@ -40,6 +40,8 @@ import EditProduct from './Pages/Products/editProduct'
 import SpecialOffer from './Pages/SpecialOffer'
 import Colors from './Pages/Colors'
 import Reviews from './Pages/Review'
+import Brands from './Pages/Brands'
+import Materials from './Pages/Materials'
 
 const Transition = React.forwardRef(function Transition(
   props, ref) {
@@ -315,6 +317,44 @@ function App() {
               </div>
               <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
                 <Colors />
+              </div>
+            </div>
+          </section>
+        </>
+      )
+    },
+    {
+      path: "/brands/list",
+      exact: true,
+      element: (
+        <>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Brands />
+              </div>
+            </div>
+          </section>
+        </>
+      )
+    },
+    {
+      path: "/materials/list",
+      exact: true,
+      element: (
+        <>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Materials />
               </div>
             </div>
           </section>

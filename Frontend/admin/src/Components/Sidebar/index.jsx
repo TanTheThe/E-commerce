@@ -13,8 +13,10 @@ import { Collapse } from 'react-collapse';
 import { MyContext } from "../../App";
 import AddCategory from "../../Pages/Category/addCategory";
 import AddSpecialOffer from "../../Pages/SpecialOffer/addSpecialOffer";
-import { MdOutlinePreview } from "react-icons/md";
+import { MdBrandingWatermark, MdOutlinePreview } from "react-icons/md";
 import { IoIosColorPalette } from "react-icons/io";
+import { SiMaterialdesignicons } from "react-icons/si";
+
 
 
 const Sidebar = () => {
@@ -160,6 +162,20 @@ const Sidebar = () => {
                         <Link to="/colors/list">
                             <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
                                 <IoIosColorPalette className="text-[18px]" /> <span>Colors</span>
+                            </Button>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link to="/brands/list">
+                            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
+                                <MdBrandingWatermark className="text-[18px]" /> <span>Brands</span>
+                            </Button>
+                        </Link>
+                    </li>
+                    <li>
+                        <Link to="/materials/list">
+                            <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
+                                <SiMaterialdesignicons className="text-[18px]" /> <span>Materials</span>
                             </Button>
                         </Link>
                     </li>

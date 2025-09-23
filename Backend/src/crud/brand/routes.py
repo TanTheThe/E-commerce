@@ -19,7 +19,7 @@ access_token_bearer = AccessTokenBearer()
 async def create_brand(brand_data: BrandCreateModel,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
-    brand_dict = await brand_service.create_brand(brand_data, session)
+    brand_dict = await brand_service.create_brand_service(brand_data, session)
     
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -37,9 +37,8 @@ async def get_all_brands_admin(search: Optional[str] = None,
                                limit: int = 10,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
-    brands = await brand_service.get_all_brands_admin(
-        search, is_active, sort_by, skip, limit, session
-    )
+    brands = await brand_service.get_all_brands_admin(search, is_active, sort_by, skip, limit, session)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -52,7 +51,7 @@ async def get_all_brands_admin(search: Optional[str] = None,
 async def update_brand(id: str, brand_data: BrandUpdateModel,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
-    brand = await brand_service.update_brand(id, brand_data, session)
+    brand = await brand_service.update_brand_service(id, brand_data, session)
     
     return JSONResponse(
         status_code=status.HTTP_200_OK,

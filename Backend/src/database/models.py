@@ -3,7 +3,7 @@ import sqlalchemy.dialects.postgresql as pg
 from sqlmodel import SQLModel, Field, Column, Relationship
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import text, UniqueConstraint
+from sqlalchemy import text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import JSONB
 
 
@@ -183,6 +183,20 @@ class Categories_Product(SQLModel, table=True):
 
 class Brand(SQLModel, table=True):
     __tablename__ = "brand"
+    __table_args__ = (
+        Index(
+            'ix_brand_name_unique_not_deleted',
+            'name',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        Index(
+            'ix_brand_slug_unique_not_deleted',
+            'slug',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -193,12 +207,17 @@ class Brand(SQLModel, table=True):
         )
     )
 
-    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
-    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     logo: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     is_active: bool = Field(
         sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
         default=True
+    )
+
+    products_count: int = Field(
+        sa_column=Column(pg.INTEGER, nullable=False, server_default=text("0")),
+        default=0
     )
 
     created_at: datetime = Field(
@@ -272,6 +291,20 @@ class Product_Tag(SQLModel, table=True):
 
 class Material(SQLModel, table=True):
     __tablename__ = "material"
+    __table_args__ = (
+        Index(
+            'ix_material_name_unique_not_deleted',
+            'name',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        Index(
+            'ix_material_slug_unique_not_deleted',
+            'slug',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -282,11 +315,16 @@ class Material(SQLModel, table=True):
         )
     )
 
-    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
-    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     is_active: bool = Field(
         sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
         default=True
+    )
+
+    products_count: int = Field(
+        sa_column=Column(pg.INTEGER, nullable=False, server_default=text("0")),
+        default=0
     )
 
     created_at: datetime = Field(
@@ -306,6 +344,20 @@ class Material(SQLModel, table=True):
 
 class Tag(SQLModel, table=True):
     __tablename__ = 'tag'
+    __table_args__ = (
+        Index(
+            'ix_tag_name_unique_not_deleted',
+            'name',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        Index(
+            'ix_tag_slug_unique_not_deleted',
+            'slug',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+    )
     
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -315,11 +367,13 @@ class Tag(SQLModel, table=True):
             default=uuid.uuid4
         )
     )
-    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
-    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
-    is_active: bool = Field(
-        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), 
-        default=True
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    slug: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")), default=True)
+
+    products_count: int = Field(
+        sa_column=Column(pg.INTEGER, nullable=False, server_default=text("0")),
+        default=0
     )
     
     created_at: datetime = Field(
