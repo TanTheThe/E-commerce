@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
-import { Button, DialogActions, DialogContent, DialogContentText, DialogTitle, Rating, TextField } from "@mui/material";
+import { Button, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, ListItemText, Rating, TextField } from "@mui/material";
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -26,6 +26,8 @@ const label = { inputProps: { 'aria-label': 'Checkbox demo' } };
 
 const columns = [
     { id: 'product', label: 'PRODUCT', minWidth: 200 },
+    { id: 'brand', label: 'BRAND', minWidth: 120 },
+    { id: 'materials', label: 'MATERIALS', minWidth: 150 },
     { id: 'category', label: 'CATEGORY', minWidth: 150 },
     {
         id: 'variants',
@@ -82,6 +84,14 @@ const Products = () => {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
 
+    const [brandId, setBrandId] = useState('');
+    const [materialIds, setMaterialIds] = useState([]);
+    const [sortBy, setSortBy] = useState('newest');
+    const [ratings, setRatings] = useState([]);
+
+    const [brands, setBrands] = useState([]);
+    const [materials, setMaterials] = useState([]);
+
     const context = useContext(MyContext);
 
     const roundRating = (rating) => {
@@ -95,6 +105,28 @@ const Products = () => {
             return Math.floor(rating) + 0.5;
         } else {
             return Math.floor(rating);
+        }
+    };
+
+    const fetchBrands = async () => {
+        try {
+            const response = await getDataApi('/admin/brand/all');
+            if (response.success === true) {
+                setBrands(response.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching brands:', error);
+        }
+    };
+
+    const fetchMaterials = async () => {
+        try {
+            const response = await getDataApi('/admin/material/all');
+            if (response.success === true) {
+                setMaterials(response.data.data || []);
+            }
+        } catch (error) {
+            console.error('Error fetching materials:', error);
         }
     };
 
@@ -129,6 +161,22 @@ const Products = () => {
             filterData.category_ids = categoryFilterIds;
         }
 
+        if (brandId) {
+            filterData.brand_id = brandId;
+        }
+
+        if (materialIds && materialIds.length > 0) {
+            filterData.material_ids = materialIds;
+        }
+
+        if (sortBy) {
+            filterData.sort_by = sortBy;
+        }
+
+        if (ratings && ratings.length > 0) {
+            filterData.rating = ratings;
+        }
+
         if (debouncedMinPrice && !minPriceError && Number.isInteger(parseFloat(debouncedMinPrice)) && parseFloat(debouncedMinPrice) > 0) {
             filterData.min_price = parseInt(debouncedMinPrice);
         }
@@ -158,15 +206,18 @@ const Products = () => {
                     queryParams.append('category_ids', id.toString());
                 });
             }
+            if (filterData.brand_id) queryParams.append('brand_id', filterData.brand_id);
+            if (filterData.material_ids?.length) {
+                filterData.material_ids.forEach(id => {
+                    queryParams.append('material_ids', id.toString());
+                });
+            }
+            if (filterData.sort_by) queryParams.append('sort_by', filterData.sort_by);
+            if (filterData.rating?.length) {
+                filterData.rating.forEach(r => queryParams.append('rating', r));
+            }
             if (filterData.min_price) queryParams.append('min_price', filterData.min_price);
             if (filterData.max_price) queryParams.append('max_price', filterData.max_price);
-            if (filterData.sort_by) queryParams.append('sort_by', filterData.sort_by);
-            if (filterData.colors?.length) {
-                filterData.colors.forEach(c => queryParams.append('colors', c));
-            }
-            if (filterData.sizes?.length) {
-                filterData.sizes.forEach(s => queryParams.append('sizes', s));
-            }
 
             const response = await getDataApi(`/admin/product/all?${queryParams.toString()}`);
 
@@ -185,6 +236,34 @@ const Products = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const MaterialsCell = ({ materials }) => {
+        const displayMaterials = materials?.slice(0, 3) || [];
+        const hasMore = materials && materials.length > 3;
+        const allMaterialsText = materials?.map(m => `${m.name} (${m.percentage}%)`).join(', ') || '';
+
+        if (!materials || materials.length === 0) {
+            return <span className="text-gray-400">No materials</span>;
+        }
+
+        return (
+            <div title={allMaterialsText} className="cursor-help">
+                <div className="flex flex-wrap gap-1">
+                    {displayMaterials.map((material, index) => (
+                        <span key={index}
+                            className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded font-[Montserrat]">
+                            {material.name} ({material.percentage}%)
+                        </span>
+                    ))}
+                    {hasMore && (
+                        <span className="text-xs text-gray-500 mt-0.5">
+                            +{materials.length - 3} more...
+                        </span>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     const fetchProductDetail = async (productId) => {
@@ -250,10 +329,12 @@ const Products = () => {
 
     useEffect(() => {
         fetchProducts();
-    }, [page, rowsPerPage, searchVal, categoryFilterIds, debouncedMinPrice, debouncedMaxPrice]);
+    }, [page, rowsPerPage, searchVal, categoryFilterIds, debouncedMinPrice, debouncedMaxPrice, brandId, materialIds, sortBy, ratings]);
 
     useEffect(() => {
         fetchCategories();
+        fetchBrands();
+        fetchMaterials();
     }, []);
 
     const handleCategorySelectionChange = (selectedIds) => {
@@ -388,6 +469,18 @@ const Products = () => {
         });
     };
 
+    const sortOptions = [
+        { value: 'newest', label: 'Mới nhất' },
+        { value: 'price_asc', label: 'Giá tăng dần' },
+        { value: 'price_desc', label: 'Giá giảm dần' },
+        { value: 'name_asc', label: 'Tên A-Z' },
+        { value: 'name_desc', label: 'Tên Z-A' },
+        { value: 'best_seller', label: 'Bán chạy nhất' },
+        { value: 'sale_desc', label: 'Khuyến mãi cao nhất' }
+    ];
+
+    const ratingOptions = [1, 2, 3, 4, 5];
+
     const debouncedSearch = useCallback(
         debounce((searchTerm) => {
             setSearchVal(searchTerm);
@@ -431,72 +524,174 @@ const Products = () => {
             </div>
 
             <div className="card my-4 pt-5 shadow-md sm:rounded-lg bg-white">
-                <div className="flex items-center w-full px-5 justify-between">
-                    <div className="flex items-center gap-4 w-[60%]">
-                        <div className="col w-[30%]">
-                            <HierarchicalCategorySelect
-                                categories={categories}
-                                selectedCategoryIds={categoryFilterIds}
-                                onSelectionChange={handleCategorySelectionChange}
-                                label="Sắp xếp theo danh mục"
-                                placeholder="Tất cả danh mục"
-                            />
+                <div className="flex items-start w-full px-5 justify-between mb-4">
+                    <div className="flex flex-col gap-4 w-[70%]">
+                        <div className="flex items-start gap-4">
+                            <div className="col w-[20%]">
+                                <HierarchicalCategorySelect
+                                    categories={categories}
+                                    selectedCategoryIds={categoryFilterIds}
+                                    onSelectionChange={handleCategorySelectionChange}
+                                    label="Sắp xếp theo danh mục"
+                                    placeholder="Tất cả danh mục"
+                                />
+                            </div>
+
+                            <div className="col w-[20%]">
+                                <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo thương hiệu</h4>
+                                <FormControl fullSize size="small">
+                                    <Select
+                                        value={brandId}
+                                        onChange={(e) => {
+                                            setBrandId(e.target.value);
+                                            setPage(0);
+                                        }}
+                                        displayEmpty
+                                        className="!text-sm"
+                                    >
+                                        <MenuItem value="">Tất cả thương hiệu</MenuItem>
+                                        {brands.map((brand) => (
+                                            <MenuItem key={brand.id} value={brand.id}>
+                                                {brand.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </div>
+
+                            <div className="col w-[20%]">
+                                <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo chất liệu</h4>
+                                <FormControl fullSize size="small">
+                                    <Select
+                                        multiple
+                                        value={materialIds}
+                                        onChange={(e) => {
+                                            setMaterialIds(e.target.value);
+                                            setPage(0);
+                                        }}
+                                        displayEmpty
+                                        renderValue={(selected) =>
+                                            selected.length === 0
+                                                ? 'Tất cả chất liệu'
+                                                : `${selected.length} chất liệu`
+                                        }
+                                        className="!text-sm"
+                                    >
+                                        {materials.map((material) => (
+                                            <MenuItem key={material.id} value={material.id}>
+                                                <Checkbox checked={materialIds.indexOf(material.id) > -1} />
+                                                <ListItemText primary={material.name} />
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </div>
                         </div>
 
-                        <div className="col w-[30%]">
-                            <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo giá</h4>
-                            <div className="flex flex-col gap-2 mb-5">
-                                <div className="flex gap-2 items-start">
-                                    <div className="flex-1">
-                                        <TextField
-                                            size="small"
-                                            type="text"
-                                            placeholder="Giá từ"
-                                            value={minPrice}
-                                            onChange={handleMinPriceChange}
-                                            error={!!minPriceError}
-                                            helperText={minPriceError}
-                                            InputProps={{
-                                                endAdornment: <span className="text-sm text-gray-500">đ</span>
-                                            }}
-                                            FormHelperTextProps={{
-                                                style: { fontSize: '10px', marginTop: '4px' }
-                                            }}
-                                        />
+                        <div className="flex items-start gap-4">
+                            <div className="col w-[20%]">
+                                <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo giá</h4>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2 items-start">
+                                        <div className="flex-1">
+                                            <TextField
+                                                size="small"
+                                                type="text"
+                                                placeholder="Giá từ"
+                                                value={minPrice}
+                                                onChange={handleMinPriceChange}
+                                                error={!!minPriceError}
+                                                helperText={minPriceError}
+                                                InputProps={{
+                                                    endAdornment: <span className="text-sm text-gray-500">đ</span>
+                                                }}
+                                                FormHelperTextProps={{
+                                                    style: { fontSize: '10px', marginTop: '4px' }
+                                                }}
+                                            />
+                                        </div>
+                                        <span className="text-gray-400 mt-2">-</span>
+                                        <div className="flex-1">
+                                            <TextField
+                                                size="small"
+                                                type="text"
+                                                placeholder="Giá đến"
+                                                value={maxPrice}
+                                                onChange={handleMaxPriceChange}
+                                                error={!!maxPriceError}
+                                                helperText={maxPriceError}
+                                                InputProps={{
+                                                    endAdornment: <span className="text-sm text-gray-500">đ</span>
+                                                }}
+                                                FormHelperTextProps={{
+                                                    style: { fontSize: '10px', marginTop: '4px' }
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <span className="text-gray-400 mt-2">-</span>
-                                    <div className="flex-1">
-                                        <TextField
+                                    {(minPrice || maxPrice) && (
+                                        <Button
                                             size="small"
-                                            type="text"
-                                            placeholder="Giá đến"
-                                            value={maxPrice}
-                                            onChange={handleMaxPriceChange}
-                                            error={!!maxPriceError}
-                                            helperText={maxPriceError}
-                                            InputProps={{
-                                                endAdornment: <span className="text-sm text-gray-500">đ</span>
-                                            }}
-                                            FormHelperTextProps={{
-                                                style: { fontSize: '10px', marginTop: '4px' }
-                                            }}
-                                        />
-                                    </div>
+                                            onClick={clearPriceFilter}
+                                            className="!text-xs !text-red-500 !p-1 !min-w-0 self-start"
+                                        >
+                                            Xóa bộ lọc giá
+                                        </Button>
+                                    )}
                                 </div>
-                                {(minPrice || maxPrice) && (
-                                    <Button
-                                        size="small"
-                                        onClick={clearPriceFilter}
-                                        className="!text-xs !text-red-500 !p-1 !min-w-0 self-start"
+                            </div>
+
+                            <div className="col w-[20%]">
+                                <h4 className="block text-sm font-medium text-gray-700 mb-2">Lọc theo đánh giá</h4>
+                                <FormControl fullSize size="small">
+                                    <Select
+                                        multiple
+                                        value={ratings}
+                                        onChange={(e) => {
+                                            setRatings(e.target.value);
+                                            setPage(0);
+                                        }}
+                                        displayEmpty
+                                        renderValue={(selected) =>
+                                            selected.length === 0
+                                                ? 'Tất cả đánh giá'
+                                                : `${selected.length} sao`
+                                        }
+                                        className="!text-sm"
                                     >
-                                        Xóa bộ lọc giá
-                                    </Button>
-                                )}
+                                        {ratingOptions.map((rating) => (
+                                            <MenuItem key={rating} value={rating}>
+                                                <Checkbox checked={ratings.indexOf(rating) > -1} />
+                                                <ListItemText primary={`${rating} sao`} />
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </div>
+
+                            <div className="col w-[20%]">
+                                <h4 className="block text-sm font-medium text-gray-700 mb-2">Sắp xếp</h4>
+                                <FormControl fullSize size="small">
+                                    <Select
+                                        value={sortBy}
+                                        onChange={(e) => {
+                                            setSortBy(e.target.value);
+                                            setPage(0);
+                                        }}
+                                        className="!text-sm"
+                                    >
+                                        {sortOptions.map((option) => (
+                                            <MenuItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </div>
                         </div>
                     </div>
 
-                    <div className="col w-[20%] ml-auto">
+                    <div className="col w-[30%] ml-auto">
                         <SearchBox onSearch={debouncedSearch} />
                     </div>
                 </div>
@@ -568,6 +763,22 @@ const Products = () => {
                                                             </h3>
                                                         </div>
                                                     </div>
+                                                </TableCell>
+
+                                                <TableCell style={{ minWidth: 120 }}>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {product.brand ? (
+                                                            <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded font-[Montserrat]">
+                                                                {product.brand.name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-gray-400">No brand</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+
+                                                <TableCell style={{ minWidth: 150 }}>
+                                                    <MaterialsCell materials={product.materials} />
                                                 </TableCell>
 
                                                 <TableCell style={{ minWidth: 150 }}>

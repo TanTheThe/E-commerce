@@ -53,6 +53,7 @@ class GetAllCartsService:
                     Product.id,
                     Product.name,
                     Product.status,
+                    Product.slug,
                     Product.deleted_at
                 ),
                 joinedload(Cart_Item.product_variant).options(
@@ -213,6 +214,7 @@ class GetAllCartsService:
                 products_dict[product_id] = {
                     "product_id": product_id,
                     "product_name": product.name if product.name else "Unknown Product",
+                    "product_slug": product.slug if product.slug else "unknown-product",
                     "variants": []
                 }
 

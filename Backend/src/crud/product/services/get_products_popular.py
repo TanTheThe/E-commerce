@@ -129,6 +129,7 @@ class GetProductsPopularService:
                 "images": product[0].images,
                 "avg_rating": product[0].avg_rating,
                 "total_sold": product[0].total_sold,
+                "slug": product[0].slug,
                 "original_price": original_price,
                 "discounted_price": discounted_price,
                 "categories": categories_data

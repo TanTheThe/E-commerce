@@ -120,28 +120,28 @@ const Search = () => {
     };
 
     const handleCategoryNavigation = (category, parentId = null) => {
-        console.log('Category clicked:', category, 'Parent ID:', parentId);
-
         if (parentId) {
-            navigate(`/category/${parentId}?selected_categories=${category.id}`);
+            const parentCategory = searchResults?.categories.find(cat => cat.id === parentId);
+            const parentIdentifier = parentCategory?.slug || parentId;
+            navigate(`/category/${parentIdentifier}?selected_categories=${category.id}`);
         } else {
             switch (category.type) {
                 case "parent_direct_match":
                 case "parent":
                 case "parent_from_child_match":
-                    navigate(`/category/${category.id}`);
+                    navigate(`/category/${category.slug || category.id}`);
                     break;
 
                 default:
                     if (category.children_count === 0) {
                         const parentCategory = findParentCategory(category);
                         if (parentCategory) {
-                            navigate(`/category/${parentCategory.id}?selected_categories=${category.id}`);
+                            navigate(`/category/${parentCategory.slug || parentCategory.id}?selected_categories=${category.id}`);
                         } else {
-                            navigate(`/category/${category.id}`);
+                            navigate(`/category/${category.slug || category.id}`);
                         }
                     } else {
-                        navigate(`/category/${category.id}`);
+                        navigate(`/category/${category.slug || category.id}`);
                     }
                     break;
             }

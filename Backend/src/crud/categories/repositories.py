@@ -8,9 +8,7 @@ from src.errors.categories import CategoriesException
 
 
 class CategoriesRepository:
-    async def create_categories(self, categories_data, session: AsyncSession):
-        categories_data_dict = categories_data.model_dump()
-
+    async def create_categories(self, categories_data_dict, session: AsyncSession):
         if "image" in categories_data_dict and categories_data_dict["image"]:
             base64_image = categories_data_dict["image"]
 

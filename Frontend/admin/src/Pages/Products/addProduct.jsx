@@ -7,7 +7,7 @@ import { IoMdClose } from "react-icons/io";
 import Button from "@mui/material/Button";
 import { FaChevronDown, FaChevronUp, FaCloudUploadAlt, FaCopy, FaPlus } from "react-icons/fa";
 import ColorPicker from "../../Components/ColorPicker";
-import { Checkbox, ListItemText } from "@mui/material";
+import { Checkbox, FormControl, ListItemText } from "@mui/material";
 import { MyContext } from "../../App";
 import { fetchWithAutoRefresh, getDataApi, postDataApi } from "../../utils/api";
 import HierarchicalCategorySelect from "./categoriesSelect";
@@ -31,6 +31,13 @@ const AddProduct = () => {
         sizes: []
     });
     const [collapsedGroups, setCollapsedGroups] = useState({});
+
+    const [brands, setBrands] = useState([]);
+    const [selectedBrand, setSelectedBrand] = useState('');
+    const [materials, setMaterials] = useState([]);
+    const [selectedMaterials, setSelectedMaterials] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]);
 
     const context = useContext(MyContext);
     const { onUpdated } = context?.isOpenFullScreenPanel || {};
@@ -56,6 +63,45 @@ const AddProduct = () => {
             }
         };
         fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        const fetchBrands = async () => {
+            try {
+                const response = await getDataApi('/admin/brand/all');
+                if (response.success === true) {
+                    setBrands(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching brands:', error);
+            }
+        };
+
+        const fetchMaterials = async () => {
+            try {
+                const response = await getDataApi('/admin/material/all');
+                if (response.success === true) {
+                    setMaterials(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching materials:', error);
+            }
+        };
+
+        const fetchTags = async () => {
+            try {
+                const response = await getDataApi('/admin/tag/all');
+                if (response.success === true) {
+                    setTags(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching tags:', error);
+            }
+        };
+
+        fetchBrands();
+        fetchMaterials();
+        fetchTags();
     }, []);
 
     useEffect(() => {
@@ -192,6 +238,42 @@ const AddProduct = () => {
 
     const handleRemoveVariantGroup = (groupId) => {
         setVariantGroups(prev => prev.filter(group => group.id !== groupId));
+    };
+
+    const handleMaterialChange = (materialId, field, value) => {
+        setSelectedMaterials(prev => {
+            const existing = prev.find(m => m.material_id === materialId);
+            if (existing) {
+                return prev.map(m =>
+                    m.material_id === materialId
+                        ? { ...m, [field]: value }
+                        : m
+                );
+            } else {
+                return [...prev, { material_id: materialId, percentage: field === 'percentage' ? value : 0 }];
+            }
+        });
+    };
+
+    const handleMaterialToggle = (materialId) => {
+        setSelectedMaterials(prev => {
+            const exists = prev.find(m => m.material_id === materialId);
+            if (exists) {
+                return prev.filter(m => m.material_id !== materialId);
+            } else {
+                return [...prev, { material_id: materialId, percentage: 0 }];
+            }
+        });
+    };
+
+    const handleTagToggle = (tagId) => {
+        setSelectedTags(prev => {
+            if (prev.includes(tagId)) {
+                return prev.filter(id => id !== tagId);
+            } else {
+                return [...prev, tagId];
+            }
+        });
     };
 
     const handleColorChange = (groupId, field, value) => {
@@ -493,6 +575,96 @@ const AddProduct = () => {
         }
     };
 
+    const renderMaterialsSelection = () => {
+        const totalPercentage = selectedMaterials.reduce((sum, material) => sum + (material.percentage || 0), 0);
+
+        return (
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-gray-700">Chọn chất liệu</h4>
+                    {selectedMaterials.length > 0 && (
+                        <span className={`text-sm font-medium ${totalPercentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
+                            Tổng: {totalPercentage}%
+                        </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {materials.map(material => {
+                        const selected = selectedMaterials.find(m => m.material_id === material.id);
+                        return (
+                            <div key={material.id} className={`p-3 border rounded-lg transition-all ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!selected}
+                                            onChange={() => handleMaterialToggle(material.id)}
+                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-gray-700">{material.name}</span>
+                                    </label>
+                                </div>
+
+                                {selected && (
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">Phần trăm (%)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={selected.percentage || ''}
+                                            onChange={(e) => handleMaterialChange(material.id, 'percentage', parseFloat(e.target.value) || 0)}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const renderTagsSelection = () => {
+        return (
+            <div className="space-y-4">
+                <h4 className="text-sm font-medium text-gray-700">Chọn tags</h4>
+                <div className="grid grid-cols-3 gap-2">
+                    {tags.map(tag => (
+                        <label key={tag.id} className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={selectedTags.includes(tag.id)}
+                                onChange={() => handleTagToggle(tag.id)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">{tag.name}</span>
+                        </label>
+                    ))}
+                </div>
+
+                {selectedTags.length > 0 && (
+                    <div className="mt-3">
+                        <p className="text-xs text-gray-600 mb-2">Tags đã chọn:</p>
+                        <div className="flex flex-wrap gap-2">
+                            {selectedTags.map(tagId => {
+                                const tag = tags.find(t => t.id === tagId);
+                                return tag ? (
+                                    <span key={tagId} className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
+                                        {tag.name}
+                                    </span>
+                                ) : null;
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const validateForm = () => {
         if (!formData.name.trim()) {
             context.openAlertBox("error", 'Tên sản phẩm không được để trống');
@@ -540,6 +712,22 @@ const AddProduct = () => {
                 }
             }
         }
+
+        if (selectedMaterials.length > 0) {
+            const totalPercentage = selectedMaterials.reduce((sum, material) => sum + (material.percentage || 0), 0);
+            if (totalPercentage > 100) {
+                context.openAlertBox("error", 'Tổng phần trăm chất liệu không được vượt quá 100%');
+                return false;
+            }
+
+            for (let material of selectedMaterials) {
+                if (!material.percentage || material.percentage <= 0) {
+                    context.openAlertBox("error", 'Phần trăm chất liệu phải lớn hơn 0');
+                    return false;
+                }
+            }
+        }
+
         return true;
     };
 
@@ -580,7 +768,10 @@ const AddProduct = () => {
                 description: formData.description?.trim() || null,
                 images: images.map(img => img.base64),
                 categories_id: selectedCategories,
-                product_variant: allVariants
+                product_variant: allVariants,
+                brand_id: selectedBrand || null,
+                materials: selectedMaterials.length > 0 ? selectedMaterials : null,
+                tags_id: selectedTags.length > 0 ? selectedTags : null
             };
 
             const result = await postDataApi('/admin/product/', submitData);
@@ -697,6 +888,47 @@ const AddProduct = () => {
 
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                                 <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-purple-500 rounded-full mr-3"></div>
+                                    Thương hiệu
+                                </h2>
+
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={selectedBrand}
+                                        onChange={(e) => setSelectedBrand(e.target.value)}
+                                        displayEmpty
+                                        className="!text-sm"
+                                    >
+                                        <MenuItem value="">Không chọn thương hiệu</MenuItem>
+                                        {brands.map((brand) => (
+                                            <MenuItem key={brand.id} value={brand.id}>
+                                                {brand.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-green-500 rounded-full mr-3"></div>
+                                    Chất liệu
+                                </h2>
+
+                                {renderMaterialsSelection()}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-yellow-500 rounded-full mr-3"></div>
+                                    Tags
+                                </h2>
+
+                                {renderTagsSelection()}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                                     <div className="w-2 h-6 bg-green-500 rounded-full mr-3"></div>
                                     Ảnh chính sản phẩm
                                 </h2>
@@ -740,7 +972,7 @@ const AddProduct = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeImage(image.id)}
-                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                                                     >
                                                         <IoMdClose />
                                                     </button>
@@ -760,7 +992,7 @@ const AddProduct = () => {
                                     </h2>
                                     <Button
                                         type="button"
-                                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
                                         onClick={handleAddVariantGroup}
                                     >
                                         <FaPlus className="text-sm" />
@@ -786,7 +1018,7 @@ const AddProduct = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleGroupCollapse(group.id)}
-                                                            className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                            className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded transition-colors cursor-pointer"
                                                         >
                                                             {collapsedGroups[group.id] ? (
                                                                 <>
@@ -804,7 +1036,7 @@ const AddProduct = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleRemoveVariantGroup(group.id)}
-                                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                                        className="text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                                                     >
                                                         <IoMdClose size={20} />
                                                     </button>
@@ -826,7 +1058,7 @@ const AddProduct = () => {
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => copyFirstVariantToAll(group.id)}
-                                                                            className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md transition-colors flex items-center gap-1"
+                                                                            className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded-md transition-colors flex items-center gap-1 cursor-pointer"
                                                                         >
                                                                             <FaCopy size={10} />
                                                                             Sao chép từ đầu tiên

@@ -197,16 +197,6 @@ const OrderSuccessPage = () => {
                                 </p>
                             </div>
                         </div>
-
-                        <div className="mt-4 text-center">
-                            <button
-                                onClick={() => navigate(`/order-detail/${orderId}`)}
-                                className="px-6 py-3 bg-[#ff5252] text-white font-medium rounded-lg hover:bg-[#e53e3e] transition-colors cursor-pointer inline-flex items-center gap-2"
-                            >
-                                <FiEye />
-                                Theo dõi đơn hàng chi tiết
-                            </button>
-                        </div>
                     </div>
                 </div>
 

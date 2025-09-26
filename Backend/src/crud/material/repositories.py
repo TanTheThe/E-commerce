@@ -116,7 +116,7 @@ class MaterialRepository:
     
     async def delete_multiple_materials(self, data: DeleteMultipleMaterialsModel, session: AsyncSession):
         conditions = [Material.id.in_(data.material_ids), Material.deleted_at.is_(None)]
-        materials = await self.get_all_material(conditions, session)
+        materials, _ = await self.get_all_material(conditions, session)
         existing_ids = {str(row.id) for row in materials}
         missing_ids = set(data.material_ids) - existing_ids
         if missing_ids:

@@ -1,11 +1,12 @@
+import uuid
 from datetime import datetime
-
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer
+from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer, Brand, \
+    Product_Material, Material, Product_Tag, Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
@@ -28,50 +29,8 @@ color_service = ColorService()
 
 
 class GetDetailProductService:
-    async def get_detail_product(self, product_id: str, session: AsyncSession):
-        condition = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
-        joins = [
-            selectinload(Product.categories_product).options(
-                joinedload(Categories_Product.categories).load_only(
-                    Categories.id,
-                    Categories.name,
-                    Categories.parent_id,
-                    Categories.deleted_at
-                )
-            ),
-
-            selectinload(Product.product_variant).options(
-                joinedload(Product_Variant.color).load_only(
-                    Color.id,
-                    Color.name,
-                    Color.code,
-                )
-            ).load_only(
-                Product_Variant.id,
-                Product_Variant.size,
-                Product_Variant.price,
-                Product_Variant.quantity,
-                Product_Variant.image,
-                Product_Variant.sku,
-                Product_Variant.color_name,
-                Product_Variant.color_code,
-                Product_Variant.deleted_at
-            ),
-
-            selectinload(Product.special_offer).load_only(
-                Special_Offer.id,
-                Special_Offer.discount,
-                Special_Offer.type,
-                Special_Offer.name,
-                Special_Offer.used_quantity,
-                Special_Offer.total_quantity,
-                Special_Offer.start_time,
-                Special_Offer.end_time,
-                Special_Offer.deleted_at
-            ),
-        ]
-
-        product_obj = await product_repository.get_product(condition, session, joins)
+    async def get_detail_product(self, product_identifier: str, session: AsyncSession):
+        product_obj = await self.find_product_by_identifier(product_identifier, session)
 
         if not product_obj:
             ProductException.not_found()
@@ -92,6 +51,43 @@ class GetDetailProductService:
             ProductException.invalid_categories()
 
         product_dict["categories"] = valid_categories
+
+        brand = product.brand
+        product_dict["brand"] = None
+        if brand and brand.deleted_at is None and brand.is_active:
+            product_dict["brand"] = {
+                "id": str(brand.id),
+                "name": brand.name,
+                "slug": brand.slug,
+                "logo": brand.logo
+            }
+
+        valid_materials = []
+        for pm in product.product_materials:
+            if (pm.deleted_at is None and pm.material and
+                    pm.material.deleted_at is None and pm.material.is_active):
+                material_data = {
+                    "id": str(pm.material.id),
+                    "name": pm.material.name,
+                    "slug": pm.material.slug
+                }
+                if pm.percentage is not None:
+                    material_data["percentage"] = pm.percentage
+                valid_materials.append(material_data)
+
+        product_dict["materials"] = valid_materials
+
+        valid_tags = []
+        for pt in product.product_tags:
+            if (pt.deleted_at is None and pt.tag and
+                    pt.tag.deleted_at is None and pt.tag.is_active):
+                valid_tags.append({
+                    "id": str(pt.tag.id),
+                    "name": pt.tag.name,
+                    "slug": pt.tag.slug
+                })
+
+        product_dict["tags"] = valid_tags
 
         offer = product.special_offer
         valid_offer = self._is_offer_valid(offer)
@@ -163,6 +159,97 @@ class GetDetailProductService:
 
         return product_dict
 
+    async def find_product_by_identifier(self, identifier: str, session: AsyncSession):
+        try:
+            uuid.UUID(identifier)
+            is_uuid = True
+        except ValueError:
+            is_uuid = False
+
+        if is_uuid:
+            condition = and_(Product.id == identifier, Product.deleted_at.is_(None), Product.status == "active")
+        else:
+            condition = and_(Product.slug == identifier, Product.deleted_at.is_(None), Product.status == "active")
+
+        joins = [
+            selectinload(Product.categories_product).options(
+                joinedload(Categories_Product.categories).load_only(
+                    Categories.id,
+                    Categories.name,
+                    Categories.parent_id,
+                    Categories.deleted_at
+                )
+            ),
+
+            selectinload(Product.product_variant).options(
+                joinedload(Product_Variant.color).load_only(
+                    Color.id,
+                    Color.name,
+                    Color.code,
+                )
+            ).load_only(
+                Product_Variant.id,
+                Product_Variant.size,
+                Product_Variant.price,
+                Product_Variant.quantity,
+                Product_Variant.image,
+                Product_Variant.sku,
+                Product_Variant.color_name,
+                Product_Variant.color_code,
+                Product_Variant.deleted_at
+            ),
+
+            selectinload(Product.special_offer).load_only(
+                Special_Offer.id,
+                Special_Offer.discount,
+                Special_Offer.type,
+                Special_Offer.name,
+                Special_Offer.used_quantity,
+                Special_Offer.total_quantity,
+                Special_Offer.start_time,
+                Special_Offer.end_time,
+                Special_Offer.deleted_at
+            ),
+
+            selectinload(Product.brand).load_only(
+                Brand.id,
+                Brand.name,
+                Brand.slug,
+                Brand.logo,
+                Brand.is_active,
+                Brand.deleted_at
+            ),
+
+            selectinload(Product.product_materials).options(
+                joinedload(Product_Material.material).load_only(
+                    Material.id,
+                    Material.name,
+                    Material.slug,
+                    Material.is_active,
+                    Material.deleted_at
+                )
+            ).load_only(
+                Product_Material.id,
+                Product_Material.percentage,
+                Product_Material.deleted_at
+            ),
+
+            selectinload(Product.product_tags).options(
+                joinedload(Product_Tag.tag).load_only(
+                    Tag.id,
+                    Tag.name,
+                    Tag.slug,
+                    Tag.is_active,
+                    Tag.deleted_at
+                )
+            ).load_only(
+                Product_Tag.id,
+                Product_Tag.deleted_at
+            ),
+        ]
+
+        return await product_repository.get_product(condition, session, joins)
+
     def _is_offer_valid(self, offer: Special_Offer) -> bool:
         if not offer:
             return False
@@ -179,8 +266,8 @@ class GetDetailProductService:
 
         return True
 
-    async def get_detail_product_admin(self, product_id: str, session: AsyncSession):
-        product = await self.get_detail_product(product_id, session)
+    async def get_detail_product_admin(self, product_identifier: str, session: AsyncSession):
+        product = await self.get_detail_product(product_identifier, session)
 
         if product is None:
             ProductException.not_found()
@@ -208,6 +295,9 @@ class GetDetailProductService:
             "description": product["description"],
             "short_description": product["short_description"],
             "categories": product["categories"],
+            "brand": product["brand"],
+            "materials": product["materials"],
+            "tags": product["tags"],
             "offer": product["offer"],
             "status": product["status"],
             "product_variant": product_variant
@@ -215,8 +305,8 @@ class GetDetailProductService:
 
         return product_dict
 
-    async def get_detail_product_customer(self, product_id: str, session: AsyncSession):
-        product = await self.get_detail_product(product_id, session)
+    async def get_detail_product_customer(self, product_identifier: str, session: AsyncSession):
+        product = await self.get_detail_product(product_identifier, session)
 
         if product is None:
             ProductException.not_found()
@@ -243,10 +333,12 @@ class GetDetailProductService:
             "description": product["description"],
             "short_description": product["short_description"],
             "categories": product["categories"],
-            "total_sold": product["total_sold"],
-            "review_count": product["review_count"],
-            "avg_rating": product["avg_rating"],
+            "brand": product["brand"],
+            "materials": product["materials"],
+            "tags": product["tags"],
             "offer": product["offer"],
+            "status": product["status"],
+            "slug": product["slug"],
             "product_variant": product_variant
         }
 

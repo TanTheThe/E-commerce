@@ -22,7 +22,8 @@ function handleClick(event) {
 }
 
 const ProductListing = () => {
-    const { categoryId } = useParams();
+    const { categoryIdentifier } = useParams();
+    const [categoryId, setCategoryId] = useState(null);
     const [searchParams] = useSearchParams();
     const [searchParamsProcessed, setSearchParamsProcessed] = useState(false);
 
@@ -45,6 +46,9 @@ const ProductListing = () => {
     const [selectedColors, setSelectedColors] = useState([]);
     const [selectedSizes, setSelectedSizes] = useState([]);
     const [selectedRatings, setSelectedRatings] = useState([]);
+
+    const [selectedBrandId, setSelectedBrandId] = useState(null);
+    const [selectedMaterialIds, setSelectedMaterialIds] = useState([]);
 
     const open = Boolean(anchorEl);
 
@@ -69,11 +73,65 @@ const ProductListing = () => {
         if (selectedColors?.length) filterData.colors = selectedColors;
         if (selectedSizes?.length) filterData.sizes = selectedSizes;
         if (selectedRatings?.length) filterData.rating = selectedRatings;
+        if (selectedBrandId) filterData.brand_id = selectedBrandId;
+        if (selectedMaterialIds?.length) filterData.material_ids = selectedMaterialIds;
 
         return filterData;
     };
 
+    const resolveCategoryId = async (identifier) => {
+        try {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(identifier)) {
+                setCategoryId(identifier);
+                return;
+            }
+        } catch (error) { }
+
+        try {
+            const response = await getDataApi(`/customer/categories/${identifier}/id`);
+            if (response.success) {
+                setCategoryId(response.data.category_id);
+            }
+        } catch (error) {
+            console.error('Error resolving category ID:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (categoryIdentifier) {
+            // Reset all filter states when category changes
+            setSearchVal('');
+            setMinPrice(null);
+            setMaxPrice(null);
+            setSelectedColors([]);
+            setSelectedSizes([]);
+            setSelectedRatings([]);
+            setSelectedBrandId(null);
+            setSelectedMaterialIds([]);
+            setCurrentPage(1);
+
+            setSearchParamsProcessed(false);
+
+            const selectedCategoriesFromUrl = searchParams.get('selected_categories');
+
+            if (selectedCategoriesFromUrl) {
+                const categoryIds = selectedCategoriesFromUrl.split(',').map(id => id.trim());
+                setSelectedCategoryIds(categoryIds);
+            } else {
+                setSelectedCategoryIds([]);
+            }
+
+            resolveCategoryId(categoryIdentifier);
+            setSearchParamsProcessed(true);
+        }
+    }, [categoryIdentifier, searchParams]);
+
     const fetchProducts = async () => {
+        if (!categoryIdentifier || !searchParamsProcessed) {
+            return;
+        }
+
         setLoading(true);
         try {
             const skip = (currentPage - 1) * rowsPerPage;
@@ -84,18 +142,25 @@ const ProductListing = () => {
                 limit: rowsPerPage.toString(),
             });
 
-            if (categoryId) {
-                queryParams.append('category_id', categoryId);
-            }
+            queryParams.append('category_identifier', categoryIdentifier);
 
             if (filterData.search) {
                 queryParams.append('search', filterData.search);
             }
 
             if (filterData.category_ids?.length) {
-                filterData.category_ids.forEach(id => {
-                    queryParams.append('category_ids', id.toString());
-                });
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                const isCategoryUuid = uuidRegex.test(categoryIdentifier);
+
+                if (isCategoryUuid) {
+                    filterData.category_ids.forEach(id => {
+                        queryParams.append('category_ids', id.toString());
+                    });
+                } else {
+                    filterData.category_ids.forEach(slug => {
+                        queryParams.append('category_slugs', slug);
+                    });
+                }
             }
 
             if (filterData.min_price !== null && filterData.min_price !== undefined) {
@@ -127,10 +192,24 @@ const ProductListing = () => {
                 });
             }
 
+            if (filterData.brand_id) {
+                queryParams.append('brand_id', filterData.brand_id);
+            }
+
+            if (filterData.material_ids?.length) {
+                filterData.material_ids.forEach(materialId => {
+                    queryParams.append('material_ids', materialId);
+                });
+            }
+
+            console.log('Fetching with params:', queryParams.toString());
+
             const response = await getDataApi(`/customer/product/category?${queryParams.toString()}`);
 
             if (response.success === true) {
                 const products = response.data?.data || [];
+                console.log(products);
+
                 const total = response.data?.total || 0;
 
                 setProducts(products);
@@ -150,21 +229,26 @@ const ProductListing = () => {
     };
 
     useEffect(() => {
-        if (categoryId && searchParamsProcessed) {
+        const timeoutId = setTimeout(() => {
             fetchProducts();
-        }
-    }, [categoryId, currentPage, sortBy, searchVal, selectedCategoryIds, minPrice, maxPrice, selectedColors, selectedSizes, selectedRatings, searchParamsProcessed]);
+        }, 50);
 
-    useEffect(() => {
-        const selectedCategoriesFromUrl = searchParams.get('selected_categories');
-        if (selectedCategoriesFromUrl) {
-            const categoryIds = selectedCategoriesFromUrl.split(',').map(id => id.trim());
-            setSelectedCategoryIds(categoryIds);
-        } else {
-            setSelectedCategoryIds([]);
-        }
-        setSearchParamsProcessed(true);
-    }, [searchParams]);
+        return () => clearTimeout(timeoutId);
+    }, [
+        categoryIdentifier,
+        searchParamsProcessed,
+        currentPage,
+        sortBy,
+        searchVal,
+        selectedCategoryIds,
+        minPrice,
+        maxPrice,
+        selectedColors,
+        selectedSizes,
+        selectedRatings,
+        selectedBrandId,
+        selectedMaterialIds
+    ]);
 
     const handleSortChange = (option) => {
         setSortBy(option);
@@ -199,6 +283,12 @@ const ProductListing = () => {
             case 'search':
                 setSearchVal(value);
                 break;
+            case 'brand':
+                setSelectedBrandId(value);
+                break;
+            case 'materials':
+                setSelectedMaterialIds(value);
+                break;
             default:
                 break;
         }
@@ -229,6 +319,8 @@ const ProductListing = () => {
                             selectedSizes={selectedSizes}
                             selectedColors={selectedColors}
                             selectedRatings={selectedRatings}
+                            selectedBrandId={selectedBrandId}
+                            selectedMaterialIds={selectedMaterialIds}
                             minPrice={minPrice}
                             maxPrice={maxPrice}
                         />

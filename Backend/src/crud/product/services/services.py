@@ -1,21 +1,18 @@
-from sqlalchemy.orm import selectinload, joinedload
-from collections import defaultdict
+import uuid
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer, Size
+from src.database.models import Product
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, desc
-from datetime import datetime
+from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
 from src.crud.categories_product.repositories import CategoriesProductRepository
 from src.crud.product_variant.services import ProductVariantService
 from src.crud.categories_product.services import CategoriesProductService
 from src.errors.product import ProductException
-from src.errors.categories import CategoriesException
 from src.schemas.product import DeleteMultipleProductModel
 
 product_repository = ProductRepository()
@@ -31,6 +28,17 @@ color_service = ColorService()
 
 
 class ProductService:
+    async def resolve_product_id(self, product_identifier: str, session: AsyncSession):
+        try:
+            uuid.UUID(product_identifier)
+            condition = and_(Product.id == product_identifier, Product.deleted_at.is_(None))
+            product = await product_repository.get_product(condition, session)
+            return str(product[0].id) if product else None
+        except ValueError:
+            condition = and_(Product.slug == product_identifier, Product.deleted_at.is_(None))
+            product = await product_repository.get_product(condition, session)
+            return str(product[0].id) if product else None
+
     async def delete_product(self, product_id: str, session: AsyncSession):
         condition = and_(Product.id == product_id)
         product_delete = await product_repository.delete_product(condition, session)

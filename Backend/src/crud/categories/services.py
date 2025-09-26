@@ -1,9 +1,11 @@
+import uuid
+from src.crud.categories.utils import generate_slug
 from src.crud.size.services import SizeService
-from src.database.models import Categories, Size
+from src.database.models import Categories
 from src.errors.size import SizeException
 from src.schemas.categories import CategoriesCreateModel, CategoriesUpdateModel, CategoriesFilterModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, select, func, or_
+from sqlmodel import and_
 from src.crud.categories.repositories import CategoriesRepository
 from src.errors.categories import CategoriesException
 
@@ -18,11 +20,17 @@ class CategoriesService:
         if categories_data.type_size not in valid_types:
             SizeException.size_not_exists()
 
-        new_categories = await categories_repository.create_categories(categories_data, session)
+        slug = generate_slug(categories_data.name)
+
+        categories_data_with_slug = categories_data.model_dump()
+        categories_data_with_slug['slug'] = slug
+
+        new_categories = await categories_repository.create_categories(categories_data_with_slug, session)
 
         new_categories_dict = {
             "id": str(new_categories.id),
             "name": new_categories.name,
+            "slug": new_categories.slug,
             "image": new_categories.image,
             "parent_id": str(new_categories.parent_id) if new_categories.parent_id else None,
             "type_size": new_categories.type_size
@@ -76,6 +84,7 @@ class CategoriesService:
                         "id": str(cat.id),
                         "name": cat.name,
                         "image": cat.image,
+                        "slug": cat.slug,
                         "parent_id": str(cat.parent_id) if cat.parent_id else None,
                         "type_size": cat.type_size,
                     }
@@ -87,7 +96,7 @@ class CategoriesService:
         else:
             filters = [Categories.deleted_at.is_(None), Categories.parent_id.is_(None)]
             if filter_data.type_size:
-                filters.append(Categories.type_size.in_(filter_data.type_size))
+                filters.append(Categories.type_size == filter_data.type_size)
             parent_categories, parent_total = await categories_repository.get_all_categories(filters, session, skip, limit)
 
             parent_ids = [cat.id for cat in parent_categories]
@@ -105,6 +114,7 @@ class CategoriesService:
                         "id": str(cat.id),
                         "name": cat.name,
                         "image": cat.image,
+                        "slug": cat.slug,
                         "parent_id": str(cat.parent_id) if cat.parent_id else None,
                         "type_size": cat.type_size,
                     }
@@ -113,6 +123,19 @@ class CategoriesService:
                 "total": parent_total,
                 "sizes": list(size_map.values())
             }
+
+
+    async def resolve_category_id(self, category_identifier: str, session: AsyncSession):
+        try:
+            uuid.UUID(category_identifier)
+            condition = and_(Categories.id == category_identifier, Categories.deleted_at.is_(None))
+            category = await categories_repository.get_category(condition, session)
+            return str(category.id) if category else None
+        except ValueError:
+            condition = and_(Categories.slug == category_identifier, Categories.deleted_at.is_(None))
+            category = await categories_repository.get_category(condition, session)
+            return str(category.id) if category else None
+
 
     async def get_detail_category_service(self, id: str, session: AsyncSession):
         condition = and_(Categories.id == id)
@@ -129,7 +152,6 @@ class CategoriesService:
             "type_size": categories.type_size
         }
 
-
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):
         condition = and_(Categories.id == id)
         category = await categories_repository.get_category(condition, session)
@@ -138,6 +160,9 @@ class CategoriesService:
             CategoriesException.not_found()
 
         update_data = categories_update.model_dump(exclude_unset=True)
+
+        if 'name' in update_data:
+            update_data['slug'] = generate_slug(update_data['name'])
 
         if 'parent_id' in update_data and update_data['parent_id']:
             parent_id = update_data['parent_id']
@@ -155,6 +180,7 @@ class CategoriesService:
         response_dict = {
             "id": str(category.id),
             "name": category.name,
+            "slug": category.slug,
             "image": category.image,
             "parent_id": str(category.parent_id) if category.parent_id else None,
             "type_size": category.type_size

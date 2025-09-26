@@ -103,6 +103,7 @@ class GetLatestProductsService:
                 "name": product[0].name,
                 "images": product[0].images,
                 "total_sold": product[0].total_sold,
+                "slug": product[0].slug,
                 "categories": [
                     {
                         "id": str(category.id),

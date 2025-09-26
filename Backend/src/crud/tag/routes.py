@@ -29,7 +29,7 @@ async def create_tag(tag_data: TagCreateModel,
         }
     )
 
-@tag_customer_router.get("/all", dependencies=[Depends(admin_role_middleware)])
+@tag_admin_router.get("/all", dependencies=[Depends(admin_role_middleware)])
 async def get_all_tags_admin(search: Optional[str] = None,
                              is_active: Optional[bool] = None,
                              sort_by: Optional[str] = None,

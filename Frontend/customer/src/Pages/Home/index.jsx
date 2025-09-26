@@ -22,12 +22,21 @@ import TopDiscountSection from "../../components/TopDiscount";
 
 const Home = () => {
     const [value, setValue] = useState(0);
-    const context = useContext(MyContext)
-    const parentCategories = context.categories.filter(category => category.parent_id === null);
+    const context = useContext(MyContext);
+
+    const parentCategories = context?.categories?.filter(category => category.parent_id === null) || [];
 
     const handleChange = (event, newValue) => {
         setValue(newValue);
     };
+
+    if (!context || !context.categories) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">Đang tải...</div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -36,17 +45,16 @@ const Home = () => {
             <section className="py-6">
                 <div className="container flex gap-5">
                     <div className="part1 w-[65%]">
-                        <HomeBannerV2/>
+                        <HomeBannerV2 />
                     </div>
                     <div className="part2 w-[35%] flex items-center gap-5 justify-between flex-col">
-                        <BannerBoxV2 info='right' images={'https://serviceapi.spicezgold.com/download/1741664665391_1741497254110_New_Project_50.jpg'}/>
-                        <BannerBoxV2 info='left' images={'https://serviceapi.spicezgold.com/download/1741664496923_1737020250515_New_Project_47.jpg'}/>
+                        <BannerBoxV2 info='right' images={'https://serviceapi.spicezgold.com/download/1741664665391_1741497254110_New_Project_50.jpg'} />
+                        <BannerBoxV2 info='left' images={'https://serviceapi.spicezgold.com/download/1741664496923_1737020250515_New_Project_47.jpg'} />
                     </div>
                 </div>
             </section>
-            {/* <HomeCatSlider /> */}
 
-            <BestSellerSection/>
+            <BestSellerSection />
 
             <section className="py-8 pt-2 bg-white">
                 <div className="container">
@@ -67,31 +75,31 @@ const Home = () => {
                 </div>
             </section>
 
-            <LatestSection/>
+            <LatestSection />
 
-            <TopDiscountSection/>
+            <TopDiscountSection />
 
             <section className="py-5 pb-8 pt-0 bg-white blogSection">
                 <div className="container">
                     <h2 className="text-[20px] font-[600] mb-4">From The Blog</h2>
                     <Swiper slidesPerView={4} spaceBetween={20} navigation={true} modules={[Navigation]} observer={true} observeParents={true} className="blogSlider">
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                         <SwiperSlide>
-                            <BlogItem/>
+                            <BlogItem />
                         </SwiperSlide>
                     </Swiper>
                 </div>

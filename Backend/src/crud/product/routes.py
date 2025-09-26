@@ -55,29 +55,35 @@ async def create_product(product_data: ProductCreateModel,
     )
 
 @product_customer_router.get('/category')
-async def get_all_products_customer(category_id: str,
+async def get_all_products_customer(category_identifier: str,
                                     search: Optional[str] = None,
                                     category_ids: Optional[List[str]] = Query(default=[]),
+                                    category_slugs: Optional[List[str]] = Query(default=[]),
                                     min_price: Optional[int] = None,
                                     max_price: Optional[int] = None,
                                     sort_by: Optional[str] = None,
                                     colors: Optional[List[str]] = Query(default=[]),
                                     sizes: Optional[List[str]] = Query(default=[]),
                                     rating: Optional[List[int]] = Query(default=[]),
+                                    brand_id: Optional[str] = None,
+                                    material_ids: Optional[List[str]] = Query(default=[]),
                                     skip: int = 0, limit: int = 16,
                                     session: AsyncSession = Depends(get_session)):
     filter_data = ProductFilterModel(
         search=search,
         category_ids=category_ids,
+        category_slugs=category_slugs,
         min_price=min_price,
         max_price=max_price,
         sort_by=sort_by,
         colors=colors,
         sizes=sizes,
-        rating=rating
+        rating=rating,
+        brand_id=brand_id,
+        material_ids=material_ids
     )
 
-    products = await get_all_products_service.get_all_products_customer(category_id, filter_data, session, skip, limit)
+    products = await get_all_products_service.get_all_products_customer(category_identifier, filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -151,6 +157,7 @@ async def get_products_related(product_id: str, price_range: float = 0.4, limit_
         }
     )
 
+
 @product_customer_router.get('/top-discount')
 async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
     products = await get_top_discount_service.get_top_discount(session, limit)
@@ -163,6 +170,7 @@ async def get_products_top_discount(limit: int = 12, session: AsyncSession = Dep
         }
     )
 
+
 @product_customer_router.get('/filter-info')
 async def get_filters_info(category_id: str, session: AsyncSession = Depends(get_session)):
     filters = await get_filters_info_service.get_filters_info(category_id, session)
@@ -174,6 +182,7 @@ async def get_filters_info(category_id: str, session: AsyncSession = Depends(get
             "content": filters
         }
     )
+
 
 @product_admin_router.get("/statistics/count-products", status_code=status.HTTP_200_OK,
                           dependencies=[Depends(admin_role_middleware)])
@@ -201,6 +210,8 @@ async def get_all_product_admin(search: Optional[str] = None,
                                 colors: Optional[List[str]] = None,
                                 sizes: Optional[List[str]] = None,
                                 rating: Optional[List[int]] = Query(None),
+                                brand_id: Optional[str] = None,
+                                material_ids: Optional[List[str]] = Query(default=[]),
                                 token_details: dict = Depends(access_token_bearer),
                                 skip: int = 0, limit: int = 10,
                                 session: AsyncSession = Depends(get_session)):
@@ -212,7 +223,9 @@ async def get_all_product_admin(search: Optional[str] = None,
         sort_by=sort_by,
         colors=colors,
         sizes=sizes,
-        rating=rating
+        rating=rating,
+        brand_id=brand_id,
+        material_ids=material_ids
     )
 
     product_list_dict = await get_all_products_service.get_all_product_admin(filter_data, session, skip, limit,
@@ -226,15 +239,31 @@ async def get_all_product_admin(search: Optional[str] = None,
         }
     )
 
-@product_customer_router.get('/{id}')
-async def get_detail_product_customer(id: str, session: AsyncSession = Depends(get_session)):
-    product_dict = await get_detail_product_service.get_detail_product_customer(id, session)
+
+@product_customer_router.get('/{identifier}')
+async def get_detail_product_customer(identifier: str, session: AsyncSession = Depends(get_session)):
+    product_dict = await get_detail_product_service.get_detail_product_customer(identifier, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin chi tiết của sản phẩm",
             "content": product_dict
+        }
+    )
+
+
+@product_customer_router.get('/{product_identifier}/id')
+async def get_product_id(product_identifier: str, session: AsyncSession = Depends(get_session)):
+    product_id = await product_service.resolve_product_id(product_identifier, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin id của sản phẩm",
+            "content": {
+                "product_id": product_id
+            }
         }
     )
 

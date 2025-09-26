@@ -17,7 +17,7 @@ from src.schemas.product import DeleteMultipleProductModel
 
 class ProductRepository:
     async def create_product(self, product_data, session: AsyncSession):
-        product_data_dict = product_data.model_dump(exclude={"categories_id", "product_variant"})
+        product_data_dict = product_data.model_dump(exclude={"categories_id", "product_variant", "materials", "tags_id"})
 
         new_product = Product(
             **product_data_dict

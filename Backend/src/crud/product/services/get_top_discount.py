@@ -120,6 +120,7 @@ class GetTopDiscountService:
                 "images": p.images,
                 "avg_rating": p.avg_rating,
                 "total_sold": p.total_sold,
+                "slug": p.slug,
                 "original_price": original_price,
                 "discounted_price": discounted_price,
                 "discount_percent": offer_discount,

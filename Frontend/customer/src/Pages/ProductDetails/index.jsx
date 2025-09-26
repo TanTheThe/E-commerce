@@ -15,19 +15,31 @@ const ProductDetails = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
     const [product, setProduct] = useState(null);
+    const [productId, setProductId] = useState(null);
     const [loading, setLoading] = useState(false);
     const [reviews, setReviews] = useState([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsTotal, setReviewsTotal] = useState(0);
-    const [reviewForm, setReviewForm] = useState({
-        content: '',
-        rating: 0
-    });
     const [selectedReviewId, setSelectedReviewId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const { id } = useParams();
 
+    const fetchProductId = async () => {
+        try {
+            const response = await getDataApi(`/customer/product/${id}/id`);
+
+            if (response.success === true) {
+                setProductId(response.data.product_id || null);
+            } else {
+                console.error('Failed to fetch product ID:', response.message);
+                setProductId(null);
+            }
+        } catch (error) {
+            console.error('Error fetching product ID:', error);
+            setProductId(null);
+        }
+    };
 
     const fetchProductDetail = async () => {
         setLoading(true);
@@ -49,11 +61,11 @@ const ProductDetails = () => {
     };
 
     const fetchReviews = async () => {
-        if (!id) return;
+        if (!productId) return;
 
         setReviewsLoading(true);
         try {
-            const response = await getDataApi(`/customer/evaluate/by-product/${id}`);
+            const response = await getDataApi(`/customer/evaluate/by-product/${productId}`);
 
             if (response.success === true) {
                 setReviews(response.data.data || []);
@@ -75,14 +87,15 @@ const ProductDetails = () => {
     useEffect(() => {
         if (id) {
             fetchProductDetail();
+            fetchProductId();
         }
     }, [id]);
 
     useEffect(() => {
-        if (activeTab === 2 && id) {
+        if (activeTab === 2 && productId) {
             fetchReviews();
         }
-    }, [activeTab, id]);
+    }, [activeTab, productId]);
 
     useEffect(() => {
         const token = localStorage.getItem('accesstoken');
@@ -98,11 +111,6 @@ const ProductDetails = () => {
         });
     };
 
-    const formatPrice = (price) => {
-        if (!price) return 'N/A';
-        return `${price.toLocaleString('vi-VN')}đ`;
-    };
-
     const roundRating = (rating) => {
         if (rating === null || rating === undefined) return 0;
 
@@ -115,13 +123,6 @@ const ProductDetails = () => {
         } else {
             return Math.floor(rating);
         }
-    };
-
-    const handleReviewFormChange = (field, value) => {
-        setReviewForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
     };
 
     const formatCustomerName = (customer) => {
@@ -177,7 +178,7 @@ const ProductDetails = () => {
                             <Link
                                 underline="hover"
                                 color="inherit"
-                                href={`/category/${product.categories[0].id}`}
+                                href={`/category/${product.categories[0].slug || product.categories[0].id}`}
                                 className="link transition !text-[14px]"
                             >
                                 {product.categories[0].name}
@@ -252,15 +253,31 @@ const ProductDetails = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr className="bg-white border-b border-gray-200">
-                                            <td className="px-6 py-4 font-[500]">Tên sản phẩm</td>
-                                            <td className="px-6 py-4 font-[500]">{product.name}</td>
-                                        </tr>
-                                        {product.categories && product.categories.length > 0 && (
+                                        {product.brand && (
                                             <tr className="bg-white border-b border-gray-200">
-                                                <td className="px-6 py-4 font-[500]">Danh mục</td>
+                                                <td className="px-6 py-4 font-[500]">Thương hiệu</td>
+                                                <td className="px-6 py-4 font-[500]">{product.brand.name}</td>
+                                            </tr>
+                                        )}
+                                        {product.materials && product.materials.length > 0 && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <td className="px-6 py-4 font-[500]">Chất liệu</td>
                                                 <td className="px-6 py-4 font-[500]">
-                                                    {product.categories.map(cat => cat.name).join(', ')}
+                                                    {product.materials.map(material => material.name).join(', ')}
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {product.tags && product.tags.length > 0 && (
+                                            <tr className="bg-white border-b border-gray-200">
+                                                <td className="px-6 py-4 font-[500]">Tags</td>
+                                                <td className="px-6 py-4 font-[500]">
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {product.tags.map((tag, index) => (
+                                                            <span key={tag.id || index} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                                                {tag.name}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         )}
@@ -376,7 +393,7 @@ const ProductDetails = () => {
                     )}
                 </div>
 
-                <RelatedSection productId={id} />
+                <RelatedSection productId={productId} />
             </section>
             <ReviewDetailModal
                 reviewId={selectedReviewId}

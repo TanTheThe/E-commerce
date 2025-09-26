@@ -1,4 +1,6 @@
+import uuid
 from datetime import datetime
+from typing import List
 
 from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
@@ -6,7 +8,8 @@ from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories, Product_Variant, Special_Offer
+from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand, Material, Product_Material, \
+    Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc, asc, or_, func, select, case
 from src.crud.product.repositories import ProductRepository
@@ -30,26 +33,44 @@ color_service = ColorService()
 
 
 class GetAllProductsService:
-    async def get_all_products_customer(self, category_id: str, filter_data: ProductFilterModel,
+    async def get_all_products_customer(self, category_identifier: str, filter_data: ProductFilterModel,
                                                 session: AsyncSession, skip: int = 0, limit: int = 16):
-        condition_cate = and_(Categories.id == category_id, Categories.deleted_at.is_(None))
-        category = await categories_repository.get_category(condition_cate, session)
+        category = await self.find_category_by_identifier(category_identifier, session)
 
         if not category:
             CategoriesException.not_found()
 
         category_ids_to_filter = await self.get_category_ids_for_filter(category, session)
 
-        if filter_data.category_ids:
-            existing_categories = set(filter_data.category_ids)
-            url_categories = set(category_ids_to_filter)
-            combined_categories = existing_categories.intersection(url_categories)
-            if combined_categories:
-                filter_data.category_ids = list(combined_categories)
+        is_category_uuid = await self.is_uuid(category_identifier)
+
+        if is_category_uuid:
+            if filter_data.category_ids:
+                existing_categories = set(filter_data.category_ids)
+                url_categories = set(category_ids_to_filter)
+                combined_categories = existing_categories.intersection(url_categories)
+                if combined_categories:
+                    filter_data.category_ids = list(combined_categories)
+                else:
+                    filter_data.category_ids = []
             else:
-                filter_data.category_ids = []
+                filter_data.category_ids = category_ids_to_filter
         else:
-            filter_data.category_ids = category_ids_to_filter
+            if filter_data.category_slugs:
+                selected_category_ids = await self.convert_slugs_to_ids(filter_data.category_slugs, session)
+
+                existing_categories = set(selected_category_ids)
+
+                url_categories = set(category_ids_to_filter)
+
+                combined_categories = existing_categories.intersection(url_categories)
+
+                if combined_categories:
+                    filter_data.category_ids = list(combined_categories)
+                else:
+                    filter_data.category_ids = []
+            else:
+                filter_data.category_ids = category_ids_to_filter
 
         joins = [
             selectinload(Product.categories).options(
@@ -77,6 +98,18 @@ class GetAllProductsService:
                 Special_Offer.start_time,
                 Special_Offer.end_time,
                 Special_Offer.deleted_at
+            ),
+
+            selectinload(Product.brand).load_only(
+                Brand.id,
+                Brand.name,
+                Brand.deleted_at
+            ),
+
+            selectinload(Product.materials).load_only(
+                Material.id,
+                Material.name,
+                Material.deleted_at
             ),
         ]
 
@@ -117,6 +150,7 @@ class GetAllProductsService:
                 "description": product[0].description,
                 "short_description": product[0].short_description,
                 "total_sold": product[0].total_sold,
+                "slug": product[0].slug,
                 "categories": [
                     {
                         "id": str(category.id),
@@ -135,6 +169,20 @@ class GetAllProductsService:
             "data": product_list,
             "total": len(product_list)
         }
+
+    async def find_category_by_identifier(self, identifier: str, session: AsyncSession):
+        try:
+            uuid.UUID(identifier)
+            is_uuid = True
+        except ValueError:
+            is_uuid = False
+
+        if is_uuid:
+            condition = and_(Categories.id == identifier, Categories.deleted_at.is_(None))
+        else:
+            condition = and_(Categories.slug == identifier, Categories.deleted_at.is_(None))
+
+        return await categories_repository.get_category(condition, session)
 
     def _is_offer_valid(self, offer: Special_Offer) -> bool:
         if not offer:
@@ -162,6 +210,31 @@ class GetAllProductsService:
             return [str(category.id)] + child_category_ids
         else:
             return [str(category.id)]
+
+    async def is_uuid(self, identifier: str):
+        try:
+            uuid.UUID(identifier)
+            return True
+        except ValueError:
+            return False
+
+    async def convert_slugs_to_ids(self, slugs: List[str], session: AsyncSession):
+        if not slugs:
+            return []
+
+        condition = [
+            Categories.slug.in_(slugs),
+            Categories.deleted_at.is_(None)
+        ]
+        categories, _ = await categories_repository.get_all_categories(condition, session)
+
+        category_ids = [str(category.id) for category in categories]
+
+        return category_ids
+
+
+
+# --------------------------------------------- Get all products admin ------------------------------------------------
 
     async def get_all_product_admin(self, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0,
                                             limit: int = 10,
@@ -194,6 +267,28 @@ class GetAllProductsService:
                 Special_Offer.start_time,
                 Special_Offer.end_time,
                 Special_Offer.deleted_at
+            ),
+
+            selectinload(Product.brand).load_only(
+                Brand.id,
+                Brand.name,
+                Brand.slug,
+                Brand.logo,
+                Brand.deleted_at
+            ),
+
+            selectinload(Product.materials).load_only(
+                Material.id,
+                Material.name,
+                Material.slug,
+                Material.deleted_at
+            ),
+
+            selectinload(Product.product_materials).load_only(
+                Product_Material.id,
+                Product_Material.material_id,
+                Product_Material.percentage,
+                Product_Material.deleted_at
             ),
         ]
 
@@ -229,6 +324,31 @@ class GetAllProductsService:
             offer = p.special_offer
             offer_status = self._get_offer_status(offer)
 
+            brand_data = None
+            if p.brand and p.brand.deleted_at is None:
+                brand_data = {
+                    "id": str(p.brand.id),
+                    "name": p.brand.name,
+                    "slug": p.brand.slug,
+                    "logo": p.brand.logo
+                }
+
+            materials_data = []
+            if p.product_materials:
+                for product_material in p.product_materials:
+                    if product_material.deleted_at is None:
+                        material = next(
+                            (m for m in p.materials if m.id == product_material.material_id and m.deleted_at is None),
+                            None
+                        )
+                        if material:
+                            materials_data.append({
+                                "id": str(material.id),
+                                "name": material.name,
+                                "slug": material.slug,
+                                "percentage": product_material.percentage
+                            })
+
             product_data = {
                 "id": str(p.id),
                 "name": p.name,
@@ -241,6 +361,8 @@ class GetAllProductsService:
                     }
                     for category in valid_categories
                 ],
+                "brand": brand_data,
+                "materials": materials_data,
                 "created_at": str(p.created_at) if p.created_at else "",
                 "variant_count": variant_count,
                 "price_range": price_range,
@@ -259,6 +381,10 @@ class GetAllProductsService:
             "data": product_list,
             "total": total[0]
         }
+
+
+
+# ----------------------------------- Hàm dùng chung-----------------------------------------------------------
 
     def _get_offer_status(self, offer: Special_Offer) -> dict:
         if not offer:
@@ -284,7 +410,17 @@ class GetAllProductsService:
         filters = [Product.deleted_at.is_(None)]
 
         if filter_data.search:
-            filters.append(Product.name.ilike(f"%{filter_data.search}%"))
+            search_conditions = [
+                Product.name.ilike(f"%{filter_data.search}%"),
+                Product.tags.any(
+                    and_(
+                        Tag.name.ilike(f"%{filter_data.search}%"),
+                        Tag.deleted_at.is_(None),
+                        Tag.is_active == True
+                    )
+                )
+            ]
+            filters.append(or_(*search_conditions))
 
         if filter_data.category_ids:
             filters.append(
@@ -292,6 +428,30 @@ class GetAllProductsService:
                     and_(
                         Categories.id.in_(filter_data.category_ids),
                         Categories.deleted_at.is_(None)
+                    )
+                )
+            )
+
+        if filter_data.brand_id:
+            filters.append(
+                and_(
+                    Product.brand_id == filter_data.brand_id,
+                    Product.brand.has(
+                        and_(
+                            Brand.deleted_at.is_(None),
+                            Brand.is_active == True
+                        )
+                    )
+                )
+            )
+
+        if filter_data.material_ids:
+            filters.append(
+                Product.materials.any(
+                    and_(
+                        Material.id.in_(filter_data.material_ids),
+                        Material.deleted_at.is_(None),
+                        Material.is_active == True
                     )
                 )
             )
@@ -391,7 +551,6 @@ class GetAllProductsService:
     async def filter_sort_product(self, sort_by: SortBy, session: AsyncSession):
         if not sort_by or sort_by == SortBy.newest:
             return desc(Product.created_at)
-
 
         elif sort_by == SortBy.price_asc:
             min_price_subquery = (

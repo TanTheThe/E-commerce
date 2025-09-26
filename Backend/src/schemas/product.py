@@ -1,6 +1,8 @@
 from typing import Optional, List
 from pydantic import BaseModel, Field
 import uuid
+
+from src.schemas.material import ProductMaterialCreateModel
 from src.schemas.product_variant import ProductVariantModel, ProductVariantCreateModel, ProductVariantUpdateModel
 from datetime import datetime
 from enum import Enum
@@ -24,6 +26,9 @@ class ProductCreateModel(BaseModel):
     short_description: Optional[str] = None
     categories_id: List[uuid.UUID]
     product_variant: List[ProductVariantCreateModel]
+    brand_id: Optional[uuid.UUID] = None
+    materials: Optional[List[ProductMaterialCreateModel]] = None
+    tags_id: Optional[List[uuid.UUID]] = None
 
 class ProductUpdateModel(BaseModel):
     name: str = None
@@ -32,6 +37,9 @@ class ProductUpdateModel(BaseModel):
     short_description: Optional[str] = None
     status: str = Field(default="active")
     categories_id: List[uuid.UUID] = None
+    brand_id: Optional[uuid.UUID] = None
+    materials: Optional[List[dict]] = None
+    tags_id: Optional[List[uuid.UUID]] = None
     product_variant: List[ProductVariantUpdateModel] = None
     deleted_variant_ids: List[str] = None
 
@@ -50,12 +58,15 @@ class SortBy(str, Enum):
 class ProductFilterModel(BaseModel):
     search: Optional[str] = None
     category_ids: Optional[List[str]] = None
+    category_slugs: Optional[List[str]] = None
     min_price: Optional[int] = None
     max_price: Optional[int] = None
     sort_by: Optional[SortBy] = None
     colors: Optional[List[str]] = None
     sizes: Optional[List[str]] = None
     rating: Optional[List[int]] = None
+    brand_id: Optional[str] = None
+    material_ids: Optional[List[str]] = None
 
 class ProductStatus(str, Enum):
     ACTIVE = "active"

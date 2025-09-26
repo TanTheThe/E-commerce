@@ -40,13 +40,35 @@ const CartPanel = () => {
 
     const QuantityControls = ({ variant }) => {
         const currentQty = getCurrentQuantity(variant.cart_item_id, variant.quantity);
+        const isOutOfStock = variant.availability_status === "out_of_stock";
+        const isInsufficient = variant.availability_status === "insufficient";
+
+        if (isOutOfStock) {
+            return (
+                <div className="flex items-center gap-2 opacity-50">
+                    <button
+                        disabled
+                        className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm cursor-not-allowed opacity-50"
+                    >
+                        -
+                    </button>
+                    <span className="mx-2 min-w-[30px] text-center text-gray-400">{currentQty}</span>
+                    <button
+                        disabled
+                        className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm cursor-not-allowed opacity-50"
+                    >
+                        +
+                    </button>
+                </div>
+            );
+        }
 
         return (
             <div className="flex items-center gap-2">
                 <button
                     onClick={() => updateQuantity(variant.cart_item_id, currentQty - 1)}
                     disabled={currentQty <= 1}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm cursor-pointer hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     -
                 </button>
@@ -54,12 +76,35 @@ const CartPanel = () => {
                 <button
                     onClick={() => updateQuantity(variant.cart_item_id, currentQty + 1)}
                     disabled={currentQty >= variant.max_quantity}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm cursor-pointer hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     +
                 </button>
             </div>
         );
+    };
+
+    const getAvailabilityMessage = (variant) => {
+        const currentQty = getCurrentQuantity(variant.cart_item_id, variant.quantity);
+
+        switch (variant.availability_status) {
+            case "out_of_stock":
+                return (
+                    <div className="text-[12px] text-red-500 font-medium bg-red-50 px-2 py-1 rounded">
+                        ❌ Sản phẩm hết hàng
+                    </div>
+                );
+            case "insufficient":
+                return (
+                    <div className="text-[12px] text-orange-500 font-medium bg-orange-50 px-2 py-1 rounded">
+                        ⚠️ Chỉ còn {variant.max_quantity} sản phẩm (đang chọn {currentQty})
+                    </div>
+                );
+            case "available":
+                return null;
+            default:
+                return null;
+        }
     };
 
     const fetchCartData = async (pageNum = 1, append = false) => {
@@ -118,11 +163,14 @@ const CartPanel = () => {
     };
 
     const isProductFullySelected = (product) => {
-        return product.variants.every(variant => selectedVariants.has(variant.cart_item_id));
+        const availableVariants = product.variants.filter(variant => variant.availability_status !== "out_of_stock");
+        if (availableVariants.length === 0) return false;
+        return availableVariants.every(variant => selectedVariants.has(variant.cart_item_id));
     };
 
     const isProductPartiallySelected = (product) => {
-        return product.variants.some(variant => selectedVariants.has(variant.cart_item_id)) &&
+        const availableVariants = product.variants.filter(variant => variant.availability_status !== "out_of_stock");
+        return availableVariants.some(variant => selectedVariants.has(variant.cart_item_id)) &&
             !isProductFullySelected(product);
     };
 
@@ -198,14 +246,15 @@ const CartPanel = () => {
     const toggleProduct = (product) => {
         setSelectedVariants(prev => {
             const newSet = new Set(prev);
-            const isFullySelected = product.variants.every(variant => newSet.has(variant.cart_item_id));
+            const availableVariants = product.variants.filter(variant => variant.availability_status !== "out_of_stock");
+            const isFullySelected = availableVariants.every(variant => newSet.has(variant.cart_item_id));
 
             if (isFullySelected) {
-                product.variants.forEach(variant => {
+                availableVariants.forEach(variant => {
                     newSet.delete(variant.cart_item_id);
                 });
             } else {
-                product.variants.forEach(variant => {
+                availableVariants.forEach(variant => {
                     newSet.add(variant.cart_item_id);
                 });
             }
@@ -231,9 +280,16 @@ const CartPanel = () => {
         }
 
         const selectedItems = [];
+        let hasUnavailableItems = false;
+
         allVariants.forEach(product => {
             product.variants.forEach(variant => {
                 if (selectedVariants.has(variant.cart_item_id)) {
+                    if (variant.availability_status === "out_of_stock") {
+                        hasUnavailableItems = true;
+                        return;
+                    }
+
                     selectedItems.push({
                         ...variant,
                         product_name: product.product_name,
@@ -245,13 +301,21 @@ const CartPanel = () => {
             });
         });
 
+        if (hasUnavailableItems) {
+            toast.error('Có sản phẩm đã hết hàng, vui lòng bỏ chọn để tiếp tục');
+            return;
+        }
+
         const totalPrice = getTotalPrice();
-
         addItemsToCheckout(selectedItems, totalPrice);
-
         setOpenCartPanel(false);
-
         navigate('/cart');
+    };
+
+
+    const getProductUrl = (product) => {
+        const identifier = product.product_slug || product.product_id;
+        return `/product/${identifier}`;
     };
 
     return (
@@ -280,7 +344,7 @@ const CartPanel = () => {
                                         />
                                     </div>
                                     <h3 className="text-[16px] font-[600] text-gray-800">
-                                        <Link to={`/product/${product.product_id}`} className="link transition-all">
+                                        <Link to={getProductUrl(product)} className="link transition-all">
                                             {product.product_name}
                                         </Link>
                                     </h3>
@@ -289,19 +353,23 @@ const CartPanel = () => {
                                 <div className="variants-list">
                                     {product.variants.map((variant, index) => {
                                         const colorName = getColorDisplay(variant);
+                                        const isOutOfStock = variant.availability_status === "out_of_stock";
+                                        const isInsufficient = variant.availability_status === "insufficient";
+                                        const availabilityMessage = getAvailabilityMessage(variant);
 
                                         return (
-                                            <div key={variant.cart_item_id} className={`cartItem w-full flex items-center gap-4 pb-4 mb-4 ${index < product.variants.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                                            <div key={variant.cart_item_id} className={`cartItem w-full flex items-center gap-4 pb-4 mb-4 ${index < product.variants.length - 1 ? 'border-b border-gray-100' : ''} ${isOutOfStock ? 'bg-gray-50' : ''}`}>
                                                 <div className="flex items-center">
                                                     <input
                                                         type="checkbox"
                                                         checked={isVariantSelected(variant.cart_item_id)}
                                                         onChange={() => toggleVariant(variant.cart_item_id)}
-                                                        className="w-4 h-4 mr-3 accent-[#ff5252] cursor-pointer"
+                                                        disabled={isOutOfStock}
+                                                        className="w-4 h-4 mr-3 accent-[#ff5252] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                                     />
                                                 </div>
 
-                                                <div className="img w-[25%] overflow-hidden h-[80px] rounded-md">
+                                                <div className={`img w-[25%] overflow-hidden h-[80px] rounded-md ${isOutOfStock ? 'opacity-50' : ''}`}>
                                                     <img
                                                         src={variant.image || '/default-product.jpg'}
                                                         alt={`${product.product_name} - ${variant.size} ${colorName}`}
@@ -309,11 +377,17 @@ const CartPanel = () => {
                                                     />
                                                 </div>
 
-                                                <div className='info w-[75%] pr-5 relative'>
+                                                <div className={`info w-[75%] pr-5 relative ${isOutOfStock ? 'opacity-75' : ''}`}>
                                                     <div className="text-[13px] text-gray-600 mb-2 flex gap-3">
                                                         {variant.size && <span>Size: <strong>{variant.size}</strong></span>}
                                                         {colorName && <span>Màu: <strong>{colorName}</strong></span>}
                                                     </div>
+
+                                                    {availabilityMessage && (
+                                                        <div className="mb-2">
+                                                            {availabilityMessage}
+                                                        </div>
+                                                    )}
 
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-2">
@@ -321,7 +395,7 @@ const CartPanel = () => {
                                                             <QuantityControls variant={variant} />
                                                         </div>
                                                         <div className="text-right">
-                                                            <div className="text-[14px] text-[#ff5252] font-bold">
+                                                            <div className={`text-[14px] font-bold ${isOutOfStock ? 'text-gray-400' : 'text-[#ff5252]'}`}>
                                                                 {variant.unit_price?.toLocaleString('vi-VN')}đ
                                                             </div>
                                                             <div className="text-[12px] text-gray-500">

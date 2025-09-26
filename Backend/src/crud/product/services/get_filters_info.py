@@ -1,9 +1,11 @@
+from src.crud.brand.repositories import BrandRepository
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
+from src.crud.material.repositories import MaterialRepository
 from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Categories, Color, Size
+from src.database.models import Categories, Color, Size, Brand, Material
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
@@ -23,6 +25,8 @@ get_detail_product_service = GetDetailProductService()
 product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()
 color_service = ColorService()
+brand_repository = BrandRepository()
+material_repository = MaterialRepository()
 
 
 class GetFiltersInfoService:
@@ -40,9 +44,15 @@ class GetFiltersInfoService:
 
         colors, _ = await color_repository.get_all_color([Color.deleted_at.is_(None)], session, 0, 1000)
 
+        brands, _ = await brand_repository.get_all_brand([Brand.deleted_at.is_(None), Brand.is_active == True], session,
+                                                         0, 1000)
+
+        materials, _ = await material_repository.get_all_material(
+            [Material.deleted_at.is_(None), Material.is_active == True], session, 0, 1000)
+
         return {
             "categories": [
-                {"id": str(category.id), "name": category.name}
+                {"id": str(category.id), "name": category.name, "slug": category.slug}
                 for category in child_categories
             ],
             "sizes": [
@@ -52,5 +62,13 @@ class GetFiltersInfoService:
             "colors": [
                 {"id": str(color.id), "name": color.name}
                 for color in colors
+            ],
+            "brands": [
+                {"id": str(brand.id), "name": brand.name, "slug": brand.slug}
+                for brand in brands
+            ],
+            "materials": [
+                {"id": str(material.id), "name": material.name, "slug": material.slug}
+                for material in materials
             ]
         }

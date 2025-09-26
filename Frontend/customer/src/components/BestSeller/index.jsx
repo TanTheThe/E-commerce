@@ -5,31 +5,43 @@ import { getDataApi } from '../../utils/api';
 import { MyContext } from '../../App';
 
 const BestSellerSection = () => {
-    const context = useContext(MyContext);
-
     const [value, setValue] = useState(0);
     const [bestSellerData, setBestSellerData] = useState({});
     const [parentCategories, setParentCategories] = useState([]);
 
     const [loadingCategories, setLoadingCategories] = useState(true);
     const [loadingProducts, setLoadingProducts] = useState(false);
-
     const [fetchingCategories, setFetchingCategories] = useState(new Set());
 
-    useEffect(() => {
-        if (context?.categories && Array.isArray(context.categories)) {
-            const parents = context.categories.filter(cat => cat.parent_id === null);
-            setParentCategories(parents);
-            setLoadingCategories(false);
+    const fetchCategories = async () => {
+        try {
+            const res = await getDataApi("/customer/categories/all");
+            if (res.success) {
+                const categories = res.data.data;
+                const parents = categories.filter(cat => cat.parent_id === null);
+                setParentCategories(parents);
+                setLoadingCategories(false);
 
-            if (parents.length > 0 && !bestSellerData[parents[0].id] && !fetchingCategories.has(parents[0].id)) {
-                fetchBestSellersForCategory(parents[0].id);
+                if (parents.length > 0 && parents[0]?.id && !bestSellerData[parents[0].id] && !fetchingCategories.has(parents[0].id)) {
+                    fetchBestSellersForCategory(parents[0].id);
+                }
+            } else {
+                setParentCategories([]);
+                setLoadingCategories(false);
             }
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+            setParentCategories([]);
+            setLoadingCategories(false);
         }
-    }, [context?.categories]);
+    };
+
+    useEffect(() => {
+        fetchCategories();
+    }, []);
 
     const fetchBestSellersForCategory = async (parentCategoryId) => {
-        if (fetchingCategories.has(parentCategoryId)) {
+        if (!parentCategoryId || fetchingCategories.has(parentCategoryId)) {
             return;
         }
 
@@ -89,16 +101,6 @@ const BestSellerSection = () => {
         const currentParentId = parentCategories[value]?.id;
         return bestSellerData[currentParentId] || [];
     };
-
-    if (!context) {
-        return (
-            <section className="bg-white py-8">
-                <div className="container">
-                    <div className="text-center">Đang tải...</div>
-                </div>
-            </section>
-        );
-    }
 
     if (loadingCategories) {
         return (

@@ -168,6 +168,7 @@ class GetRelatedProductsService:
                 "name": p.name,
                 "images": p.images,
                 "total_sold": p.total_sold,
+                "slug": p.slug,
                 "categories": [
                     {"id": str(category.id), "name": category.name}
                     for category in valid_categories

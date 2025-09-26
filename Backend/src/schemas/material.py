@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
+import uuid
 
 
 class MaterialCreateModel(BaseModel):
@@ -16,3 +17,7 @@ class DeleteMultipleMaterialsModel(BaseModel):
 class ProductMaterialAssignmentModel(BaseModel):
     product_id: str
     materials: List[Dict[str, Any]]
+
+class ProductMaterialCreateModel(BaseModel):
+    material_id: uuid.UUID
+    percentage: float

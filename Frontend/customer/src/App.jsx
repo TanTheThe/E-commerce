@@ -173,7 +173,7 @@ function App() {
           </Drawer>
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
-            <Route path={"/category/:categoryId"} exact={true} element={<ProductListing />} />
+            <Route path={"/category/:categoryIdentifier"} exact={true} element={<ProductListing />} />
             <Route path={"/product/:id"} exact={true} element={<ProductDetails />} />
             <Route path={"/login"} element={<Login />} />
             <Route path={"/signup"} exact={true} element={<Register />} />
