@@ -16,35 +16,7 @@ access_token_bearer = AccessTokenBearer()
 
 user_admin_router = APIRouter(prefix="/user")
 user_customer_router = APIRouter(prefix="/user")
-user_common_router = APIRouter(prefix="/user")
-
-
-@user_customer_router.put('/change-password', dependencies=[Depends(customer_role_middleware)])
-async def change_password_customer(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
-                                   token_details: dict = Depends(access_token_bearer)):
-    user_id = token_details['user']['id']
-    return await user_service.change_password_service(user_id, passwords, session)
-
-
-@user_admin_router.put('/change-password', dependencies=[Depends(admin_role_middleware)])
-async def change_password_admin(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
-                                token_details: dict = Depends(access_token_bearer)):
-    user_id = token_details['user']['id']
-    return await user_service.change_password_service(user_id, passwords, session)
-
-
-@user_customer_router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def create_user_account(user_data: UserCreateModel, bg_tasks: BackgroundTasks,
-                              session: AsyncSession = Depends(get_session)):
-    new_user = await user_service.create_user_account_service(user_data, bg_tasks, session)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Tạo tài khoản thành công! Vui lòng kiểm tra email để tiến hành xác thực",
-            "content": new_user.model_dump()
-        }
-    )
+user_staff_router = APIRouter(prefix="/user")
 
 
 @user_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
@@ -90,14 +62,6 @@ async def get_all_customer_for_offer(offer_id: str,
             "content": filtered_users
         }
     )
-
-@user_customer_router.get('/verify/{token}')
-async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
-    try:
-        await user_service.verify_user_account_service(token, session)
-        return RedirectResponse(url="http://localhost:5173/login?verified=true", status_code=302)
-    except Exception:
-        return RedirectResponse(url="http://localhost:5173/login?verified=false", status_code=302)
 
 
 @user_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 cart_admin_router = APIRouter(prefix="/cart")
 cart_customer_router = APIRouter(prefix="/cart")
-cart_common_router = APIRouter(prefix="/cart")
+cart_staff_router = APIRouter(prefix="/cart")
 
 create_cart_service = CreateCartService()
 get_all_carts_service = GetAllCartsService()

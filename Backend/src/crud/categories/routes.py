@@ -10,7 +10,7 @@ from typing import Optional
 
 categories_admin_router = APIRouter(prefix="/categories")
 categories_customer_router = APIRouter(prefix="/categories")
-categories_common_router = APIRouter(prefix="/categories")
+categories_staff_router = APIRouter(prefix="/categories")
 
 categories_service = CategoriesService()
 access_token_bearer = AccessTokenBearer()

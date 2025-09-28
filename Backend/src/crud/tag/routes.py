@@ -10,7 +10,7 @@ from src.schemas.tag import TagCreateModel, ProductTagAssignmentModel, TagUpdate
 
 tag_admin_router = APIRouter(prefix="/tag")
 tag_customer_router = APIRouter(prefix="/tag")
-tag_common_router = APIRouter(prefix="/tag")
+tag_staff_router = APIRouter(prefix="/tag")
 
 tag_service = TagService()
 access_token_bearer = AccessTokenBearer()

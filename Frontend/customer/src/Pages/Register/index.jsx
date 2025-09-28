@@ -45,7 +45,7 @@ const Register = () => {
 
         setIsLoading(true);
 
-        const response = await postDataApi("/customer/user/signup", formFields);
+        const response = await postDataApi("/customer/auth/signup", formFields);
 
         if (response?.success === true) {
             setIsLoading(false)

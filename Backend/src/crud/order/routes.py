@@ -19,7 +19,7 @@ from src.dependencies import admin_role_middleware, customer_role_middleware
 
 order_admin_router = APIRouter(prefix="/order")
 order_customer_router = APIRouter(prefix="/order")
-order_common_router = APIRouter(prefix="/order")
+order_staff_router = APIRouter(prefix="/order")
 
 get_all_order_service = GetAllOrdersService()
 cancel_order_service = CancelOrderService()

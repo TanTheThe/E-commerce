@@ -11,7 +11,7 @@ from src.schemas.material import MaterialCreateModel, ProductMaterialAssignmentM
 
 material_admin_router = APIRouter(prefix="/material")
 material_customer_router = APIRouter(prefix="/material")
-material_common_router = APIRouter(prefix="/material")
+material_staff_router = APIRouter(prefix="/material")
 
 material_service = MaterialService()
 access_token_bearer = AccessTokenBearer()

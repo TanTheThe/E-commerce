@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 from sqlalchemy.orm import noload
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
@@ -8,7 +8,7 @@ from src.crud.authentication.utils import generate_password_hash
 from sqlmodel import select, desc, update, func, or_, distinct
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
-from src.schemas.user import UserDeleteModel, FilterUserInputModel
+from src.schemas.user import UserCreateModel, UserDeleteModel, FilterUserInputModel, UserRole
 
 
 class UserRepository:
@@ -57,21 +57,43 @@ class UserRepository:
         data_need_update.updated_at = datetime.now()
 
         return data_need_update
+    
+    
+    async def update_user_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
+        stmt = (
+            update(User)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)
 
 
-    async def create_user(self, user_data, session: AsyncSession):
+    async def create_user(self, user_data: UserCreateModel, role: UserRole, session: AsyncSession):
         user_data_dict = user_data.model_dump()
         user_data_dict['password'] = generate_password_hash(user_data_dict['password'])
+        
+        if role == UserRole.CUSTOMER:
+            user_data_dict['is_customer'] = True
+            user_data_dict['customer_status'] = "active"
+        elif role == UserRole.STAFF:
+            user_data_dict['is_staff'] = True
+            user_data_dict['staff_status'] = "active"
 
-        new_user = User(
-            **user_data_dict,
-            customer_status="active",
-            created_at=datetime.now()
-        )
-        session.add(new_user)
-        await session.commit()
+        current_time = datetime.now()
+        user_data_dict['created_at'] = current_time
+        user_data_dict['updated_at'] = current_time
+        
+        try:
+            new_user = User(**user_data_dict)
+            session.add(new_user)
+            await session.commit()
+            await session.refresh(new_user)  
+            
+            return new_user
+        except Exception as e:
+            await session.rollback()
+            raise e
 
-        return new_user
 
     async def delete_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         user_to_delete = await self.get_user(condition, session)
@@ -89,6 +111,7 @@ class UserRepository:
 
         return str(user_to_delete.id)
 
+
     async def delete_multiple_user(self, data: UserDeleteModel, session: AsyncSession):
         condition = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None))
         users = await self.get_all_user(condition, session, None, 0, 1000)
@@ -104,6 +127,7 @@ class UserRepository:
         await session.commit()
 
         return data.user_ids
+
 
     async def change_status_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         user_to_block = await self.get_user(condition, session)

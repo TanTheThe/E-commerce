@@ -98,7 +98,7 @@ const MyAccount = () => {
         setError("");
 
         try {
-            const response = await putDataApi("/customer/user/change-password", {
+            const response = await putDataApi("/customer/auth/change-password", {
                 old_password: oldPassword,
                 new_password: newPassword,
                 confirm_new_password: confirmPassword

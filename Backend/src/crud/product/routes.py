@@ -23,7 +23,7 @@ from typing import Optional, List
 
 product_admin_router = APIRouter(prefix="/product")
 product_customer_router = APIRouter(prefix="/product")
-product_common_router = APIRouter(prefix="/product")
+product_staff_router = APIRouter(prefix="/product")
 
 product_service = ProductService()
 create_product_service = CreateProductService()

@@ -11,7 +11,7 @@ from src.dependencies import admin_role_middleware, customer_role_middleware
 
 evaluate_admin_router = APIRouter(prefix="/evaluate")
 evaluate_customer_router = APIRouter(prefix="/evaluate")
-evaluate_common_router = APIRouter(prefix="/evaluate")
+evaluate_staff_router = APIRouter(prefix="/evaluate")
 
 evaluate_service = EvaluateService()
 access_token_bearer = AccessTokenBearer()

@@ -23,7 +23,7 @@ from src.schemas.return_order import CreateReturnRequest, ProcessReturnRequest, 
 
 return_order_admin_router = APIRouter(prefix="/return-order")
 return_order_customer_router = APIRouter(prefix="/return-order")
-return_order_common_router = APIRouter(prefix="/return-order")
+return_order_staff_router = APIRouter(prefix="/return-order")
 
 create_return_order_service = CreateReturnOrderService()
 get_return_requests_service = GetReturnRequestsService()

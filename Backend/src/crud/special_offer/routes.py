@@ -11,7 +11,7 @@ from typing import Optional
 
 special_offer_admin_router = APIRouter(prefix="/special-offer")
 special_offer_customer_router = APIRouter(prefix="/special-offer")
-special_offer_common_router = APIRouter(prefix="/special-offer")
+special_offer_staff_router = APIRouter(prefix="/special-offer")
 
 special_offer_service = SpecialOfferService()
 access_token_bearer = AccessTokenBearer()

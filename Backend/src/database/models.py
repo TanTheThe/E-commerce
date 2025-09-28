@@ -26,12 +26,14 @@ class User(SQLModel, table=True):
     password: str = Field(sa_column=Column(pg.VARCHAR, nullable=False), exclude=True)
     phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     customer_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    staff_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     is_verified: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     is_admin: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     is_customer: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     otp: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
@@ -819,6 +821,7 @@ class Notification(SQLModel, table=True):
     return_order: Optional["ReturnOrder"] = Relationship(back_populates="notifications",
                                                          sa_relationship_kwargs={"lazy": "noload"})
 
+
 class ReturnOrder(SQLModel, table=True):
     __tablename__ = "return_order"
 
@@ -843,6 +846,7 @@ class ReturnOrder(SQLModel, table=True):
     notifications: List["Notification"] = Relationship(back_populates="return_order",
                                                        sa_relationship_kwargs={"lazy": "noload"})
 
+
 class ReturnItem(SQLModel, table=True):
     __tablename__ = "return_item"
 
@@ -862,7 +866,354 @@ class ReturnItem(SQLModel, table=True):
     order_detail: Optional["Order_Detail"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
 
 
+class StockReservation(SQLModel, table=True):
+    """ Quản lý đặt giữ hàng trong kho.
+    Tránh việc bán trùng khi có khách đặt nhưng chưa hoàn tất thanh toán hoặc chưa xử lý đơn hàng """
+    
+    __tablename__ = 'stock_reservation'
 
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+    
+    # Số lượng sản phẩm được giữ
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Cái này giúp trace ngược: đặt giữ này là từ đơn hàng nào, giỏ hàng nào
+    reference_id: uuid.UUID = Field(sa_column=Column(pg.UUID, nullable=False))  # order_id, cart_id, etc.
+    reference_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # order, cart, etc.
+    
+    # active, fulfilled, cancelled, expired
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")  
+    
+    # Thời gian hết hạn đặt trước
+    expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))  
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    warehouse: Optional["Warehouse"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class StockAdjustmentItem(SQLModel, table=True):
+    """ Chi tiết điều chỉnh tồn kho. Một lần kiểm kho thì tạo 1 StockAdjustment, 
+    trong đó chứa nhiều StockAdjustmentItem (mỗi item ứng với một variant) """
+    
+    __tablename__ = 'stock_adjustment_item'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    stock_adjustment_id: uuid.UUID = Field(foreign_key="stock_adjustment.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+    
+    # Số lượng sản phẩm theo hệ thống (số lượng trong Stock)
+    system_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False)) 
+    
+    # Số lượng thực tế kiểm đếm được ngoài kho.
+    actual_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Chênh lệch giữa thực tế và hệ thống
+    difference_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Giá nhập của 1 sản phẩm tại thời điểm kiểm kê
+    unit_cost: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    # Tổng giá trị cần điều chỉnh = difference_quantity × unit_cost
+    adjustment_value: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    note: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+
+    stock_adjustment: Optional["StockAdjustment"] = Relationship(back_populates="adjustment_items", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class StockAdjustment(SQLModel, table=True):
+    """ Phiếu Điều chỉnh tồn kho - khi số lượng thực tế trong kho khác với số lượng trên hệ thống và cần cập nhật lại """
+    __tablename__ = 'stock_adjustment'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    adjustment_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    
+    # inventory_count, damaged_goods, expired, system_correction,...
+    reason: str = Field(sa_column=Column(pg.TEXT, nullable=False))  
+    note: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    # draft, approved, applied
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="draft"), default="draft")  
+    
+    # Tổng giá trị tiền của việc điều chỉnh
+    total_adjustment_value: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    created_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    applied_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    warehouse: Optional["Warehouse"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    adjustment_items: List["StockAdjustmentItem"] = Relationship(back_populates="stock_adjustment", sa_relationship_kwargs={'lazy': 'noload'})
+    
+    
+class StockTransferItem(SQLModel, table=True):
+    """Chi tiết phiếu chuyển kho"""
+    __tablename__ = 'stock_transfer_item'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    stock_transfer_id: uuid.UUID = Field(foreign_key="stock_transfer.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+    
+    # Số lượng được yêu cầu chuyển (lúc tạo phiếu).
+    requested_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))  
+    
+    # Số lượng thực tế đã xuất từ kho nguồn.
+    shipped_quantity: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))  
+    
+    # Số lượng thực tế đã nhận tại kho đích.
+    received_quantity: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True)) 
+    
+    # Giá vốn của sản phẩm tại thời điểm chuyển kho.
+    unit_cost: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    note: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+
+    stock_transfer: Optional["StockTransfer"] = Relationship(back_populates="transfer_items", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class StockTransfer(SQLModel, table=True):
+    """ Phiếu chuyển kho"""
+    __tablename__ = 'stock_transfer'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    transfer_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    
+    # ID kho xuất hàng (kho gửi)
+    from_warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    
+    # ID kho nhập hàng (kho nhận)
+    to_warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    
+    # pending, shipped, received, cancelled
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")  
+    
+    # Lý do chuyển kho
+    reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    note: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    requested_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True) # Người tạo yêu cầu
+    approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)  # Người duyệt yêu cầu (thường là quản lý)
+    shipped_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)   # Nhân viên kho xuất hàng
+    received_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)  # Nhân viên kho nhận hàng
+    
+    requested_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    shipped_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    received_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    from_warehouse: Optional["Warehouse"] = Relationship(back_populates="transfer_from", sa_relationship_kwargs={'lazy': 'noload'})
+    to_warehouse: Optional["Warehouse"] = Relationship(back_populates="transfer_to", sa_relationship_kwargs={'lazy': 'noload'})
+    transfer_items: List["StockTransferItem"] = Relationship(back_populates="stock_transfer", sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class StockTransaction(SQLModel, table=True):
+    """Lịch sử giao dịch kho"""
+    __tablename__ = 'stock_transaction'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    stock_id: uuid.UUID = Field(foreign_key="stock.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+
+    # inbound, outbound, adjustment, transfer, return, damaged
+    transaction_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  
+    
+    # Số lượng thay đổi trong giao dịch. Nhập thì số đương (VD: +50), xuất thì số âm (VD: -10)
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng tồn (trong Stock.quantity) trước khi giao dịch.
+    previous_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng tồn sau khi giao dịch.
+    new_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Giá vốn của 1 variant cho lần nhập này (lần nhập hiện tại)
+    unit_cost: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))  
+    
+    # Tổng giá vốn của toàn bộ variant đó cho lần nhập này. unit_cost * số lượng nhập vào
+    total_cost: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))  # Tổng giá vốn
+    
+    # ID tham chiếu đến thực thể gốc đã gây ra giao dịch kho (order_id, transfer_id,...)
+    reference_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True))
+    
+    # Loại tham chiếu (order, transfer, adjustment,...)
+    reference_type: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  
+    
+    # Lý do thực hiện giao dịch.
+    reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    note: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))  # Ghi chú
+    
+    # Nhân viên/ai đã thực hiện giao dịch
+    performed_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+
+    warehouse: Optional["Warehouse"] = Relationship(back_populates="stock_transactions", sa_relationship_kwargs={'lazy': 'noload'})
+    stock: Optional["Stock"] = Relationship(back_populates="stock_transactions", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    user: Optional["User"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class Stock(SQLModel, table=True):
+    """Tồn kho theo từng sản phẩm variant trên từng kho"""
+    __tablename__ = 'stock'
+    __table_args__ = (
+        UniqueConstraint(
+            "warehouse_id", "product_variant_id",
+            name="uq_stock_warehouse_product_variant"
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+
+    # Tổng số lượng trong kho
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    
+    # Số lượng đã giữ cho đơn hàng chưa hoàn tất
+    reserved_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    
+    # Số lượng có thể bán = quantity - reserved_quantity
+    available_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    
+    # Mức tồn kho tối thiểu. Khi còn ít hơn mức này thì cần đặt hàng
+    min_stock_level: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True), default=0)  
+    
+    # Mức tồn kho tối đa. Cảnh báo khi nhập vượt ngưỡng (trật kho)
+    max_stock_level: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    # Giá vốn trung bình hiện tại của variant trên 1 kho (bình quân cho nhiều lần nhập / nhiều giá khác nhau)
+    cost_price: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))  
+    
+    # Giá vốn của lần nhập mới nhất
+    last_cost_price: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="available"), default="available")
+    
+    # Thời điểm nhập hàng gần nhất
+    last_inbound_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True)) 
+    
+    # Thời điểm xuất hàng gần nhất.
+    last_outbound_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))  
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    warehouse: Optional["Warehouse"] = Relationship(back_populates="stocks", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    stock_transactions: List["StockTransaction"] = Relationship(back_populates="stock", sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class Warehouse(SQLModel, table=True):
+    """Kho hàng"""
+    __tablename__ = 'warehouse'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    address: str = Field(sa_column=Column(pg.TEXT, nullable=False))
+    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    email: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    manager_name: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="true"), default=True)
+    
+    # Có phải là kho mặc định không
+    is_default: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    stocks: List["Stock"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    stock_transactions: List["StockTransaction"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    
+    # Danh sách phiếu chuyển kho (đi từ kho này => Chuyển đi)
+    transfer_from: List["StockTransfer"] = Relationship(back_populates="from_warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    
+    # Danh sách phiếu chuyển kho (đến kho này => Nhận vào)
+    transfer_to: List["StockTransfer"] = Relationship(back_populates="to_warehouse", sa_relationship_kwargs={'lazy': 'noload'})
 
 
 

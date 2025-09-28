@@ -10,7 +10,7 @@ from src.schemas.notification import MarkAsReadRequest, MarkAsProcessedRequest
 
 notification_admin_router = APIRouter(prefix="/notification")
 notification_customer_router = APIRouter(prefix="/notification")
-notification_common_router = APIRouter(prefix="/notification")
+notification_staff_router = APIRouter(prefix="/notification")
 
 notification_service = NotificationService()
 access_token_bearer = AccessTokenBearer()

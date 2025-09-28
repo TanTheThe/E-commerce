@@ -10,7 +10,7 @@ from src.dependencies import admin_role_middleware
 
 brand_admin_router = APIRouter(prefix="/brand")
 brand_customer_router = APIRouter(prefix="/brand")
-brand_common_router = APIRouter(prefix="/brand")
+brand_staff_router = APIRouter(prefix="/brand")
 
 brand_service = BrandService()
 access_token_bearer = AccessTokenBearer()

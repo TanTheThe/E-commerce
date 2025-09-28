@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, model_validator
 import uuid
@@ -57,10 +58,6 @@ class VerifyLoginAdminModel(BaseModel):
     token: str
     otp: str
 
-class PasswordResetEmailModel(BaseModel):
-    email: str
-    check: str
-
 class PasswordResetConfirmModel(BaseModel):
     token: str
     new_password: str
@@ -88,5 +85,36 @@ class FilterUserInputModel(BaseModel):
 class CustomerStatusType:
     ACTIVE = "active"
     INACTIVE = "inactive"
+    
+class UserRole(str, Enum):
+    CUSTOMER = "customer"
+    STAFF = "staff"
+    ADMIN = "admin"
+    
+class AdminStaffRole(str, Enum):
+    ADMIN = "admin"
+    STAFF = "staff"
+    
+class ResetMethod(str, Enum):
+    EMAIL = "email"
+    OTP = "otp"
+    
+class ForgotPasswordConfirmModel(BaseModel):
+    token: str
+    new_password: str = Field(
+        ..., 
+        min_length=8, 
+        max_length=100,
+    )
+    
+class PasswordResetEmailModel(BaseModel):
+    email: str
+    check: ResetMethod
+    
+class VerifyOtpModel(BaseModel):
+    email: str
+    otp: str = Field(..., min_length=6, max_length=6)
+    
+
 
 

@@ -18,7 +18,7 @@ import base64
 
 vnpay_admin_router = APIRouter(prefix="/vnpay")
 vnpay_customer_router = APIRouter(prefix="/vnpay")
-vnpay_common_router = APIRouter(prefix="/vnpay")
+vnpay_staff_router = APIRouter(prefix="/vnpay")
 
 vnpay_service = VNPayService()
 access_token_bearer = AccessTokenBearer()

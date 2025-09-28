@@ -94,3 +94,8 @@ async def admin_role_middleware(role: str = Depends(verify_token_and_get_role)):
 async def customer_role_middleware(role: str = Depends(verify_token_and_get_role)):
     if role != "customer":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ có customer mới có thể sử dụng tính năng này")
+
+
+async def staff_role_middleware(role: str = Depends(verify_token_and_get_role)):
+    if role != "staff":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ có staff mới có thể sử dụng tính năng này")
