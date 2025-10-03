@@ -20,6 +20,7 @@ import ProductDetailOffcanvas from "./offcanvasProductDetail";
 import debounce from 'lodash/debounce';
 import { useCallback } from 'react';
 import HierarchicalCategorySelect from "./categoriesSelect";
+import useAuth from "../Verify/auth";
 
 
 const label = { inputProps: { 'aria-label': 'Checkbox demo' } };
@@ -91,6 +92,9 @@ const Products = () => {
 
     const [brands, setBrands] = useState([]);
     const [materials, setMaterials] = useState([]);
+
+    const { userRole, isLoading } = useAuth();
+    const isStaff = userRole === 'staff';
 
     const context = useContext(MyContext);
 
@@ -221,6 +225,8 @@ const Products = () => {
 
             const response = await getDataApi(`/admin/product/all?${queryParams.toString()}`);
 
+            console.log("39127889371892378912");
+
             if (response.success === true) {
                 setProducts(response.data.data || []);
                 setTotalProducts(response.data.total || 0);
@@ -328,14 +334,20 @@ const Products = () => {
     };
 
     useEffect(() => {
+        if (isLoading) return;
+        if (userRole === 'staff') return;
+
         fetchProducts();
-    }, [page, rowsPerPage, searchVal, categoryFilterIds, debouncedMinPrice, debouncedMaxPrice, brandId, materialIds, sortBy, ratings]);
+    }, [page, rowsPerPage, searchVal, categoryFilterIds, debouncedMinPrice, debouncedMaxPrice, brandId, materialIds, sortBy, ratings, userRole, isLoading]);
 
     useEffect(() => {
+        if (isLoading) return;
+        if (userRole === 'staff') return;
+
         fetchCategories();
         fetchBrands();
         fetchMaterials();
-    }, []);
+    }, [userRole, isLoading]);
 
     const handleCategorySelectionChange = (selectedIds) => {
         setCategoryFilterIds(selectedIds);

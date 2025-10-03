@@ -8,47 +8,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 
 
-class User(SQLModel, table=True):
-    __tablename__ = 'user'
-
-    id: uuid.UUID = Field(
-        sa_column=Column(
-            pg.UUID,
-            nullable=False,
-            primary_key=True,
-            default=uuid.uuid4
-        )
-    )
-
-    first_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    last_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    email: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    password: str = Field(sa_column=Column(pg.VARCHAR, nullable=False), exclude=True)
-    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    customer_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
-    staff_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
-    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
-    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    is_verified: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_admin: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_customer: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    otp: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-
-
-    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    user_special_offer: List["UserSpecialOffer"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={'lazy': 'noload'}
-    )
-
-
 class Address(SQLModel, table=True):
     __tablename__ = 'address'
 
@@ -1059,8 +1018,20 @@ class StockTransfer(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
-    from_warehouse: Optional["Warehouse"] = Relationship(back_populates="transfer_from", sa_relationship_kwargs={'lazy': 'noload'})
-    to_warehouse: Optional["Warehouse"] = Relationship(back_populates="transfer_to", sa_relationship_kwargs={'lazy': 'noload'})
+    from_warehouse: Optional["Warehouse"] = Relationship(
+        back_populates="transfer_from",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[StockTransfer.from_warehouse_id]'
+        }
+    )
+    to_warehouse: Optional["Warehouse"] = Relationship(
+        back_populates="transfer_to",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[StockTransfer.to_warehouse_id]'
+        }
+    )
     transfer_items: List["StockTransferItem"] = Relationship(back_populates="stock_transfer", sa_relationship_kwargs={'lazy': 'noload'})
 
 
@@ -1197,23 +1168,108 @@ class Warehouse(SQLModel, table=True):
     address: str = Field(sa_column=Column(pg.TEXT, nullable=False))
     phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     email: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    manager_name: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+
+    manager_id: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+
     is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="true"), default=True)
-    
     # Có phải là kho mặc định không
     is_default: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
     
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
+    manager: Optional["User"] = Relationship(
+        back_populates="managed_warehouses",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[Warehouse.manager_id]'
+        }
+    )
+    staff_members: List["User"] = Relationship(
+        back_populates="warehouse",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[User.warehouse_id]'
+        }
+    )
+
     stocks: List["Stock"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
     stock_transactions: List["StockTransaction"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
     
     # Danh sách phiếu chuyển kho (đi từ kho này => Chuyển đi)
-    transfer_from: List["StockTransfer"] = Relationship(back_populates="from_warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    transfer_from: List["StockTransfer"] = Relationship(
+        back_populates="from_warehouse",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[StockTransfer.from_warehouse_id]'
+        }
+    )
     
     # Danh sách phiếu chuyển kho (đến kho này => Nhận vào)
-    transfer_to: List["StockTransfer"] = Relationship(back_populates="to_warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    transfer_to: List["StockTransfer"] = Relationship(
+        back_populates="to_warehouse",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[StockTransfer.to_warehouse_id]'
+        }
+    )
+
+
+class User(SQLModel, table=True):
+    __tablename__ = 'user'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    first_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    last_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    email: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    password: str = Field(sa_column=Column(pg.VARCHAR, nullable=False), exclude=True)
+    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    customer_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    staff_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    is_verified: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_admin: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_customer: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    otp: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
+    warehouse_role: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "manager", "staff", "picker", "checker"
+
+    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    user_special_offer: List["UserSpecialOffer"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    managed_warehouses: List["Warehouse"] = Relationship(
+        back_populates="manager",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[Warehouse.manager_id]'
+        }
+    )
+    warehouse: Optional["Warehouse"] = Relationship(
+        back_populates="staff_members",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[User.warehouse_id]'
+        }
+    )
 
 
 

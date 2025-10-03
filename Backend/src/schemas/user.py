@@ -1,9 +1,12 @@
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
 from typing import List
+
+from src.schemas.stock import WarehouseRole
+
 
 class UserModel(BaseModel):
     id: uuid.UUID
@@ -40,9 +43,6 @@ class UserReadModel(BaseModel):
     last_name: str
     email: str
 
-class AdminUpdateModel(BaseModel):
-    customer_status: Optional[str] = Field(default="active")
-
 class UserLoginModel(BaseModel):
     email: str
     password: str
@@ -58,15 +58,21 @@ class VerifyLoginAdminModel(BaseModel):
     token: str
     otp: str
 
-class PasswordResetConfirmModel(BaseModel):
-    token: str
-    new_password: str
-    confirm_new_password: str
-
 class ChangePasswordModel(BaseModel):
-    old_password: str
-    new_password: str
-    confirm_new_password: str
+    old_password: str = Field(
+        ...,
+        min_length=1,
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=100,
+    )
+    confirm_new_password: str = Field(
+        ...,
+        min_length=8,
+        max_length=100,
+    )
 
 class VerifyOTPModel(BaseModel):
     otp: str
@@ -74,13 +80,6 @@ class VerifyOTPModel(BaseModel):
 
 class UserDeleteModel(BaseModel):
     user_ids: List[str]
-
-class FilterUserInputModel(BaseModel):
-    search: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    customer_status: Optional[str] = None
-    sort_by_created_at: Optional[str] = None
 
 class CustomerStatusType:
     ACTIVE = "active"
@@ -98,15 +97,34 @@ class AdminStaffRole(str, Enum):
 class ResetMethod(str, Enum):
     EMAIL = "email"
     OTP = "otp"
+
+class SortOrder(str, Enum):
+    NEWEST = "newest"
+    OLDEST = "oldest"
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+class FilterUserInputModel(BaseModel):
+    search: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    status: Optional[UserStatus] = None
+    is_verified: Optional[bool] = None
+    sort_by_created_at: Optional[SortOrder] = None
+    warehouse_code: Optional[str] = None
+    warehouse_role: Optional[WarehouseRole] = None
+
+class AdminUpdateModel(BaseModel):
+    status: Optional[UserStatus] = Field(default=UserStatus.ACTIVE)
     
 class ForgotPasswordConfirmModel(BaseModel):
     token: str
-    new_password: str = Field(
-        ..., 
-        min_length=8, 
-        max_length=100,
-    )
-    
+    new_password: str = Field(..., min_length=8, max_length=100)
+    new_password_confirm: str = Field(..., min_length=8, max_length=100)
+
+
 class PasswordResetEmailModel(BaseModel):
     email: str
     check: ResetMethod
@@ -114,6 +132,9 @@ class PasswordResetEmailModel(BaseModel):
 class VerifyOtpModel(BaseModel):
     email: str
     otp: str = Field(..., min_length=6, max_length=6)
+
+class StaffMultipleDeleteModel(BaseModel):
+    user_ids: List[str]
     
 
 

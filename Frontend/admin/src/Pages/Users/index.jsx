@@ -18,12 +18,13 @@ import { deleteDataApi, getDataApi, postDataApi, putDataApi } from "../../utils/
 const label = { inputProps: { 'aria-label': 'Checkbox demo' } };
 
 const columns = [
-    { id: 'userName', label: 'USER NAME', minWidth: 120 },
-    { id: 'userEmail', label: 'USER EMAIL', minWidth: 180 },
-    { id: 'userPhone', label: 'USER PHONE', minWidth: 140 },
-    { id: 'status', label: 'STATUS', minWidth: 120 },
-    { id: 'createdAt', label: 'CREATED AT', minWidth: 160 },
-    { id: 'actions', label: 'ACTIONS', minWidth: 100 },
+    { id: 'userName', label: 'TÊN KHÁCH HÀNG', minWidth: 120 },
+    { id: 'userEmail', label: 'EMAIL', minWidth: 180 },
+    { id: 'userPhone', label: 'SỐ ĐIỆN THOẠI', minWidth: 140 },
+    { id: 'isVerified', label: 'XÁC THỰC', minWidth: 120 },
+    { id: 'status', label: 'TRẠNG THÁI', minWidth: 120 },
+    { id: 'createdAt', label: 'NGÀY TẠO', minWidth: 160 },
+    { id: 'actions', label: 'HÀNH ĐỘNG', minWidth: 100 },
 ];
 
 const Users = () => {
@@ -34,8 +35,9 @@ const Users = () => {
     const [users, setUsers] = useState([]);
     const [totalUsers, setTotalUsers] = useState(0);
     const [selectedUserIds, setSelectedUserIds] = useState([]);
-    const [sortByCreatedAt, setSortByCreatedAt] = useState('newest');
+    const [sortByCreatedAt, setSortByCreatedAt] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isVerifiedFilter, setIsVerifiedFilter] = useState('');
 
     const context = useContext(MyContext);
 
@@ -52,9 +54,10 @@ const Users = () => {
 
             if (searchVal) queryParams.append('search', searchVal);
             if (statusFilterVal) queryParams.append('customer_status', statusFilterVal);
-            queryParams.append('sort_by_created_at', sortByCreatedAt);
+            if (sortByCreatedAt) queryParams.append('sort_by_created_at', sortByCreatedAt);
+            if (isVerifiedFilter !== '') queryParams.append('is_verified', isVerifiedFilter);
 
-            const response = await getDataApi(`/admin/user/all?${queryParams.toString()}`);
+            const response = await getDataApi(`/admin/user/all-customers?${queryParams.toString()}`);
 
             if (response.success === true) {
                 setUsers(response.data.data || []);
@@ -71,7 +74,7 @@ const Users = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, [page, rowsPerPage, statusFilterVal, searchVal, sortByCreatedAt]);
+    }, [page, rowsPerPage, statusFilterVal, searchVal, sortByCreatedAt, isVerifiedFilter]);
 
     const handleChangeStatusFilter = (event) => {
         setStatusFilterVal(event.target.value);
@@ -92,9 +95,14 @@ const Users = () => {
         setPage(0);
     };
 
+    const handleChangeIsVerifiedFilter = (event) => {
+        setIsVerifiedFilter(event.target.value);
+        setPage(0);
+    };
+
     const handleBlockUser = async (userId) => {
         try {
-            const response = await putDataApi(`/admin/user/${userId}/change-status`);
+            const response = await putDataApi(`/admin/user/${userId}/change-customer-status`);
             if (response.success) {
                 context.openAlertBox('success', response.message);
                 fetchUsers();
@@ -179,6 +187,20 @@ const Users = () => {
                         </div>
 
                         <div className="col w-[30%]">
+                            <h4 className="font-[600] text-[13px] mb-3">Xác thực email</h4>
+                            <Select
+                                className="w-full mb-5"
+                                size="small"
+                                value={isVerifiedFilter}
+                                onChange={handleChangeIsVerifiedFilter}
+                            >
+                                <MenuItem value="">Tất cả</MenuItem>
+                                <MenuItem value="true">Đã xác thực</MenuItem>
+                                <MenuItem value="false">Chưa xác thực</MenuItem>
+                            </Select>
+                        </div>
+
+                        <div className="col w-[30%]">
                             <h4 className="font-[600] text-[13px] mb-3">Sắp xếp theo thời gian</h4>
                             <Select
                                 size="small"
@@ -186,6 +208,7 @@ const Users = () => {
                                 onChange={handleSortByCreatedAtChange}
                                 className="w-full mb-5"
                             >
+                                <MenuItem value="">Mặc định</MenuItem>
                                 <MenuItem value="newest">Mới nhất</MenuItem>
                                 <MenuItem value="oldest">Cũ nhất</MenuItem>
                             </Select>
@@ -270,7 +293,14 @@ const Users = () => {
 
                                                 <TableCell>
                                                     <span className={`text-sm font-medium px-5 py-2 rounded-full
-                                                        ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        ${user.is_verified ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                        {user.is_verified ? 'Đã xác thực' : 'Chưa xác thực'}
+                                                    </span>
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <span className={`text-sm font-medium px-5 py-2 rounded-full
+                        ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                         {isActive ? 'Hoạt động' : 'Bị khóa'}
                                                     </span>
                                                 </TableCell>
@@ -300,6 +330,7 @@ const Users = () => {
                                         );
                                     })}
                                 </TableBody>
+
                             </Table>
                         </TableContainer>
 

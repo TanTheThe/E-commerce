@@ -391,5 +391,84 @@ class AuthException:
                 "error_code": "auth_039",
             },
         )
-        
+
+    @staticmethod
+    def password_change_failed():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Thay đổi mật khẩu thất bại",
+                "error_code": "auth_040",
+            },
+        )
+
+    @staticmethod
+    def invalid_user_id():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "ID người dùng không hợp lệ",
+                "error_code": "auth_041",
+            },
+        )
+
+    @staticmethod
+    def old_password_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu hiện tại là bắt buộc",
+                "error_code": "auth_042",
+            },
+        )
+
+    @staticmethod
+    def new_password_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu mới là bắt buộc",
+                "error_code": "auth_043",
+            },
+        )
+
+    @staticmethod
+    def confirm_password_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Xác nhận mật khẩu mới là bắt buộc",
+                "error_code": "auth_044",
+            },
+        )
+
+    @staticmethod
+    def password_needs_letters():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu phải chứa ít nhất 1 chữ cái",
+                "error_code": "auth_044",
+            },
+        )
+
+    @staticmethod
+    def password_needs_numbers():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu phải chứa ít nhất 1 chữ số",
+                "error_code": "auth_044",
+            },
+        )
+
+    @staticmethod
+    def email_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Email không tồn tại trong hệ thống",
+                "error_code": "auth_045",
+            },
+        )
     

@@ -10,20 +10,26 @@ import Checkbox from '@mui/material/Checkbox';
 import SearchBox from "../../Components/SearchBox";
 import { MyContext } from "../../App";
 import { MdDelete, MdLocalPhone, MdOutlineMarkEmailRead } from "react-icons/md";
-import { Button, IconButton, MenuItem, Select } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Select, TextField } from "@mui/material";
 import debounce from 'lodash/debounce';
 import { deleteDataApi, getDataApi, postDataApi, putDataApi } from "../../utils/api";
+import CreateStaffDialog from "./createStaff";
+import UpdateRoleDialog from "./updateRole";
+import AssignWarehouseDialog from "./assignWarehouse";
 
 
 const label = { inputProps: { 'aria-label': 'Checkbox demo' } };
 
 const columns = [
-    { id: 'userName', label: 'USER NAME', minWidth: 120 },
+    { id: 'userName', label: 'USER NAME', minWidth: 160 },
     { id: 'userEmail', label: 'USER EMAIL', minWidth: 180 },
     { id: 'userPhone', label: 'USER PHONE', minWidth: 140 },
-    { id: 'status', label: 'STATUS', minWidth: 120 },
+    { id: 'warehouseRole', label: 'VAI TRÒ KHO', minWidth: 180 },
+    { id: 'warehouseCode', label: 'MÃ KHO', minWidth: 120 },
+    { id: 'isVerified', label: 'XÁC THỰC', minWidth: 150 },
+    { id: 'status', label: 'STATUS', minWidth: 160 },
     { id: 'createdAt', label: 'CREATED AT', minWidth: 160 },
-    { id: 'actions', label: 'ACTIONS', minWidth: 100 },
+    { id: 'actions', label: 'ACTIONS', minWidth: 200 },
 ];
 
 const Staffs = () => {
@@ -34,10 +40,34 @@ const Staffs = () => {
     const [users, setUsers] = useState([]);
     const [totalUsers, setTotalUsers] = useState(0);
     const [selectedUserIds, setSelectedUserIds] = useState([]);
-    const [sortByCreatedAt, setSortByCreatedAt] = useState('newest');
+    const [sortByCreatedAt, setSortByCreatedAt] = useState('');
     const [loading, setLoading] = useState(false);
+    const [openCreateDialog, setOpenCreateDialog] = useState(false);
+    const [isVerifiedFilter, setIsVerifiedFilter] = useState('');
+
+    const [warehouseRoleFilter, setWarehouseRoleFilter] = useState('');
+    const [warehouseCodeFilter, setWarehouseCodeFilter] = useState('');
+
+    const [openUpdateRoleDialog, setOpenUpdateRoleDialog] = useState(false);
+    const [selectedUserForUpdate, setSelectedUserForUpdate] = useState(null);
+
+    const [openAssignDialog, setOpenAssignDialog] = useState(false);
+    const [selectedUserForAssign, setSelectedUserForAssign] = useState(null);
 
     const context = useContext(MyContext);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const verified = urlParams.get('verified');
+
+        if (verified === 'true') {
+            context.openAlertBox('success', 'Xác thực tài khoản thành công!');
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (verified === 'false') {
+            context.openAlertBox('error', 'Xác thực tài khoản thất bại hoặc link đã hết hạn!');
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -51,10 +81,13 @@ const Staffs = () => {
             });
 
             if (searchVal) queryParams.append('search', searchVal);
-            if (statusFilterVal) queryParams.append('customer_status', statusFilterVal);
-            queryParams.append('sort_by_created_at', sortByCreatedAt);
+            if (statusFilterVal) queryParams.append('staff_status', statusFilterVal);
+            if (sortByCreatedAt) queryParams.append('sort_by_created_at', sortByCreatedAt);
+            if (isVerifiedFilter !== '') queryParams.append('is_verified', isVerifiedFilter);
+            if (warehouseRoleFilter) queryParams.append('warehouse_role', warehouseRoleFilter);
+            if (warehouseCodeFilter) queryParams.append('warehouse_code', warehouseCodeFilter);
 
-            const response = await getDataApi(`/admin/user/all?${queryParams.toString()}`);
+            const response = await getDataApi(`/admin/user/all-staffs?${queryParams.toString()}`);
 
             if (response.success === true) {
                 setUsers(response.data.data || []);
@@ -71,7 +104,7 @@ const Staffs = () => {
 
     useEffect(() => {
         fetchUsers();
-    }, [page, rowsPerPage, statusFilterVal, searchVal, sortByCreatedAt]);
+    }, [page, rowsPerPage, statusFilterVal, searchVal, sortByCreatedAt, isVerifiedFilter, warehouseRoleFilter, warehouseCodeFilter]);
 
     const handleChangeStatusFilter = (event) => {
         setStatusFilterVal(event.target.value);
@@ -92,9 +125,57 @@ const Staffs = () => {
         setPage(0);
     };
 
+    const handleChangeIsVerifiedFilter = (event) => {
+        setIsVerifiedFilter(event.target.value);
+        setPage(0);
+    };
+
+    const handleOpenCreateDialog = () => {
+        setOpenCreateDialog(true);
+    };
+
+    const handleChangeWarehouseRoleFilter = (event) => {
+        setWarehouseRoleFilter(event.target.value);
+        setPage(0);
+    };
+
+    const handleChangeWarehouseCodeFilter = (event) => {
+        setWarehouseCodeFilter(event.target.value);
+        setPage(0);
+    };
+
+    const handleOpenUpdateRoleDialog = (user) => {
+        setSelectedUserForUpdate(user);
+        setOpenUpdateRoleDialog(true);
+    };
+
+    const handleOpenAssignDialog = (user) => {
+        setSelectedUserForAssign(user);
+        setOpenAssignDialog(true);
+    };
+
+    const formatWarehouseRole = (role) => {
+        const roleMap = {
+            'manager': 'Quản lý kho',
+            'warehouse_keeper': 'Thủ kho',
+            'stock_clerk': 'Nhân viên kho',
+            'picker': 'Nhân viên lấy hàng',
+            'packer': 'Nhân viên đóng gói'
+        };
+        return roleMap[role] || 'Chưa phân công';
+    };
+
+    const isStaffRole = (role) => {
+        return ['warehouse_keeper', 'stock_clerk', 'picker', 'packer'].includes(role);
+    };
+
+    const hasNoWarehouse = (user) => {
+        return !user.warehouse_code[0] && !user.warehouse_role;
+    };
+
     const handleBlockUser = async (userId) => {
         try {
-            const response = await putDataApi(`/admin/user/${userId}/change-status`);
+            const response = await putDataApi(`/admin/user/${userId}/change-staff-status`);
             if (response.success) {
                 context.openAlertBox('success', response.message);
                 fetchUsers();
@@ -158,13 +239,19 @@ const Staffs = () => {
     return (
         <>
             <div className="flex items-center justify-between px-2 py-0 mt-3">
-                <h2 className="text-[18px] font-[600]">Danh sách khách hàng</h2>
+                <h2 className="text-[18px] font-[600]">Danh sách nhân viên</h2>
+                <Button
+                    className="!bg-blue-600 hover:!bg-blue-700 !text-white"
+                    onClick={handleOpenCreateDialog}
+                >
+                    + Tạo tài khoản nhân viên
+                </Button>
             </div>
 
             <div className="card my-4 pt-5 shadow-md sm:rounded-lg bg-white">
                 <div className="flex items-center w-full px-5 justify-between">
-                    <div className="flex items-center gap-4 w-[60%]">
-                        <div className="col w-[30%]">
+                    <div className="flex items-center gap-4 w-[80%] flex-wrap">
+                        <div className="col w-[18%]">
                             <h4 className="font-[600] text-[13px] mb-3">Sắp xếp theo trạng thái</h4>
                             <Select
                                 className="w-full mb-5"
@@ -178,7 +265,52 @@ const Staffs = () => {
                             </Select>
                         </div>
 
-                        <div className="col w-[30%]">
+                        <div className="col w-[18%]">
+                            <h4 className="font-[600] text-[13px] mb-3">Xác thực email</h4>
+                            <Select
+                                className="w-full mb-5"
+                                size="small"
+                                value={isVerifiedFilter}
+                                onChange={handleChangeIsVerifiedFilter}
+                            >
+                                <MenuItem value="">Tất cả</MenuItem>
+                                <MenuItem value="true">Đã xác thực</MenuItem>
+                                <MenuItem value="false">Chưa xác thực</MenuItem>
+                            </Select>
+                        </div>
+
+                        <div className="col w-[18%]">
+                            <h4 className="font-[600] text-[13px] mb-3">Vai trò kho</h4>
+                            <Select
+                                className="w-full mb-5"
+                                size="small"
+                                value={warehouseRoleFilter}
+                                onChange={handleChangeWarehouseRoleFilter}
+                            >
+                                <MenuItem value="">Tất cả vai trò</MenuItem>
+                                <MenuItem value="manager">Quản lý kho</MenuItem>
+                                <MenuItem value="warehouse_keeper">Thủ kho</MenuItem>
+                                <MenuItem value="stock_clerk">Nhân viên kho</MenuItem>
+                                <MenuItem value="picker">Nhân viên lấy hàng</MenuItem>
+                                <MenuItem value="packer">Nhân viên đóng gói</MenuItem>
+                            </Select>
+                        </div>
+
+                        <div className="col w-[18%]">
+                            <h4 className="font-[600] text-[13px] mb-3">Mã kho</h4>
+                            <input
+                                type="text"
+                                className="w-full mb-5 px-3 py-2 border border-gray-300 rounded text-sm"
+                                placeholder="Nhập mã kho..."
+                                value={warehouseCodeFilter}
+                                onChange={(e) => {
+                                    setWarehouseCodeFilter(e.target.value);
+                                    setPage(0);
+                                }}
+                            />
+                        </div>
+
+                        <div className="col w-[18%]">
                             <h4 className="font-[600] text-[13px] mb-3">Sắp xếp theo thời gian</h4>
                             <Select
                                 size="small"
@@ -186,13 +318,14 @@ const Staffs = () => {
                                 onChange={handleSortByCreatedAtChange}
                                 className="w-full mb-5"
                             >
+                                <MenuItem value="">Mặc định</MenuItem>
                                 <MenuItem value="newest">Mới nhất</MenuItem>
                                 <MenuItem value="oldest">Cũ nhất</MenuItem>
                             </Select>
                         </div>
                     </div>
 
-                    <div className="col w-[20%] ml-auto">
+                    <div className="col w-[18%] ml-auto">
                         <SearchBox onSearch={debouncedSearch} />
                     </div>
                 </div>
@@ -234,7 +367,11 @@ const Staffs = () => {
 
                                 <TableBody>
                                     {users.map((user) => {
-                                        const isActive = user.customer_status === "active";
+                                        const isActive = user.staff_status === "active";
+                                        const isManager = user.warehouse_role === 'manager';
+                                        const isStaff = isStaffRole(user.warehouse_role);
+                                        const noWarehouse = hasNoWarehouse(user);
+
                                         return (
                                             <TableRow key={user.id}>
                                                 <TableCell>
@@ -243,15 +380,28 @@ const Staffs = () => {
                                                         onChange={(e) => {
                                                             if (e.target.checked) {
                                                                 setSelectedUserIds(prev => [...prev, user.id]);
+                                                                if (isManager) {
+                                                                    setManagerSelected(true);
+                                                                }
+                                                                if (!user.warehouse_id || !user.warehouse_role) {
+                                                                    setHasUserWithoutWarehouse(true);
+                                                                }
                                                             } else {
                                                                 setSelectedUserIds(prev => prev.filter(id => id !== user.id));
+                                                                const remaining = users.filter(u =>
+                                                                    selectedUserIds.filter(id => id !== user.id).includes(u.id)
+                                                                );
+                                                                setManagerSelected(remaining.some(u => u.warehouse_role === 'manager'));
+                                                                setHasUserWithoutWarehouse(remaining.some(u => !u.warehouse_id || !u.warehouse_role));
                                                             }
                                                         }}
                                                     />
                                                 </TableCell>
 
                                                 <TableCell>
-                                                    <span className="font-[Montserrat] text-gray-600">{user.first_name} {user.last_name}</span>
+                                                    <span className="font-[Montserrat] text-gray-600">
+                                                        {user.first_name} {user.last_name}
+                                                    </span>
                                                 </TableCell>
 
                                                 <TableCell>
@@ -269,8 +419,28 @@ const Staffs = () => {
                                                 </TableCell>
 
                                                 <TableCell>
+                                                    <span className={`text-sm font-medium px-3 py-1 rounded-full
+                        ${user.warehouse_role ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'}`}>
+                                                        {formatWarehouseRole(user.warehouse_role)}
+                                                    </span>
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <span className="text-sm font-medium text-gray-700">
+                                                        {user.warehouse_code || 'Chưa có'}
+                                                    </span>
+                                                </TableCell>
+
+                                                <TableCell>
                                                     <span className={`text-sm font-medium px-5 py-2 rounded-full
-                                                        ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        ${user.is_verified ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                        {user.is_verified ? 'Đã xác thực' : 'Chưa xác thực'}
+                                                    </span>
+                                                </TableCell>
+
+                                                <TableCell>
+                                                    <span className={`text-sm font-medium px-5 py-2 rounded-full
+                        ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                                         {isActive ? 'Hoạt động' : 'Bị khóa'}
                                                     </span>
                                                 </TableCell>
@@ -281,20 +451,41 @@ const Staffs = () => {
                                                     </span>
                                                 </TableCell>
 
-                                                <TableCell className="flex gap-2">
-                                                    <Button
-                                                        className={`!text-white btn-sm ${isActive ? '!bg-red-700 hover:!bg-red-600' : '!bg-green-600 hover:!bg-green-500'}`}
-                                                        onClick={() => handleBlockUser(user.id)}
-                                                    >
-                                                        {isActive ? 'Khóa' : 'Mở khóa'}
-                                                    </Button>
+                                                <TableCell>
+                                                    <div className="flex gap-2 flex-wrap">
+                                                        {noWarehouse && (
+                                                            <Button
+                                                                className="!bg-blue-600 hover:!bg-blue-700 !text-white btn-sm !text-xs"
+                                                                onClick={() => handleOpenAssignDialog(user)}
+                                                            >
+                                                                Assign
+                                                            </Button>
+                                                        )}
 
-                                                    <IconButton
-                                                        onClick={() => handleDeleteUser(user.id)}
-                                                        className="!text-red-600 hover:!text-red-800"
-                                                    >
-                                                        <MdDelete />
-                                                    </IconButton>
+                                                        {isStaff && (
+                                                            <Button
+                                                                className="!bg-amber-600 hover:!bg-amber-700 !text-white btn-sm !text-xs"
+                                                                onClick={() => handleOpenUpdateRoleDialog(user)}
+                                                            >
+                                                                Update Role
+                                                            </Button>
+                                                        )}
+
+                                                        <Button
+                                                            className={`!text-white btn-sm !text-xs ${isActive ? '!bg-red-700 hover:!bg-red-600' : '!bg-green-600 hover:!bg-green-500'}`}
+                                                            onClick={() => handleBlockUser(user.id)}
+                                                        >
+                                                            {isActive ? 'Khóa' : 'Mở khóa'}
+                                                        </Button>
+
+                                                        <IconButton
+                                                            onClick={() => handleDeleteUser(user.id)}
+                                                            className="!text-red-600 hover:!text-red-800"
+                                                            size="small"
+                                                        >
+                                                            <MdDelete />
+                                                        </IconButton>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -316,7 +507,7 @@ const Staffs = () => {
                 )}
             </div>
             {selectedUserIds.length > 0 && (
-                <div className="px-2 mt-2">
+                <div className="px-2 mt-2 flex gap-3">
                     <Button
                         className="!bg-red-700 hover:!bg-red-600 btn-sm !text-white"
                         onClick={handleDeleteMultipleUser}
@@ -325,6 +516,33 @@ const Staffs = () => {
                     </Button>
                 </div>
             )}
+
+            <CreateStaffDialog
+                open={openCreateDialog}
+                onClose={() => setOpenCreateDialog(false)}
+                onSuccess={fetchUsers}
+            />
+
+            <UpdateRoleDialog
+                open={openUpdateRoleDialog}
+                onClose={() => {
+                    setOpenUpdateRoleDialog(false);
+                    setSelectedUserForUpdate(null);
+                }}
+                user={selectedUserForUpdate}
+                onSuccess={fetchUsers}
+                formatWarehouseRole={formatWarehouseRole}
+            />
+
+            <AssignWarehouseDialog
+                open={openAssignDialog}
+                onClose={() => {
+                    setOpenAssignDialog(false);
+                    setSelectedUserForAssign(null);
+                }}
+                userId={selectedUserForAssign?.id}
+                onSuccess={fetchUsers}
+            />
         </>
     );
 }

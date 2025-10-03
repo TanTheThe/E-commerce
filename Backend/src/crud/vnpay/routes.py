@@ -107,16 +107,16 @@ async def payment_return(request: Request,
         payment_data = json.dumps(payment_result)
         encoded_data = base64.urlsafe_b64encode(payment_data.encode()).decode()
 
-        frontend_url = f"http://{Config.DOMAIN_CLIENT}/payment-return?data={encoded_data}"
+        frontend_url = f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/payment-return?data={encoded_data}"
 
         return RedirectResponse(url=frontend_url, status_code=302)
 
     except ValueError as e:
-        error_url = f"http://{Config.DOMAIN_CLIENT}/payment-return?error={urllib.parse.quote(str(e))}"
+        error_url = f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/payment-return?error={urllib.parse.quote(str(e))}"
         return RedirectResponse(url=error_url, status_code=302)
 
     except Exception as e:
-        error_url = f"http://{Config.DOMAIN_CLIENT}/payment-return?error={urllib.parse.quote('Lỗi xử lý kết quả thanh toán')}"
+        error_url = f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/payment-return?error={urllib.parse.quote('Lỗi xử lý kết quả thanh toán')}"
         return RedirectResponse(url=error_url, status_code=302)
 
 

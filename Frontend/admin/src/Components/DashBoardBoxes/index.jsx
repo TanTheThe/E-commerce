@@ -9,6 +9,7 @@ import { BsBank } from "react-icons/bs";
 import { RiProductHuntLine } from "react-icons/ri";
 import { MyContext } from "../../App";
 import { getDataApi } from "../../utils/api";
+import useAuth from "../../Pages/Verify/auth";
 
 const DashBoardBoxes = () => {
     const [newOrders, setNewOrders] = useState(0);
@@ -16,14 +17,22 @@ const DashBoardBoxes = () => {
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [countProducts, setCountProducts] = useState(0);
     const context = useContext(MyContext)
+    const { userRole, isLoading } = useAuth();
 
     useEffect(() => {
+        if (isLoading) return;
+
+        if (userRole === 'staff') {
+            return;
+        }
+
         const fetchNewOrders = async () => {
             try {
                 const res = await getDataApi(`/admin/order/statistics/count-orders`);
+                console.log("dajw0d9a9w0j");
                 if (res.success) {
                     setNewOrders(res.data.count_orders);
-                }else{
+                } else {
                     context.openAlertBox("error", res?.data?.detail.message || "Xảy ra lỗi trong quá trình tính tổng sản phẩm")
                 }
             } catch (error) {
@@ -78,7 +87,7 @@ const DashBoardBoxes = () => {
         fetchTotalSales();
         fetchTotalRevenue();
         fetchCountProducts();
-    }, []);
+    }, [userRole, isLoading]);
 
     return (
         <>

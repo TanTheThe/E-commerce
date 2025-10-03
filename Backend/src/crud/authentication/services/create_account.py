@@ -2,7 +2,7 @@ from datetime import datetime
 from src.database.models import User
 from src.errors.authentication import AuthException
 from src.errors.user import UserException
-from src.schemas.user import UserCreateModel, UserReadModel, UserRole
+from src.schemas.user import UserCreateModel, UserRole
 from src.crud.authentication.utils import create_url_safe_token, decode_url_safe_token
 from sqlmodel import and_
 from src.mail import create_message, mail
@@ -78,14 +78,11 @@ class CreateAccountService:
         return subject, html
 
     async def verify_user_account(self, token: str, role: UserRole, session: AsyncSession):
-        try:
-            token_data = decode_url_safe_token(
-                token, 
-                role=role.value, 
-                purpose="create_account"
-            )
-        except Exception as e:
-            AuthException.authentication_error()
+        token_data = decode_url_safe_token(
+            token,
+            role=role.value,
+            purpose="create_account"
+        )
             
         if token_data is None:
             AuthException.authentication_error()
@@ -110,6 +107,8 @@ class CreateAccountService:
         try:
             condition = and_(User.id == user.id, User.deleted_at.is_(None))
             await user_repository.update_user_some_field(condition, update_data, session)
+            await session.commit()
+
         except Exception as e:
             raise AuthException.verification_failed()
             

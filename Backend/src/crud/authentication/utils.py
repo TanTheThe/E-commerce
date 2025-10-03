@@ -5,7 +5,7 @@ from src.config import Config
 import uuid
 import logging
 from itsdangerous import URLSafeTimedSerializer
-from jwt import ExpiredSignatureError, InvalidTokenError
+from jwt import InvalidTokenError
 
 passwd_context = CryptContext(
     schemes=['bcrypt']

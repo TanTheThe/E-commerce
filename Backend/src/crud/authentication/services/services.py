@@ -1,21 +1,16 @@
 from datetime import timedelta, datetime
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
-from starlette.responses import JSONResponse
 import random
 from src.config import Config
 from src.crud.user.services import user_repository
 from src.database.models import User
 from sqlmodel import and_
-from src.crud.authentication.utils import verify_password, create_access_token, create_url_safe_token, \
+from src.crud.authentication.utils import verify_password, create_url_safe_token, \
     decode_url_safe_token, generate_password_hash
-import pyotp
-import qrcode
-from io import BytesIO
-import base64
 # from src.database.redis import add_jti_to_blocklist
 from src.mail import create_message, mail
-from src.schemas.user import ForgotPasswordConfirmModel, LoginAdminModel, ResetMethod, UserLoginModel, Setup2FA, UserRole, VerifyLoginAdminModel, VerifyOTPModel
+from src.schemas.user import ForgotPasswordConfirmModel, ResetMethod, UserRole, VerifyOTPModel
 from src.errors.authentication import AuthException
 
 REFRESH_TOKEN_EXPIRY = 2
@@ -46,6 +41,41 @@ class AuthenticationService:
             raise
         except Exception as e:
             AuthException.forgot_password_failed()
+
+
+    async def detect_user_role(self, email: str, allowed_roles: list[UserRole], session: AsyncSession) -> UserRole:
+        if not email or not email.strip():
+            AuthException.email_required()
+
+        email = email.strip().lower()
+
+        for role in allowed_roles:
+            try:
+                user = await self.find_and_validate_user(email, role, session)
+                if user:
+                    return role
+            except HTTPException:
+                continue
+
+        AuthException.email_not_found()
+
+
+    async def detect_role_from_token(self, token: str, allowed_roles: list[UserRole], purpose: str) -> UserRole:
+        for role in allowed_roles:
+            try:
+                token_data = decode_url_safe_token(
+                    token,
+                    role.value,
+                    purpose=purpose
+                )
+
+                if token_data and token_data.get("email"):
+                    return role
+
+            except Exception:
+                continue
+
+        AuthException.token_invalid()
             
             
     async def find_and_validate_user(self, email: str, role: UserRole, session: AsyncSession):
@@ -90,9 +120,9 @@ class AuthenticationService:
             )
             
             if role == UserRole.CUSTOMER:
-                link = f"http://{Config.DOMAIN_CLIENT}/reset-password/{token}"
+                link = f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/reset-password/{token}"
             else:
-                link = f"http://{Config.DOMAIN_CLIENT}/reset-password/{token}"
+                link = f"http://{Config.ADMIN_DOMAIN_CLIENT}/reset-password/{token}"
 
             role_display = self.get_role_display(role)
             
@@ -156,6 +186,7 @@ class AuthenticationService:
             
             condition = and_(User.id == user.id, User.deleted_at.is_(None))
             await user_repository.update_user_some_field(condition, update_data, session)
+            await session.commit()
             
             role_display = self.get_role_display(role)
             
@@ -230,6 +261,9 @@ class AuthenticationService:
 
             await self.validate_user_role(user, role)
 
+            if data.new_password != data.new_password_confirm:
+                AuthException.password_mismatch()
+
             self.validate_password_strength(data.new_password)
 
             if verify_password(data.new_password, user.password):
@@ -245,6 +279,7 @@ class AuthenticationService:
             }
             
             await user_repository.update_user_some_field(condition, update_data, session)
+            await session.commit()
             
             role_display = self.get_role_display(role)
             
@@ -263,10 +298,10 @@ class AuthenticationService:
                 AuthException.otp_and_email_required()
 
             email = data.email.strip().lower()
-            
+
             condition = and_(User.email == email, User.deleted_at.is_(None))
             user = await user_repository.get_user(condition, session)
-            
+
             if not user:
                 AuthException.user_not_found()
 
@@ -274,7 +309,7 @@ class AuthenticationService:
 
             if not user.otp:
                 AuthException.otp_not_found()
-                
+
             if user.otp != data.otp.strip():
                 AuthException.invalid_otp()
 
@@ -286,24 +321,25 @@ class AuthenticationService:
                 'expires_at': None,
                 'updated_at': datetime.now()
             }
-            
-            condition_update = and_(User.id == user.id, User.deleted_at.is_(None))            
+
+            condition_update = and_(User.id == user.id, User.deleted_at.is_(None))
             await user_repository.update_user_some_field(condition_update, update_data, session)
+            await session.commit()
 
             token_payload = {
                 "email": user.email,
                 "user_id": str(user.id),
                 "timestamp": datetime.utcnow().isoformat()
             }
-            
+
             token = create_url_safe_token(
-                token_payload, 
-                role.value, 
+                token_payload,
+                role.value,
                 purpose='reset_password'
             )
-            
+
             return token
-            
+
         except HTTPException:
             raise
         except Exception as e:

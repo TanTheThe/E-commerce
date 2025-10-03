@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     # REDIS_HOST: str = "localhost"
     # REDIS_PORT: int = 6379
     DOMAIN: str
-    DOMAIN_CLIENT: str
+    CUSTOMER_DOMAIN_CLIENT: str
+    ADMIN_DOMAIN_CLIENT: str
 
     MAIL_USERNAME: str
     MAIL_PASSWORD: str

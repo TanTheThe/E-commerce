@@ -257,8 +257,8 @@ class SpecialOfferService:
         if not (special_offer.start_time <= now <= special_offer.end_time):
             SpecialOfferException.expired_or_not_started()
 
-        condition_user = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None), User.customer_status == 'active')
-        existing_users, _ = await user_repository.get_all_user(condition_user, session=session)
+        condition_user = [User.id.in_(data.user_ids), User.deleted_at.is_(None), User.customer_status == 'active']
+        existing_users, _ = await user_repository.get_all_users(condition_user, session, 0, 1000)
         existing_user_ids = {user.id for user in existing_users}
 
         missing_user_ids = set(data.user_ids) - existing_user_ids

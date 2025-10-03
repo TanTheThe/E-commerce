@@ -11,6 +11,7 @@ import OrderStatusUpdateModal from "./updateStatusOrder";
 import { MyContext } from "../../App";
 import { debounce } from "lodash";
 import { MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow } from "@mui/material";
+import useAuth from "../Verify/auth";
 
 const columns = [
     { id: 'code', label: 'ORDER CODE', minWidth: 120, align: 'center' },
@@ -36,6 +37,9 @@ const Orders = () => {
     const [sortByTotalPrice, setSortByTotalPrice] = useState('');
     const [sortByCreatedAt, setSortByCreatedAt] = useState('newest');
     const [statusFilter, setStatusFilter] = useState('');
+
+    const { userRole, isLoading } = useAuth();
+    const isStaff = userRole === 'staff';
 
     const context = useContext(MyContext)
 
@@ -79,8 +83,11 @@ const Orders = () => {
     }, [buildQueryParams, page, rowsPerPage, searchTerm, context]);
 
     useEffect(() => {
+        if (isLoading) return;
+        if (userRole === 'staff') return;
+
         fetchOrders(page, rowsPerPage, searchTerm);
-    }, [page, rowsPerPage, searchTerm, sortByTotalPrice, sortByCreatedAt, statusFilter, fetchOrders]);
+    }, [page, rowsPerPage, searchTerm, sortByTotalPrice, sortByCreatedAt, statusFilter, fetchOrders, userRole, isLoading]);
 
     const debouncedSearch = useCallback(
         debounce((value) => {

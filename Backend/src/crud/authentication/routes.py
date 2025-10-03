@@ -1,5 +1,7 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from starlette import status
+
+from src.config import Config
 from src.crud.authentication.services.change_password import ChangePasswordService
 from src.crud.authentication.services.create_account import CreateAccountService
 from src.crud.authentication.services.login import LoginService
@@ -7,8 +9,8 @@ from src.dependencies import AccessTokenBearer, RefreshTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.authentication.utils import create_access_token
 from fastapi.responses import JSONResponse, RedirectResponse
-from src.schemas.user import AdminStaffRole, ChangePasswordModel, UserCreateModel, UserLoginModel, LoginAdminModel, PasswordResetConfirmModel, PasswordResetEmailModel, UserRole, \
-    VerifyOTPModel, VerifyLoginAdminModel, Setup2FA
+from src.schemas.user import AdminStaffRole, ChangePasswordModel, UserCreateModel, UserLoginModel, PasswordResetEmailModel, UserRole, \
+    VerifyOTPModel, VerifyLoginAdminModel, Setup2FA, ForgotPasswordConfirmModel
 from src.database.main import get_session
 from datetime import datetime
 from src.crud.authentication.services.services import AuthenticationService
@@ -55,7 +57,7 @@ async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSes
 
 
 @auth_customer_router.post('/confirm-reset')
-async def forget_password_confirm(data: PasswordResetConfirmModel,
+async def forget_password_confirm(data: ForgotPasswordConfirmModel,
                                   session: AsyncSession = Depends(get_session)):
     message = await auth_service.forgot_password_confirm_service(data, UserRole.CUSTOMER, session)
     return JSONResponse(
@@ -109,7 +111,7 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 async def change_password_customer(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
-    return await change_password_service.change_password(user_id, passwords, session)
+    return await change_password_service.change_password(user_id, passwords, UserRole.CUSTOMER, session)
 
 
 @auth_customer_router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -131,9 +133,9 @@ async def create_user_account(user_data: UserCreateModel,
 async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
     try:
         await create_account_service.verify_user_account(token, UserRole.CUSTOMER, session)
-        return RedirectResponse(url="http://{DOMAIN_CLIENT}/login?verified=true", status_code=302)
+        return RedirectResponse(url=f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/login?verified=true", status_code=302)
     except Exception:
-        return RedirectResponse(url="http://{DOMAIN_CLIENT}/login?verified=false", status_code=302)
+        return RedirectResponse(url=f"http://{Config.CUSTOMER_DOMAIN_CLIENT}/login?verified=false", status_code=302)
 
 
 
@@ -141,18 +143,42 @@ async def verify_user_account(token: str, session: AsyncSession = Depends(get_se
 
 
 @auth_admin_router.post("/login")
-async def login_admin(user_data: LoginAdminModel, session: AsyncSession = Depends(get_session)):
-    return await login_service.login_admin_staff(user_data, AdminStaffRole.ADMIN, session)
+async def login_admin(user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
+    detected_role = await auth_service.detect_user_role(
+        user_data.email,
+        [UserRole.ADMIN, UserRole.STAFF],
+        session
+    )
+
+    admin_staff_role = AdminStaffRole.ADMIN if detected_role == UserRole.ADMIN else AdminStaffRole.STAFF
+
+    return await login_service.login_admin_staff(user_data, admin_staff_role, session)
 
 
 @auth_admin_router.post("/login/2fa")
 async def login_admin_with_2fa(user_data: Setup2FA, session: AsyncSession = Depends(get_session)):
-    return await login_service.setup_2fa(user_data, AdminStaffRole.ADMIN, session)
+    detected_role = await auth_service.detect_role_from_token(
+        user_data.token,
+        [UserRole.ADMIN, UserRole.STAFF],
+        purpose="first_class_login"
+    )
+
+    admin_staff_role = AdminStaffRole.ADMIN if detected_role == UserRole.ADMIN else AdminStaffRole.STAFF
+
+    return await login_service.setup_2fa(user_data, admin_staff_role, session)
 
 
 @auth_admin_router.post("/login/verify")
 async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSession = Depends(get_session)):
-    return await login_service.verify_login(user_data, AdminStaffRole.ADMIN, session)
+    detected_role = await auth_service.detect_role_from_token(
+        user_data.token,
+        [UserRole.ADMIN, UserRole.STAFF],
+        purpose="first_class_login"
+    )
+
+    admin_staff_role = AdminStaffRole.ADMIN if detected_role == UserRole.ADMIN else AdminStaffRole.STAFF
+
+    return await login_service.verify_login(user_data, admin_staff_role, session)
 
 
 # @auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
@@ -169,7 +195,13 @@ async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSes
 
 @auth_admin_router.post('/forgot-password')
 async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
-    message = await auth_service.forgot_password_service(email_data.email, email_data.check, UserRole.ADMIN, session)
+    detected_role = await auth_service.detect_user_role(
+        email_data.email,
+        [UserRole.ADMIN, UserRole.STAFF],
+        session
+    )
+
+    message = await auth_service.forgot_password_service(email_data.email, email_data.check, detected_role, session)
 
     return JSONResponse(
         content={"message": message},
@@ -178,15 +210,28 @@ async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSes
 
 
 @auth_admin_router.post('/confirm-reset')
-async def forget_password_confirm(data: PasswordResetConfirmModel,
+async def forgot_password_confirm(data: ForgotPasswordConfirmModel,
                                   session: AsyncSession = Depends(get_session)):
-    message = await auth_service.forgot_password_confirm_service(data, UserRole.ADMIN, session)
+    detected_role = await auth_service.detect_role_from_token(
+        data.token,
+        [UserRole.ADMIN, UserRole.STAFF],
+        purpose="reset_password"
+    )
+
+    message = await auth_service.forgot_password_confirm_service(data, detected_role, session)
+
     return JSONResponse(content={"message": message}, status_code=200)
 
 
 @auth_admin_router.post("/forgot-password/verify-otp")
 async def verify_otp(data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
-    token = await auth_service.verify_otp(data, UserRole.ADMIN, session)
+    detected_role = await auth_service.detect_user_role(
+        data.email,
+        [UserRole.ADMIN, UserRole.STAFF],
+        session
+    )
+
+    token = await auth_service.verify_otp(data, detected_role, session)
 
     return JSONResponse(
         content={
@@ -228,7 +273,7 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 async def change_password_admin(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                 token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
-    return await change_password_service.change_password(user_id, passwords, session)
+    return await change_password_service.change_password(user_id, passwords, UserRole.ADMIN, session)
 
 
 
@@ -236,7 +281,7 @@ async def change_password_admin(passwords: ChangePasswordModel, session: AsyncSe
 # ---------------------------------------------------- Staff ---------------------------------------------------------
 
 
-@auth_staff_router.post("/signup", status_code=status.HTTP_201_CREATED)
+@auth_admin_router.post("/signup", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
 async def create_user_account(user_data: UserCreateModel, 
                               bg_tasks: BackgroundTasks,
                               session: AsyncSession = Depends(get_session)):
@@ -255,24 +300,9 @@ async def create_user_account(user_data: UserCreateModel,
 async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
     try:
         await create_account_service.verify_user_account(token, UserRole.STAFF, session)
-        return RedirectResponse(url="http://{DOMAIN_CLIENT}/login?verified=true", status_code=302)
+        return RedirectResponse(url=f"http://{Config.ADMIN_DOMAIN_CLIENT}/staffs?verified=true", status_code=302)
     except Exception:
-        return RedirectResponse(url="http://{DOMAIN_CLIENT}/login?verified=false", status_code=302)
-    
-
-@auth_staff_router.post("/login")
-async def login_staff(user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
-    return await login_service.login_admin_staff(user_data, AdminStaffRole.STAFF, session)
-
-
-@auth_staff_router.post("/login/2fa")
-async def login_admin_with_2fa(user_data: Setup2FA, session: AsyncSession = Depends(get_session)):
-    return await login_service.setup_2fa(user_data, AdminStaffRole.STAFF, session)
-
-
-@auth_staff_router.post("/login/verify")
-async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSession = Depends(get_session)):
-    return await login_service.verify_login(user_data, AdminStaffRole.STAFF, session)
+        return RedirectResponse(url=f"http://{Config.ADMIN_DOMAIN_CLIENT}/staffs?verified=false", status_code=302)
 
 
 # @auth_staff_router.get("/logout", dependencies=[Depends(staff_role_middleware)])
@@ -286,38 +316,9 @@ async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSes
 #         status_code=status.HTTP_200_OK
 #     )
 
-@auth_staff_router.post('/forgot-password')
-async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
-    message = await auth_service.forgot_password_service(email_data.email, email_data.check, UserRole.STAFF, session)
-
-    return JSONResponse(
-        content={"message": message},
-        status_code=status.HTTP_200_OK
-    )
-
-
-@auth_staff_router.post('/confirm-reset')
-async def forget_password_confirm(data: PasswordResetConfirmModel,
-                                  session: AsyncSession = Depends(get_session)):
-    message = await auth_service.forgot_password_confirm_service(data, UserRole.STAFF, session)
-    return JSONResponse(content={"message": message}, status_code=200)
-
-
-@auth_staff_router.post("/forgot-password/verify-otp")
-async def verify_otp(data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
-    token = await auth_service.verify_otp(data, UserRole.STAFF, session)
-
-    return JSONResponse(
-        content={
-            "content": {
-                "token": token
-            }
-        },
-        status_code=status.HTTP_200_OK
-    )
     
-@auth_customer_router.put('/change-password', dependencies=[Depends(customer_role_middleware)])
-async def change_password_customer(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
+@auth_staff_router.put('/change-password', dependencies=[Depends(staff_role_middleware)])
+async def change_password_staff(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
-    return await change_password_service.change_password(user_id, passwords, session)
+    return await change_password_service.change_password(user_id, passwords, UserRole.STAFF, session)
