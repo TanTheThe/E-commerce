@@ -24,7 +24,7 @@ class WarehouseUpdate(BaseModel):
 
 class AssignManagerModel(BaseModel):
     user_id: str
-    new_role_for_old_manager: WarehouseRole
+    new_role_for_old_manager: Optional[WarehouseRole] = None
 
 class ManagerActivityFilter(BaseModel):
     warehouse_id: Optional[str] = Field(None, description="Lọc theo kho cụ thể")

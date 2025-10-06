@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -65,3 +65,16 @@ class TotalInventoryFilterParams(BaseModel):
     min_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối thiểu")
     max_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối đa")
     search: Optional[str] = Field(None, description="Tìm kiếm theo tên/SKU sản phẩm")
+    
+class StockInboundItemCreate(BaseModel):
+    product_variant_id: str
+    quantity: int = Field(gt=0, description="Số lượng nhập vào phải > 0")
+    unit_cost: int = Field(gt=0, description="Giá vốn đơn vị phải > 0")
+    note: Optional[str] = None
+    
+class StockInboundCreate(BaseModel):
+    warehouse_id: str
+    items: List[StockInboundItemCreate] = Field(min_length=1, description="Phải có ít nhất 1 sản phẩm")
+    reason: Optional[str] = Field(default="Nhập hàng mới", description="Lý do nhập hàng")
+    note: Optional[str] = None
+    performed_by: str

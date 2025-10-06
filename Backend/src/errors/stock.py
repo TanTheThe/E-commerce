@@ -21,4 +21,14 @@ class StockException:
                 "error_code": "stock_002",
             },
         )
+        
+    @staticmethod
+    def stock_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy tồn kho tương ứng",
+                "error_code": "stock_003",
+            },
+        )
 

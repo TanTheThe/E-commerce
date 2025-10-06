@@ -1270,8 +1270,332 @@ class User(SQLModel, table=True):
             'foreign_keys': '[User.warehouse_id]'
         }
     )
+    
+    
+class SupplierPayment(SQLModel, table=True):
+    """Thanh toán cho nhà cung cấp"""
+    __tablename__ = 'supplier_payment'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    payment_number: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))  # SP001, SP002...
+    
+    supplier_id: uuid.UUID = Field(foreign_key="supplier.id", nullable=False)
+    purchase_order_id: uuid.UUID = Field(foreign_key="purchase_order.id", nullable=False)
+    
+    # Ngày thực hiện thanh toán (ngày bạn chuyển tiền hoặc ghi nhận trong sổ).
+    payment_date: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False), default=datetime.now)
+    
+    # Số tiền thanh toán cho nhà cung cấp (đơn vị: đồng). Đây là số tiền thật bạn trả, không nhất thiết phải bằng tổng PO.
+    amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # "cash" → tiền mặt     "bank_transfer" → chuyển khoản
+    payment_method: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    
+    reference_number: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # Mã giao dịch ngân hàng
+    
+    # pending, completed, cancelled
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+    
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    # Relationships
+    supplier: Optional["Supplier"] = Relationship(back_populates="supplier_payments", sa_relationship_kwargs={'lazy': 'noload'})
+    purchase_order: Optional["PurchaseOrder"] = Relationship(back_populates="supplier_payments", sa_relationship_kwargs={'lazy': 'noload'})
 
 
+class GoodsReceiptDetail(SQLModel, table=True):
+    """Chi tiết phiếu nhập kho"""
+    __tablename__ = 'goods_receipt_detail'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    goods_receipt_id: uuid.UUID = Field(foreign_key="goods_receipt.id", nullable=False)
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+    po_detail_id: uuid.UUID = Field(foreign_key="purchase_order_detail.id", nullable=False)
+    
+    # Số lượng đặt hàng ban đầu trong PO (nếu có). Chỉ để đối chiếu, không bắt buộc
+    ordered_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng thực tế nhận được từ nhà cung cấp (ví dụ giao 100 cái)
+    received_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng chấp nhận nhập kho sau khi kiểm hàng (ví dụ nhận 100 nhưng chỉ 95 đạt chất lượng)
+    accepted_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng từ chối nhập (hàng lỗi, hư, sai mẫu...). Thường = received_quantity - accepted_quantity
+    rejected_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    
+    # Giá nhập trên mỗi đơn vị hàng hóa (theo hóa đơn hoặc PO)
+    unit_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Thành tiền trước giảm giá = accepted_quantity * unit_cost.
+    total_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # pending, pass, fail, partial
+    quality_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+    
+    rejection_reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    # Lưu bản sao JSON thông tin sản phẩm tại thời điểm nhập hàng (ví dụ: tên, SKU, đơn vị tính, giá tại thời điểm đó).
+    product_snapshot: Optional[dict] = Field(sa_column=Column(JSONB, nullable=True))
+    
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    
+    # Relationships
+    goods_receipt: Optional["GoodsReceipt"] = Relationship(back_populates="receipt_details", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    po_detail: Optional["PurchaseOrderDetail"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class GoodsReceipt(SQLModel, table=True):
+    """Phiếu nhập kho thực tế"""
+    __tablename__ = 'goods_receipt'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    # Mã phiếu nhập. VD: GR001, GR002...
+    receipt_number: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    
+    # Liên kết với đơn đặt hàng tương ứng
+    purchase_order_id: uuid.UUID = Field(foreign_key="purchase_order.id", nullable=False)
+    
+    # Kho hàng nơi nhập hàng vào
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    supplier_id: uuid.UUID = Field(foreign_key="supplier.id", nullable=False)
+    
+    # pending, inspecting, approved, rejected, completed
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
+    
+    # Ngày nhận hàng thực tế (do nhà cung cấp giao đến).
+    receipt_date: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False), default=datetime.now)
+    
+    # Tổng giá trị hàng nhập thực tế (tính từ GoodsReceiptDetail, có thể khác PO).
+    total_received_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    
+    # Ngày hóa đơn được lập
+    invoice_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    # Số phiếu giao hàng (do NCC phát hành kèm theo lô hàng).
+    delivery_note_number: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    
+    received_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)  # Nhân viên trực tiếp nhận hàng tại kho
+    inspected_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)  # Nhân viên kiểm tra chất lượng hàng nhập
+    approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)  # Người duyệt
+    
+    # Cờ báo có sự sai lệch giữa hàng nhận và hàng đặt
+    has_discrepancy: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="false"), default=False)
+    
+    # Ghi chú chi tiết về sự sai lệch
+    discrepancy_notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    # Kết quả kiểm tra chất lượng (true/false hoặc null nếu chưa kiểm).
+    quality_check_passed: Optional[bool] = Field(sa_column=Column(pg.BOOLEAN, nullable=True))
+    
+    # Ghi chú chung (ví dụ: nhập gấp, hàng khuyến mãi...).
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    received_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False), default=datetime.now)
+    inspected_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    completed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    # Relationships
+    purchase_order: Optional["PurchaseOrder"] = Relationship(back_populates="goods_receipts", sa_relationship_kwargs={'lazy': 'noload'})
+    warehouse: Optional["Warehouse"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    supplier: Optional["Supplier"] = Relationship(back_populates="goods_receipts", sa_relationship_kwargs={'lazy': 'noload'})
+    receipt_details: List["GoodsReceiptDetail"] = Relationship(back_populates="goods_receipt", sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class PurchaseOrderDetail(SQLModel, table=True):
+    """Chi tiết đơn đặt hàng"""
+    __tablename__ = 'purchase_order_detail'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    # Chi tiết này thuộc đơn đặt hàng nào.
+    purchase_order_id: uuid.UUID = Field(foreign_key="purchase_order.id", nullable=False)
+    
+    # Biến thể nào của sản phẩm.
+    product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=False)
+    
+    # Số lượng đặt hàng từ nhà cung cấp.
+    quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Số lượng đã nhận thực tế qua các phiếu nhập hàng (GoodsReceipt).
+    received_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0) 
+    
+    # Giá mua của một đơn vị sản phẩm (chưa tính chiết khấu)
+    unit_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Tổng tiền
+    total_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    
+    # Lưu thông tin sản phẩm tại thời điểm đặt
+    product_snapshot: Optional[dict] = Field(sa_column=Column(JSONB, nullable=True))  
+    
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    
+    # Relationships
+    purchase_order: Optional["PurchaseOrder"] = Relationship(back_populates="po_details", sa_relationship_kwargs={'lazy': 'noload'})
+    product_variant: Optional["Product_Variant"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class PurchaseOrder(SQLModel, table=True):
+    """Đơn đặt hàng từ nhà cung cấp"""
+    __tablename__ = 'purchase_order'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    # Mã số đơn đặt hàng, VD: PO001, PO002,...
+    po_number: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    
+    # ID của nhà cung cấp (Supplier) → biết đơn này đặt từ ai.
+    supplier_id: uuid.UUID = Field(foreign_key="supplier.id", nullable=False)
+    
+    # ID của kho (Warehouse) sẽ nhập hàng về.
+    warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
+    
+    # Trạng thái xử lý đơn hàng: draft, sent, confirmed, partially_received, completed, cancelled
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="draft"), default="draft")
+    
+    # Ngày tạo đơn đặt hàng
+    order_date: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False), default=datetime.now)
+    
+    # Ngày dự kiến NCC giao hàng
+    expected_delivery_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    # Tổng tiền hàng (chưa tính giảm giá, vận chuyển)
+    sub_total: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    discount_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    shipping_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    
+    # Tổng số tiền mà doanh nghiệp phải trả cho đơn hàng = sub_total + shipping_cost - discount_amount
+    total_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+    
+    # Điều khoản thanh toán cụ thể của đơn hàng đó. Đôi khi vì lí do đặc biệt nên phải khác với điều khoản thanh toán của NCC
+    payment_terms: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    
+    # unpaid, partially_paid, paid
+    payment_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="unpaid"), default="unpaid")
+    
+    # Số tiền mình trả. Trả thiếu thì payment_status = "partially_paid", trả đủ thì payment_status = "paid"
+    paid_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    sent_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    confirmed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    completed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    cancelled_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    cancellation_reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    # Relationships
+    supplier: Optional["Supplier"] = Relationship(back_populates="purchase_orders", sa_relationship_kwargs={'lazy': 'noload'})
+    warehouse: Optional["Warehouse"] = Relationship(sa_relationship_kwargs={'lazy': 'noload'})
+    po_details: List["PurchaseOrderDetail"] = Relationship(back_populates="purchase_order", sa_relationship_kwargs={'lazy': 'noload'})
+    goods_receipts: List["GoodsReceipt"] = Relationship(back_populates="purchase_order", sa_relationship_kwargs={'lazy': 'noload'})
+    supplier_payments: List["SupplierPayment"] = Relationship(back_populates="purchase_order", sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class Supplier(SQLModel, table=True):
+    """Nhà cung cấp"""
+    __tablename__ = 'supplier'
+    
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    
+    code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    
+    contact_person: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    email: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    address: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    # Số tài khoản ngân hàng mà NCC cung cấp để thanh toán.
+    bank_account: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    bank_name: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    
+    # Điều khoản thanh toán từ nhà cung cấp. VD: Thanh toán sau 30 ngày
+    payment_terms: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "COD", "30_days", "60_days"
+    
+    # Hạn mức công nợ tối đa mà NCC cho phép (VD: 100,000,000 VND)
+    credit_limit: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True))
+    
+    # Công nợ hiện tại mà doanh nghiệp còn nợ NCC
+    current_debt: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"), default=0)
+    
+    # Trạng thái NCC còn đang hợp tác hay đã ngưng
+    is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="true"), default=True)
+    
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+    
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    
+    purchase_orders: List["PurchaseOrder"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
+    goods_receipts: List["GoodsReceipt"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
+    supplier_payments: List["SupplierPayment"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
 
     
 

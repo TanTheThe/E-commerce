@@ -141,3 +141,23 @@ class UserException:
                 "error_code": "user_014",
             },
         )
+        
+    @staticmethod
+    def new_role_for_old_manager_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Cần phải bổ sung role mới cho quản lí cũ",
+                "error_code": "user_015",
+            },
+        )
+        
+    @staticmethod
+    def warehouse_has_no_manager():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Kho hiện tại không có quản lí",
+                "error_code": "user_016",
+            },
+        )
