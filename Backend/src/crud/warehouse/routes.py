@@ -1,10 +1,8 @@
-from datetime import datetime
 from fastapi import APIRouter, status, Depends
-from typing import Optional, List
+from typing import Optional
 from src.crud.warehouse.services.assign_manager_to_warehouse import AssignManagerService
 from src.crud.warehouse.services.assign_staff_to_warehouse import AssignStaffService
 from src.crud.warehouse.services.create_warehouse import CreateWareHouseService
-from src.crud.warehouse.services.get_manager_activity_history import GetManagerActivityHistoryService
 from src.crud.warehouse.services.get_warehouse_by_id import GetWarehouseByIDService
 from src.crud.warehouse.services.remove_staff_from_warehouse import RemoveStaffService
 from src.crud.warehouse.services.toggle_warehouse_status import ToggleWarehouseStatusService
@@ -17,10 +15,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
-from src.schemas.stock import TransactionType
 from src.schemas.user import StaffMultipleDeleteModel
-from src.schemas.warehouse import WarehouseCreateModel, WarehouseUpdate, AssignManagerModel, ManagerActivityFilter, \
-    UpdateStaffRoleModel, AssignMultipleStaffModel, AssignStaffItemModel
+from src.schemas.warehouse import WarehouseCreateModel, WarehouseUpdate, AssignManagerModel, UpdateStaffRoleModel, AssignMultipleStaffModel, AssignStaffItemModel
 
 warehouse_admin_router = APIRouter(prefix="/warehouse")
 warehouse_customer_router = APIRouter(prefix="/warehouse")
@@ -33,7 +29,6 @@ set_default_warehouse_service = SetDefaultWarehouseService()
 toggle_warehouse_status_service = ToggleWarehouseStatusService()
 assign_manager_service = AssignManagerService()
 assign_staff_service = AssignStaffService()
-get_manager_activity_history_service = GetManagerActivityHistoryService()
 remove_staff_service = RemoveStaffService()
 update_staff_role_service = UpdateStaffRoleService()
 get_warehouse_by_id_service = GetWarehouseByIDService()
@@ -83,33 +78,6 @@ async def get_warehouse_by_id(warehouse_id: str,
         content={
             "message": "Thông tin kho",
             "content": warehouse
-        }
-    )
-
-
-@warehouse_admin_router.get('/{user_id}/activity-history', dependencies=[Depends(admin_role_middleware)])
-async def get_manager_activity_history(user_id: str,
-                                       warehouse_id: Optional[str] = None,
-                                       transaction_type: Optional[TransactionType] = None,
-                                       from_date: Optional[datetime] = None,
-                                       to_date: Optional[datetime] = None,
-                                       skip: int = 0, limit: int = 10,
-                                       token_details: dict = Depends(access_token_bearer),
-                                       session: AsyncSession = Depends(get_session)):
-    filters = ManagerActivityFilter(
-        warehouse_id=warehouse_id,
-        transaction_type=transaction_type,
-        from_date=from_date,
-        to_date=to_date
-    )
-
-    activity_history = await get_manager_activity_history_service.get_manager_activity_history(user_id, filters, session, skip, limit)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin liên quan đến nhân sự trên",
-            "content": activity_history
         }
     )
 

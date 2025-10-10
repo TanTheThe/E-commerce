@@ -48,8 +48,8 @@ class SearchProductService:
             selectinload(Categories.children),
             selectinload(Categories.parent)
         ]
-        categories, _ = await categories_repository.get_all_categories(condition_search_categories, session,
-                                                                       joins=joins_search_categories)
+        categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition_search_categories,
+                                                                       options=joins_search_categories)
         added_categories = {}
         for cat in categories:
             if cat.parent_id is None:
@@ -78,7 +78,7 @@ class SearchProductService:
                         Categories.parent_id == cat.parent.id,
                         Categories.deleted_at.is_(None)
                     ]
-                    parent_children, _ = await categories_repository.get_all_categories(condition_parent, session)
+                    parent_children, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition_parent)
                     active_children = [
                         {"id": str(c.id), "name": c.name}
                         for c in parent_children

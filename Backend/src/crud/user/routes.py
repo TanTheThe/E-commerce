@@ -1,5 +1,5 @@
 from fastapi import APIRouter, status, Depends
-from src.dependencies import AccessTokenBearer, staff_role_middleware
+from src.dependencies import AccessTokenBearer
 from src.errors.user import UserException
 from src.schemas.stock import WarehouseRole
 from src.schemas.user import UserUpdateModel, UserDeleteModel, FilterUserInputModel, UserStatus, UserRole

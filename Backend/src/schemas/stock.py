@@ -50,6 +50,21 @@ class StockStatusFilter(str, Enum):
     OUT_OF_STOCK = "out_of_stock"
     OVERSTOCKED = "overstocked"
 
+class ProductStockStatus(str, Enum):
+    ALL = "all"
+    AVAILABLE = "available"  # Còn hàng bình thường
+    LOW = "low"              # Sắp hết (dưới min_stock_level)
+    OUT = "out"              # Hết hàng
+
+class SortBy(str, Enum):
+    NAME = "name"
+    TOTAL_QUANTITY = "total_quantity"
+    UPDATED_AT = "updated_at"
+
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
 class StockFilterParams(BaseModel):
     status: Optional[StockStatusFilter] = Field(None, description="Lọc theo trạng thái")
     min_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối thiểu")

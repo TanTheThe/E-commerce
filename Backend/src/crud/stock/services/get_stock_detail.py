@@ -4,6 +4,7 @@ from unittest import skip
 from sqlalchemy.orm import selectinload
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.stock.repositories import StockRepository
+from src.crud.stock_transaction.repositories import StockTransactionRepository
 from src.crud.warehouse.repositories import WareHouseRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.models import Stock, Product_Variant, StockTransaction
@@ -12,10 +13,11 @@ from src.errors.stock import StockException
 warehouse_repository = WareHouseRepository()
 stock_repository = StockRepository()
 product_variant_repository = ProductVariantRepository()
+stock_transaction_repository = StockTransactionRepository()
 
 
 class GetStockDetailService:
-    async def get_low_stock_items(self, stock_id: str, session: AsyncSession):
+    async def get_stock_detail(self, stock_id: str, session: AsyncSession):
         condition_stock = [
             Stock.id == stock_id
         ]
@@ -44,11 +46,11 @@ class GetStockDetailService:
             selectinload(StockTransaction.warehouse)
         ]
         
-        transactions, total = await stock_repository.get_all_stock_transactions(
+        transactions, total = await stock_transaction_repository.get_all_stock_transactions(
             session=session,
             where_conditions=condition_transaction,
             skip=0,
-            limit=10,
+            limit=1000,
             options=option_transaction
         )
 
@@ -67,11 +69,22 @@ class GetStockDetailService:
                     "reference_type": txn.reference_type,
                     "reason": txn.reason,
                     "note": txn.note,
-                    "performed_by": txn.performed_by,
+                    "performed_by": str(txn.performed_by),
                     "performed_by_name": txn.user.first_name + txn.user.last_name if txn.user else None,
-                    "created_at": txn.created_at
+                    "created_at": str(txn.created_at)
                 }
             )
+
+        variant_color_name = None
+        variant_color_code = None
+
+        if stock.product_variant:
+            if stock.product_variant.color_name:
+                variant_color_name = stock.product_variant.color_name
+                variant_color_code = stock.product_variant.color_code
+            elif stock.product_variant.color:
+                variant_color_name = stock.product_variant.color.name
+                variant_color_code = stock.product_variant.color.code
             
         thirty_days_ago = datetime.now() - timedelta(days=30)
         total_inbound = 0
@@ -100,8 +113,8 @@ class GetStockDetailService:
             "product_name": stock.product_variant.product.name if stock.product_variant and stock.product_variant.product else None,
             "variant_sku": stock.product_variant.sku if stock.product_variant else None,
             "variant_size": stock.product_variant.size if stock.product_variant else None,
-            "variant_color_name": stock.product_variant.color_name if stock.product_variant else None,
-            "variant_color_code": stock.product_variant.color_code if stock.product_variant else None,
+            "variant_color_name": variant_color_name,
+            "variant_color_code": variant_color_code,
             "variant_image": stock.product_variant.image if stock.product_variant else None,
             "variant_price": stock.product_variant.price if stock.product_variant else None,
             "available_quantity": stock.available_quantity,
@@ -112,13 +125,13 @@ class GetStockDetailService:
             "cost_price": stock.cost_price,
             "last_cost_price": stock.last_cost_price,
             "status": stock.status,
-            "last_inbound_date": stock.last_inbound_date,
-            "last_outbound_date": stock.last_outbound_date,
+            "last_inbound_date": str(stock.last_inbound_date),
+            "last_outbound_date": str(stock.last_outbound_date),
             "created_at": str(stock.created_at),
             "updated_at": str(stock.updated_at),
             "recent_transactions": transaction_responses,
             "total_inbound": total_inbound,
             "total_outbound": total_outbound,
             "avg_daily_outbound": round(avg_daily_outbound, 2),
-            "estimated_days_remaining": estimated_days_remaining
+            "estimated_days_remaining": str(estimated_days_remaining)
         }

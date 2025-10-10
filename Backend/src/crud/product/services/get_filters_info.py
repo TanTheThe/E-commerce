@@ -37,15 +37,15 @@ class GetFiltersInfoService:
             CategoriesException.not_found()
 
         condition_child_categories = [Categories.parent_id == category_id, Categories.deleted_at.is_(None)]
-        child_categories, _ = await categories_repository.get_all_categories(condition_child_categories, session, 0, 1000,)
+        child_categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition_child_categories, skip=0, limit=1000)
 
         type_size = parent_category.type_size
         sizes = await size_repository.get_all_size(Size.type == type_size, session)
 
         colors, _ = await color_repository.get_all_color([Color.deleted_at.is_(None)], session, 0, 1000)
 
-        brands, _ = await brand_repository.get_all_brand([Brand.deleted_at.is_(None), Brand.is_active == True], session,
-                                                         0, 1000)
+        brands, _ = await brand_repository.get_all_brand(session=session, where_conditions=[Brand.deleted_at.is_(None), Brand.is_active == True],
+                                                         skip=0, limit=1000)
 
         materials, _ = await material_repository.get_all_material(
             [Material.deleted_at.is_(None), Material.is_active == True], session, 0, 1000)

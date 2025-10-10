@@ -103,6 +103,20 @@ async def get_detail_category(id: str,
     )
 
 
+@categories_admin_router.get('/all/select-box')
+async def get_categories_select_box(session: AsyncSession = Depends(get_session),
+                                   token_details: dict = Depends(access_token_bearer)):
+    categories = await categories_service.get_categories_select_box_service(session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin các danh mục",
+            "content": categories
+        }
+    )
+
+
 @categories_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def update_categories(id: str,
                             categories_update: CategoriesUpdateModel,

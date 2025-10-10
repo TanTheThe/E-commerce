@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import selectinload
+from sqlmodel import asc
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.stock.repositories import StockRepository
 from src.crud.warehouse.repositories import WareHouseRepository
@@ -25,13 +26,11 @@ class GetLowStockItemsService:
 
         options = [
             selectinload(Stock.warehouse),
-            selectinload(Stock.product_variant).selectinload(
-                Product_Variant.product),
-            selectinload(Stock.product_variant).selectinload(
-                Product_Variant.color)
+            selectinload(Stock.product_variant).selectinload(Product_Variant.product),
+            selectinload(Stock.product_variant).selectinload(Product_Variant.color)
         ]
 
-        order_by = (Stock.available_quantity / Stock.min_stock_level).asc()
+        order_by = asc(Stock.available_quantity / Stock.min_stock_level)
 
         stocks, total = await stock_repository.get_all_stocks(
             session=session,
@@ -55,18 +54,25 @@ class GetLowStockItemsService:
             elif shortage_percentage >= 50:
                 severity = "medium"   
             else:
-                severity = "low" 
+                severity = "low"
+
+            variant_color_name = None
+            if stock.product_variant:
+                if stock.product_variant.color_name:
+                    variant_color_name = stock.product_variant.color_name
+                elif stock.product_variant.color and stock.product_variant.color.name:
+                    variant_color_name = stock.product_variant.color.name
 
             items.append({
-                "stock_id": stock.id,
-                "warehouse_id": stock.warehouse_id,
+                "stock_id": str(stock.id),
+                "warehouse_id": str(stock.warehouse_id),
                 "warehouse_name": stock.warehouse.name if stock.warehouse else None,
                 "warehouse_code": stock.warehouse.code if stock.warehouse else None,
-                "product_variant_id": stock.product_variant_id,
+                "product_variant_id": (stock.product_variant_id),
                 "product_name": stock.product_variant.product.name if stock.product_variant and stock.product_variant.product else None,
                 "variant_sku": stock.product_variant.sku if stock.product_variant else None,
                 "variant_size": stock.product_variant.size if stock.product_variant else None,
-                "variant_color_name": stock.product_variant.color_name if stock.product_variant else None,
+                "variant_color_name": variant_color_name,
                 "variant_image": stock.product_variant.image if stock.product_variant else None,
                 "available_quantity": stock.available_quantity,
                 "reserved_quantity": stock.reserved_quantity,
@@ -76,8 +82,8 @@ class GetLowStockItemsService:
                 "shortage_percentage": round(shortage_percentage, 2),
                 "severity": severity,
                 "cost_price": stock.cost_price,
-                "last_inbound_date": stock.last_inbound_date,
-                "last_outbound_date": stock.last_outbound_date
+                "last_inbound_date": str(stock.last_inbound_date),
+                "last_outbound_date": str(stock.last_outbound_date)
             })
             
         return {

@@ -56,7 +56,7 @@ TOKEN_CONFIG = {
     ("staff", "create_account"): {
         "secret": "JWT_CREATE_ACCOUNT_SECRET_STAFF",
         "salt": "staff-create-account",
-    }
+    },
 }
 
 ACCESS_TOKEN_EXPIRY = 60

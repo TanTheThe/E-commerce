@@ -64,7 +64,7 @@ class CreateOrderService:
 
     async def get_variants_with_product_offers(self, variant_ids, session):
         condition = Product_Variant.id.in_(variant_ids)
-        joins = [
+        options = [
             selectinload(Product_Variant.product).options(
                 selectinload(Product.special_offer),
             ).load_only(
@@ -75,7 +75,7 @@ class CreateOrderService:
             ),
         ]
 
-        variants = await product_variant_repository.get_all_product_variant(condition, session, joins, for_update=True)
+        variants = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition, options=options, for_update=True)
         return {str(v.id): v for v in variants}
 
     async def calculate_order_totals(self, order_items, variant_map, session: AsyncSession):

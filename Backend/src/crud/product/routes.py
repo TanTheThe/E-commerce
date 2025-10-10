@@ -283,6 +283,36 @@ async def get_detail_product_admin(id: str,
     )
 
 
+@product_admin_router.get('/all/select-box')
+async def get_products_selectbox(category_id: Optional[str] = None,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    product_dict = await get_all_products_service.get_products_select_box(session, category_id)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin các sản phẩm",
+            "content": product_dict
+        }
+    )
+
+
+@product_admin_router.get('/variants/all/select-box')
+async def get_variants_selectbox(product_id: str,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    variant_dict = await get_all_products_service.get_variants_select_box(product_id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin các biến thể",
+            "content": variant_dict
+        }
+    )
+
+
 @product_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def update_product(id: str, product_data: ProductUpdateModel,
                          token_details: dict = Depends(access_token_bearer),

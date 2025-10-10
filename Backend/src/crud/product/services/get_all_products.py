@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional, Dict, Any
 
 from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
@@ -9,7 +9,7 @@ from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand, Material, Product_Material, \
-    Tag
+    Tag, Categories_Product, Color
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc, asc, or_, func, select, case
 from src.crud.product.repositories import ProductRepository
@@ -203,7 +203,7 @@ class GetAllProductsService:
     async def get_category_ids_for_filter(self, category: Categories, session: AsyncSession):
         if category.parent_id is None:
             condition = [Categories.parent_id == category.id, Categories.deleted_at.is_(None)]
-            child_categories, _ = await categories_repository.get_all_categories(condition, session, 0, 1000)
+            child_categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition, skip=0, limit=1000)
 
             child_category_ids = [str(row.id) for row in child_categories]
 
@@ -226,7 +226,7 @@ class GetAllProductsService:
             Categories.slug.in_(slugs),
             Categories.deleted_at.is_(None)
         ]
-        categories, _ = await categories_repository.get_all_categories(condition, session)
+        categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition)
 
         category_ids = [str(category.id) for category in categories]
 
@@ -603,3 +603,84 @@ class GetAllProductsService:
 
         else:
             return desc(Product.created_at)
+
+
+    async def get_products_select_box(self, session: AsyncSession, category_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        where_conditions = [Product.deleted_at.is_(None)]
+
+        joins = []
+        if category_id:
+            joins.append((
+                Categories_Product,
+                {
+                    'on': Categories_Product.product_id == Product.id,
+                    'type': 'inner'
+                }
+            ))
+            where_conditions.extend([
+                Categories_Product.categories_id == category_id,
+                Categories_Product.deleted_at.is_(None)
+            ])
+
+        products, _ = await product_repository.get_all_product(session=session, joins=joins if category_id else None,
+                                                               where_conditions=where_conditions, skip=0, limit=1000)
+
+        return [
+            {
+                "id": str(product[0].id),
+                "name": product[0].name
+            }
+            for product in products
+        ]
+
+
+    async def get_variants_select_box(self, product_id: str, session: AsyncSession) -> List[Dict[str, Any]]:
+        where_conditions = [
+            Product_Variant.product_id == product_id,
+            Product_Variant.deleted_at.is_(None)
+        ]
+        joins = [(
+            Color,
+            {
+                'on': Product_Variant.color_id == Color.id,
+                'type': 'outer'
+            }
+        )]
+        order_by = [
+            case(
+                (Product_Variant.color_name.isnot(None), Product_Variant.color_name),
+                else_=Color.name
+            ),
+            Product_Variant.size
+        ]
+        options = [selectinload(Product_Variant.color)]
+        variants, _ = await product_variant_repository.get_all_product_variant(session=session, where_conditions=where_conditions,
+                                                                               order_by=order_by, joins=joins, skip=0, limit=1000,
+                                                                               options=options)
+
+        return [
+            {
+                "id": str(variant.id),
+                "name": self.build_variant_name(variant),
+                "price": variant.price
+            }
+            for variant in variants
+        ]
+
+
+    def build_variant_name(self, variant: Product_Variant) -> str:
+        parts = []
+
+        color_display = variant.color_name
+        if not color_display and variant.color:
+            color_display = variant.color.name
+
+        if color_display:
+            parts.append(color_display)
+        if variant.size:
+            parts.append(f"Size {variant.size}")
+
+        if not parts:
+            parts.append(variant.sku)
+
+        return " - ".join(parts)

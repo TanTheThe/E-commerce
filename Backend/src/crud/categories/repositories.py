@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Any, Tuple
 from sqlalchemy import ColumnElement
 from src.database.models import Categories
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -25,21 +25,54 @@ class CategoriesRepository:
 
         return new_categories
 
-    async def get_all_categories(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                                 skip: int = 0, limit: int = 5, joins: list = None):
-        count_stmt = select(func.count()).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
 
-        statement = select(Categories).options(
-            *joins if joins else []
-        ).where(*conditions).offset(skip).limit(limit)
+    async def get_all_categories(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Categories)
+        else:
+            query = select(*select_columns).select_from(Categories)
 
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         categories = result.all()
 
         return categories, total
+
 
     async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         base_condition = Categories.deleted_at.is_(None)

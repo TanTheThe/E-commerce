@@ -79,8 +79,8 @@ class BrandService:
         else:
             order_by_clause = desc(Brand.created_at)
 
-        brands, total = await brand_repository.get_all_brand(conditions, session, skip, limit,
-                                                             order_by_clause=order_by_clause)
+        brands, total = await brand_repository.get_all_brand(session=session, where_conditions=conditions, skip=skip, limit=limit,
+                                                             order_by=order_by_clause)
 
         brand_list = []
         for brand in brands:
@@ -106,7 +106,7 @@ class BrandService:
         if search:
             conditions.append(Brand.name.ilike(f"%{search}%"))
 
-        brands, total = await brand_repository.get_all_brand(conditions, session, skip, limit)
+        brands, total = await brand_repository.get_all_brand(session=session, where_conditions=conditions, skip=skip, limit=limit)
 
         brand_list = []
         for brand in brands:

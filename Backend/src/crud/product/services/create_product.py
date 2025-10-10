@@ -48,7 +48,7 @@ class CreateProductService:
         try:
             category_ids = product_data.categories_id
             condition = [Categories.id.in_(category_ids), Categories.deleted_at.is_(None)]
-            existing_categories, total = await categories_repository.get_all_categories(condition, session, 0, 1000)
+            existing_categories, total = await categories_repository.get_all_categories(session=session, where_conditions=condition, skip=0, limit=1000)
 
             existing_ids = {c.id for c in existing_categories}
             missing_ids = set(category_ids) - existing_ids

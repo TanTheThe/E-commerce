@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import Optional, List, Any, Tuple
 from sqlalchemy import ColumnElement
-from src.database.models import Brand, Product
+from src.database.models import Brand
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func, update
 from datetime import datetime
@@ -20,24 +20,52 @@ class BrandRepository:
         return new_brand
 
 
-    async def get_all_brand(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0, limit: int = 10
-                            , joins: list = None, order_by_clause=None):
-        count_stmt = select(func.count(Brand.id)).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
+    async def get_all_brand(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Brand)
+        else:
+            query = select(*select_columns).select_from(Brand)
 
-        statement = select(Brand).where(*conditions).options(
-            *joins if joins else []
-        ).offset(skip).limit(limit)
-        
-        if order_by_clause is not None:
-            statement = statement.order_by(order_by_clause)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        result = await session.exec(statement)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
 
-        colors = result.all()
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
 
-        return colors, total
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
+        brands = result.all()
+
+        return brands, total
 
 
     async def get_brand(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):

@@ -15,8 +15,8 @@ product_variant_repository = ProductVariantRepository()
 
 class ProductVariantService:
     async def update_product_variant(self, product_id: str, new_variants: list, session: AsyncSession):
-        condition = and_(Product_Variant.product_id == product_id)
-        existing_variants = await product_variant_repository.get_all_product_variant(condition, session)
+        condition = [Product_Variant.product_id == product_id]
+        existing_variants = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition)
 
         existing_dict = {str(v.id): v for v in existing_variants}
         new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}

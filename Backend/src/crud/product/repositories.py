@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Tuple
 from sqlalchemy import ColumnElement
 from src.database.models import Product, Product_Variant, Categories, Evaluate, Order_Detail, Order, Categories_Product, \
     Special_Offer
@@ -44,20 +44,49 @@ class ProductRepository:
 
         return new_product
 
-    async def get_all_product(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                              joins: list = None, skip: int = 0, limit: int = 10, order_by_clause=None):
-        count_stmt = select(func.count(Product.id)).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
+    async def get_all_product(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Product)
+        else:
+            query = select(*select_columns).select_from(Product)
 
-        statement = select(Product).options(
-            *joins if joins else []
-        ).where(*conditions).offset(skip).limit(limit)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        if order_by_clause is not None:
-            statement = statement.order_by(order_by_clause)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
 
-        result = await session.exec(statement)
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         products = result.unique().all()
 
         return products, total

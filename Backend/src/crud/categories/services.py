@@ -55,7 +55,7 @@ class CategoriesService:
             if filter_data.type_size:
                 filters.append(Categories.type_size == filter_data.type_size)
 
-            matched_categories, _ = await categories_repository.get_all_categories(filters, session, 0, 1000)
+            matched_categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=filters, skip=0, limit=1000)
 
             matched_parents = [cat for cat in matched_categories if cat.parent_id is None]
             matched_children = [cat for cat in matched_categories if cat.parent_id is not None]
@@ -65,7 +65,7 @@ class CategoriesService:
             if additional_parent_ids:
                 parent_filters = [Categories.deleted_at.is_(None), Categories.id.in_(additional_parent_ids)]
 
-                additional_parents, _ = await categories_repository.get_all_categories(parent_filters, session, 0, 1000)
+                additional_parents, _ = await categories_repository.get_all_categories(session=session, where_conditions=parent_filters, skip=0, limit=1000)
 
             all_relevant_parents = matched_parents + additional_parents
 
@@ -97,12 +97,12 @@ class CategoriesService:
             filters = [Categories.deleted_at.is_(None), Categories.parent_id.is_(None)]
             if filter_data.type_size:
                 filters.append(Categories.type_size == filter_data.type_size)
-            parent_categories, parent_total = await categories_repository.get_all_categories(filters, session, skip, limit)
+            parent_categories, parent_total = await categories_repository.get_all_categories(session=session, where_conditions=filters, skip=skip, limit=limit)
 
             parent_ids = [cat.id for cat in parent_categories]
             if parent_ids:
                 child_filters = [Categories.deleted_at.is_(None), Categories.parent_id.in_(parent_ids)]
-                child_categories, _ = await categories_repository.get_all_categories(child_filters, session, 0, 1000)
+                child_categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=child_filters, skip=0, limit=1000)
             else:
                 child_categories = []
 
@@ -151,6 +151,22 @@ class CategoriesService:
             "parent_id": str(categories.parent_id) if categories.parent_id else None,
             "type_size": categories.type_size
         }
+
+    async def get_categories_select_box_service(self, session: AsyncSession):
+        condition = [
+            Categories.parent_id.isnot(None),
+            Categories.deleted_at.is_(None)
+        ]
+
+        categories, _ = await categories_repository.get_all_categories(session=session, where_conditions=condition, skip=0, limit=1000)
+
+        return [
+            {
+                "id": str(category.id),
+                "name": category.name
+            }
+            for category in categories
+        ]
 
     async def update_categories_service(self, id: str, categories_update: CategoriesUpdateModel, session: AsyncSession):
         condition = and_(Categories.id == id)

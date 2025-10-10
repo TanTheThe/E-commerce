@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class StockStatus(str, Enum):
+class GoodsReceiptStatus(str, Enum):
     PENDING = "pending"               # Mới tạo, chờ xác nhận nhận hàng
     INSPECTING = "inspecting"         # Đang kiểm hàng
     APPROVED = "approved"             # Đã kiểm và duyệt

@@ -1,7 +1,6 @@
 from typing import Optional
-
 from sqlalchemy.orm import selectinload
-from sqlmodel import and_, or_, asc, desc, func
+from sqlmodel import or_, asc, desc, func
 from src.crud.warehouse.repositories import WareHouseRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.models import Warehouse, User
@@ -17,7 +16,7 @@ class GetAllWarehousesService:
         if search:
             search_term = f"%{search}%"
 
-            joins = [(User, Warehouse.manager_id == User.id)]
+            joins = [(User, {'type': 'outer', 'on': Warehouse.manager_id == User.id})]
 
             conditions.append(or_(
                 Warehouse.name.ilike(search_term),
@@ -35,8 +34,8 @@ class GetAllWarehousesService:
 
         options = [selectinload(Warehouse.manager)]
 
-        warehouses, total = await warehouse_repository.get_all_warehouse(conditions, session, skip, limit,
-                                                       joins, order_by_clause, options)
+        warehouses, total = await warehouse_repository.get_all_warehouse(session=session, where_conditions=conditions, joins=joins,
+                                                                         skip=skip, limit=limit, order_by=order_by_clause, options=options)
 
         warehouses_list = []
         for wh in warehouses:

@@ -35,7 +35,7 @@ class SetDefaultWarehouseService:
         if exclude_id:
             condition_remove_default.append(Warehouse.id != exclude_id)
 
-        warehouses, _ = await warehouse_repository.get_all_warehouse(condition_remove_default, session)
+        warehouses, _ = await warehouse_repository.get_all_warehouse(session=session, where_conditions=condition_remove_default)
 
         for warehouse in warehouses:
             condition = and_(Warehouse.id == warehouse.id)

@@ -14,6 +14,7 @@ import { MyContext } from "../../App";
 import AddCategory from "../../Pages/Category/addCategory";
 import AddSpecialOffer from "../../Pages/SpecialOffer/addSpecialOffer";
 import { MdBrandingWatermark, MdOutlinePreview } from "react-icons/md";
+import { FaPeopleGroup } from "react-icons/fa6";
 import { IoIosColorPalette } from "react-icons/io";
 import { SiMaterialdesignicons } from "react-icons/si";
 import useAuth from "../../Pages/Verify/auth";
@@ -285,6 +286,18 @@ const Sidebar = () => {
                             <Link to="/warehouses/list">
                                 <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
                                     <FaWarehouse className="text-[18px]" /> <span>Warehouses</span>
+                                </Button>
+                            </Link>
+                        )}
+                    </li>
+
+                    <li>
+                        {isStaff ? (
+                            <LockedMenuItem icon={FaTag} label="Suppliers" />
+                        ) : (
+                            <Link to="/suppliers/list">
+                                <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">
+                                    <FaPeopleGroup className="text-[18px]" /> <span>Suppliers</span>
                                 </Button>
                             </Link>
                         )}

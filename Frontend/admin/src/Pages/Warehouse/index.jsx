@@ -6,7 +6,14 @@ import EditWarehouseModal from './editWarehouse';
 import { MyContext } from "../../App";
 import { getDataApi, postDataApi, putDataApi } from '../../utils/api';
 import WarehouseStaffModal from './managementStaff';
+import WarehouseStock from './warehouseStock/warehouseStock';
+import { AppBar, Dialog, IconButton, Slide, Toolbar, Typography } from '@mui/material';
+import { IoMdClose } from 'react-icons/io';
 
+
+const Transition = React.forwardRef(function Transition(props, ref) {
+    return <Slide direction="up" ref={ref} {...props} />;
+});
 
 const Warehouse = () => {
     const [searchVal, setSearchVal] = useState('');
@@ -32,6 +39,9 @@ const Warehouse = () => {
 
     const [showStaffModal, setShowStaffModal] = useState(false);
     const [selectedWarehouseForStaff, setSelectedWarehouseForStaff] = useState(null);
+
+    const [showStockModal, setShowStockModal] = useState(false);
+    const [selectedWarehouseForStock, setSelectedWarehouseForStock] = useState(null);
 
     const context = useContext(MyContext);
 
@@ -243,9 +253,9 @@ const Warehouse = () => {
         setShowUpdateModal(true);
     };
 
-    const handleViewInventory = (warehouseId) => {
-        console.log('Xem nội dung trong kho:', warehouseId);
-        // TODO: Implement view inventory functionality
+    const handleViewInventory = (warehouse) => {
+        setSelectedWarehouseForStock(warehouse);
+        setShowStockModal(true);
     };
 
     const handleViewStaffs = (warehouse) => {
@@ -400,7 +410,7 @@ const Warehouse = () => {
 
                                                 <button
                                                     className="text-[13px] px-3 py-2 bg-purple-500 text-white hover:bg-purple-600 rounded-md transition-colors flex items-center gap-1 cursor-pointer"
-                                                    onClick={() => handleViewInventory(warehouse.id)}
+                                                    onClick={() => handleViewInventory(warehouse)}
                                                 >
                                                     <MdInventory /> Xem nội dung
                                                 </button>
@@ -621,6 +631,44 @@ const Warehouse = () => {
                 warehouse={selectedWarehouseForStaff}
                 context={context}
             />
+
+            {showStockModal && selectedWarehouseForStock && (
+                <Dialog
+                    fullScreen
+                    open={showStockModal}
+                    onClose={() => {
+                        setShowStockModal(false);
+                        setSelectedWarehouseForStock(null);
+                    }}
+                    TransitionComponent={Transition}
+                >
+                    <AppBar sx={{ position: 'relative' }}>
+                        <Toolbar>
+                            <IconButton
+                                edge="start"
+                                color="inherit"
+                                onClick={() => {
+                                    setShowStockModal(false);
+                                    setSelectedWarehouseForStock(null);
+                                }}
+                                aria-label="close"
+                            >
+                                <IoMdClose className='text-gray-800' />
+                            </IconButton>
+                            <Typography sx={{ ml: 2, flex: 1 }} variant="h6" component="div">
+                                <span className='text-gray-800'>{selectedWarehouseForStock.name}</span>
+                            </Typography>
+                        </Toolbar>
+                    </AppBar>
+                    <WarehouseStock
+                        warehouse={selectedWarehouseForStock}
+                        onClose={() => {
+                            setShowStockModal(false);
+                            setSelectedWarehouseForStock(null);
+                        }}
+                    />
+                </Dialog>
+            )}
         </div>
     );
 };
