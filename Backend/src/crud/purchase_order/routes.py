@@ -2,11 +2,13 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, status, Depends, Query
 from src.crud.purchase_order.services.approve_purchase_order import ApprovePurchaseOrderService
+from src.crud.purchase_order.services.confirm_purchase_order import ConfirmPurchaseOrderService
 from src.crud.purchase_order.services.create_purchase_order import CreatePurchaseOrderService
 from src.crud.purchase_order.services.delete_purchase_order import DeletePurchaseOrderService
 from src.crud.purchase_order.services.get_purchase_order_by_id import GetPurchaseOrderByIDService
 from src.crud.purchase_order.services.get_purchase_orders import GetPurchaseOrdersService
 from src.crud.purchase_order.services.send_purchase_order import SendPurchaseOrderService
+from src.crud.purchase_order.services.update_po_after_negotiation import UpdatePOAfterNegotiationService
 from src.crud.purchase_order.services.update_purchase_order import UpdatePurchaseOrderService
 from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,7 +16,7 @@ from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.errors.user import UserException
 from src.schemas.purchase_order import CreatePurchaseOrderRequest, UpdatePurchaseOrderRequest, \
-    ApprovePurchaseOrderRequest, SendPurchaseOrderRequest
+    ApprovePurchaseOrderRequest, SendPurchaseOrderRequest, UpdatePurchaseOrderAfterNegotiationRequest
 
 purchase_orders_admin_router = APIRouter(prefix="/purchase-orders")
 purchase_orders_customer_router = APIRouter(prefix="/purchase-orders")
@@ -27,6 +29,8 @@ update_purchase_order_service = UpdatePurchaseOrderService()
 delete_purchase_order_service = DeletePurchaseOrderService()
 approve_purchase_order_service = ApprovePurchaseOrderService()
 send_purchase_order_service = SendPurchaseOrderService()
+update_po_after_negotiation_service = UpdatePOAfterNegotiationService()
+confirm_purchase_order_service = ConfirmPurchaseOrderService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -50,7 +54,6 @@ async def create_purchase_order(request: CreatePurchaseOrderRequest,
             "content": purchase_order
         }
     )
-
 
 
 @purchase_orders_admin_router.get("/all")
@@ -120,6 +123,35 @@ async def update_purchase_order(po_id: str, request: UpdatePurchaseOrderRequest,
     )
 
 
+@purchase_orders_admin_router.put("/{po_id}/after-negotiation", dependencies=[Depends(admin_role_middleware)])
+async def update_po_after_negotiation(po_id: str, request: UpdatePurchaseOrderAfterNegotiationRequest,
+                                      token_details: dict = Depends(access_token_bearer),
+                                      session: AsyncSession = Depends(get_session)):
+    purchase_order = await update_po_after_negotiation_service.update_po_after_negotiation(po_id, request, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Cập nhật thành công",
+            "content": purchase_order
+        }
+    )
+
+
+@purchase_orders_admin_router.put("/{po_id}/confirm", dependencies=[Depends(admin_role_middleware)])
+async def confirm_purchase_order(po_id: str,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    await confirm_purchase_order_service.confirm_purchase_order(po_id, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Cập nhật thành công"
+        }
+    )
+
+
 @purchase_orders_admin_router.post("/{po_id}/approve", dependencies=[Depends(admin_role_middleware)])
 async def approve_purchase_order(po_id: str, request: Optional[ApprovePurchaseOrderRequest] = None,
                                  token_details: dict = Depends(access_token_bearer),
@@ -140,8 +172,8 @@ async def approve_purchase_order(po_id: str, request: Optional[ApprovePurchaseOr
 async def send_purchase_order_to_supplier(po_id: str, request: Optional[SendPurchaseOrderRequest] = None,
                                           token_details: dict = Depends(access_token_bearer),
                                           session: AsyncSession = Depends(get_session)):
-
-    purchase_order = await send_purchase_order_service.send_purchase_order_to_supplier(session, po_id, request)
+    user_id = token_details['user']['id']
+    purchase_order = await send_purchase_order_service.send_purchase_order_to_supplier(session, po_id, user_id, request)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -152,7 +184,7 @@ async def send_purchase_order_to_supplier(po_id: str, request: Optional[SendPurc
     )
 
 
-@purchase_orders_admin_router.put("/{po_id}")
+@purchase_orders_admin_router.delete("/{po_id}")
 async def delete_purchase_order(po_id: str,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):

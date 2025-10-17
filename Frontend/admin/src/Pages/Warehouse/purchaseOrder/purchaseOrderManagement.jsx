@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { Package, Search, Plus, Eye, Edit, Trash2, Calendar, DollarSign, User, Warehouse, TrendingUp, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { getDataApi, postDataApi } from "../../../utils/api";
+import { deleteDataApi, getDataApi, postDataApi, putDataApi } from "../../../utils/api";
 import PurchaseOrderCard from "./purchaseOrderCard";
 import PurchaseOrderDetailModal from './purchaseOrderDetail';
 import CreatePurchaseOrderModal from './createPurchaseOrder';
 import UpdatePurchaseOrderModal from './updatePurchaseOrder';
 import useAuth from '../../Verify/auth';
 import { MyContext } from '../../../App';
+import UpdatePurchaseOrderAfterNegotiationModal from './updatePOAfterNegotiation';
 
 const PurchaseOrdersManagement = ({ warehouse }) => {
     const [activeTab, setActiveTab] = useState('all');
@@ -18,6 +19,11 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [poToUpdateId, setPoToUpdateId] = useState(null);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+
+    const [poToUpdateAfterNegotiationId, setPoToUpdateAfterNegotiationId] = useState(null);
+
     const { userRole } = useAuth();
     const context = useContext(MyContext)
 
@@ -81,6 +87,10 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
         setPoToUpdateId(poId);
     };
 
+    const handleUpdateAfterNegotiation = (poId) => {
+        setPoToUpdateAfterNegotiationId(poId);
+    };
+
     const handleSend = async (poId, requestData) => {
         try {
             const response = await postDataApi(
@@ -98,8 +108,61 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
     };
 
     const handleDelete = (poId) => {
-        console.log('Delete PO:', poId);
-        // Placeholder for delete functionality
+        setConfirmAction({
+            action: 'deletePo',
+            poId,
+            message: 'Bạn có chắc muốn xóa đơn đặt hàng này không?'
+        });
+        setShowConfirmModal(true);
+    };
+
+    const handleConfirm = (poId) => {
+        setConfirmAction({
+            action: 'confirmPo',
+            poId,
+            message: 'Bạn có chắc muốn xác nhận đơn đặt hàng này không?'
+        });
+        setShowConfirmModal(true);
+    };
+
+    const executeConfirmAction = async () => {
+        if (!confirmAction) return;
+
+        setShowConfirmModal(false);
+
+        if (confirmAction.action === 'deletePo') {
+            const poId = confirmAction.poId;
+            try {
+                const response = await deleteDataApi(`/admin/purchase-orders/${poId}`);
+
+                if (response.success) {
+                    context.openAlertBox("success", response.message || "Xóa đơn đặt hàng thành công");
+                    fetchPurchaseOrders();
+                } else {
+                    context.openAlertBox("error", response?.data?.detail?.message || "Xóa đơn hàng thất bại");
+                }
+            } catch (error) {
+                console.error('Error deleting purchase order:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi xóa đơn hàng");
+            }
+        } else if (confirmAction.action === 'confirmPo') {
+            const poId = confirmAction.poId;
+            try {
+                const response = await putDataApi(`/admin/purchase-orders/${poId}/confirm`, {});
+
+                if (response.success) {
+                    context.openAlertBox("success", response.message || "Xác nhận đơn hàng thành công");
+                    fetchPurchaseOrders();
+                } else {
+                    context.openAlertBox("error", response?.data?.detail?.message || "Xác nhận đơn hàng thất bại");
+                }
+            } catch (error) {
+                console.error('Error confirming purchase order:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi xác nhận đơn hàng");
+            }
+        }
+
+        setConfirmAction(null);
     };
 
     const handleCreateNew = () => {
@@ -160,8 +223,10 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
                                     po={po}
                                     onViewDetail={handleViewDetail}
                                     onUpdate={handleUpdate}
+                                    onUpdateAfterNegotiation={handleUpdateAfterNegotiation}
                                     onDelete={handleDelete}
                                     onSend={handleSend}
+                                    onConfirm={handleConfirm}
                                     userRole={userRole}
                                 />
                             ))}
@@ -210,6 +275,45 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
                 <PurchaseOrderDetailModal
                     poId={selectedPoId}
                     onClose={() => setSelectedPoId(null)}
+                />
+            )}
+
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                    style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Xác nhận</h3>
+                        <p className="text-gray-600 mb-6">{confirmAction?.message}</p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors cursor-pointer"
+                                onClick={() => {
+                                    setShowConfirmModal(false);
+                                    setConfirmAction(null);
+                                }}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
+                                onClick={executeConfirmAction}
+                            >
+                                Xác nhận
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {poToUpdateAfterNegotiationId && (
+                <UpdatePurchaseOrderAfterNegotiationModal
+                    isOpen={!!poToUpdateAfterNegotiationId}
+                    poId={poToUpdateAfterNegotiationId}
+                    onClose={() => setPoToUpdateAfterNegotiationId(null)}
+                    onSuccess={() => {
+                        setPoToUpdateAfterNegotiationId(null);
+                        fetchPurchaseOrders();
+                    }}
                 />
             )}
 

@@ -1,54 +1,53 @@
 from typing import Optional, List, Any, Tuple, Dict
 from sqlalchemy import ColumnElement, delete, update
-from src.database.models import PurchaseOrder, PurchaseOrderDetail
+from src.database.models import PurchaseOrder, PurchaseOrderDetail, GoodsReceipt, GoodsReceiptDetail
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, and_, func, or_
+from sqlmodel import select, and_, func
 from datetime import datetime
 
 
-class PurchaseOrderRepository:
-    async def generate_po_number(self, session: AsyncSession) -> str:
+class GoodsReceiptRepository:
+    async def generate_gr_number(self, session: AsyncSession) -> str:
         today = datetime.now().strftime("%Y%m%d")
-        prefix = f"PO{today}"
+        prefix = f"GR-{today}-"
 
-        statement = select(func.count(PurchaseOrder.id)).where(
-            PurchaseOrder.po_number.like(f"{prefix}%")
+        stmt = select(func.count(GoodsReceipt.id)).where(
+            GoodsReceipt.receipt_number.like(f"{prefix}%")
         )
-        result = await session.exec(statement)
+        result = await session.execute(stmt)
 
         count = result.one_or_none()
 
-        sequence = str(count + 1).zfill(3)
-        return f"{prefix}{sequence}"
+        return f"{prefix}{str(count + 1).zfill(3)}"
 
 
-    async def create_purchase_order(self, po_data: PurchaseOrder, po_details: List[PurchaseOrderDetail], session: AsyncSession):
-        session.add(po_data)
+    async def create_goods_receipt(self, goods_receipt: GoodsReceipt, receipt_details: List[GoodsReceiptDetail], session: AsyncSession):
+        session.add(goods_receipt)
         await session.flush()
 
-        for detail in po_details:
-            detail.purchase_order_id = po_data.id
+        for detail in receipt_details:
+            detail.goods_receipt_id = goods_receipt.id
             session.add(detail)
 
         await session.commit()
-        await session.refresh(po_data)
+        await session.refresh(goods_receipt)
 
-        return po_data
+        return goods_receipt
 
 
-    async def get_purchase_order(self, session: AsyncSession,
-                            select_columns: Optional[List[Any]] = None,
-                            joins: Optional[List[Tuple[Any, dict]]] = None,
-                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                            group_by_columns: Optional[List[Any]] = None,
-                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                            order_by: Optional[Any] = None,
-                            options: Optional[list] = None):
+    async def get_goods_receipt(self, session: AsyncSession,
+                                select_columns: Optional[List[Any]] = None,
+                                joins: Optional[List[Tuple[Any, dict]]] = None,
+                                where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                group_by_columns: Optional[List[Any]] = None,
+                                having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                order_by: Optional[Any] = None,
+                                options: Optional[list] = None):
 
         if select_columns is None:
-            query = select(PurchaseOrder)
+            query = select(GoodsReceipt)
         else:
-            query = select(*select_columns).select_from(PurchaseOrder)
+            query = select(*select_columns).select_from(GoodsReceipt)
 
         if joins:
             for table, config in joins:
@@ -73,25 +72,24 @@ class PurchaseOrderRepository:
             query = query.order_by(order_by)
 
         result = await session.exec(query)
-        po = result.one_or_none()
+        gr = result.one_or_none()
 
-        return po
+        return gr
 
-
-    async def get_all_purchase_orders(self, session: AsyncSession,
-                             select_columns: Optional[List[Any]] = None,
-                             joins: Optional[List[Tuple[Any, dict]]] = None,
-                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                             group_by_columns: Optional[List[Any]] = None,
-                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                             order_by: Optional[Any] = None,
-                             skip: int = 0, limit: int = 10,
-                             options: Optional[list] = None):
+    async def get_all_goods_receipt(self, session: AsyncSession,
+                                    select_columns: Optional[List[Any]] = None,
+                                    joins: Optional[List[Tuple[Any, dict]]] = None,
+                                    where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    group_by_columns: Optional[List[Any]] = None,
+                                    having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    order_by: Optional[Any] = None,
+                                    skip: int = 0, limit: int = 10,
+                                    options: Optional[list] = None):
 
         if select_columns is None:
-            query = select(PurchaseOrder)
+            query = select(GoodsReceipt)
         else:
-            query = select(*select_columns).select_from(PurchaseOrder)
+            query = select(*select_columns).select_from(GoodsReceipt)
 
         if joins:
             for table, config in joins:
@@ -122,9 +120,9 @@ class PurchaseOrderRepository:
         query = query.offset(skip).limit(limit)
 
         result = await session.exec(query)
-        pos = result.all()
+        grs = result.all()
 
-        return pos, total
+        return grs, total
 
 
     async def update_purchase_order(self, session: AsyncSession, po: PurchaseOrder,

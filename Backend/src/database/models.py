@@ -1144,6 +1144,7 @@ class User(SQLModel, table=True):
     address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
     order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
     evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    cash_transactions: List["CashTransaction"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
     user_special_offer: List["UserSpecialOffer"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={'lazy': 'noload'}
@@ -1162,6 +1163,53 @@ class User(SQLModel, table=True):
             'foreign_keys': '[User.warehouse_id]'
         }
     )
+
+
+class CashTransaction(SQLModel, table=True):
+    """Giao dịch thu chi tiền mặt"""
+    __tablename__ = 'cash_transaction'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+
+    # Mã giao dịch: VD: CT001, CT002
+    transaction_code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
+
+    # Loại giao dịch: inflow (thu), outflow (chi), transfer (chuyển khoản nội bộ)
+    transaction_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # Danh mục giao dịch:
+    # - revenue (doanh thu bán hàng)
+    # - purchase (chi phí mua hàng)
+    # - loan (vay/trả nợ)
+    # - other (khác)
+    category: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # Số tiền giao dịch (luôn dương)
+    amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+
+    # Ngày giao dịch
+    transaction_date: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False), default=datetime.now)
+
+    # Đối tượng giao dịch (khách hàng, nhà cung cấp, nhân viên...)
+    reference_type: Optional[str] = Field(
+        sa_column=Column(pg.VARCHAR, nullable=True))  # customer, supplier, employee, other
+    reference_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True))
+    reference_name: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+
+    # Phương thức thanh toán: cash, bank_transfer, card, e_wallet
+    payment_method: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # Ghi chú thêm
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+
+    # Người thực hiện giao dịch
+    performed_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+
+    user: Optional["User"] = Relationship(back_populates="cash_transactions", sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class SupplierPayment(SQLModel, table=True):
@@ -1255,9 +1303,6 @@ class PurchaseReturn(SQLModel, table=True):
     # Số tiền NCC đồng ý hoàn lại (có thể khác total_return_amount do phí xử lý, khấu trừ...)
     refund_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
 
-    # Số tiền đã nhận được hoàn lại
-    refunded_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
-
     # Lý do trả hàng chung
     return_reason: str = Field(sa_column=Column(pg.TEXT, nullable=False))
 
@@ -1325,6 +1370,9 @@ class PurchaseReturnDetail(SQLModel, table=True):
 
     # Lưu bản sao thông tin sản phẩm tại thời điểm trả hàng
     product_snapshot: Optional[dict] = Field(sa_column=Column(JSONB, nullable=True))
+
+    # Hình ảnh/chứng từ về hàng reject
+    rejection_evidence: Optional[List[str]] = Field(sa_column=Column(JSONB, nullable=True), default=None)
 
     notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
 
@@ -1410,6 +1458,8 @@ class GoodsReceipt(SQLModel, table=True):
     warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
     supplier_id: uuid.UUID = Field(foreign_key="supplier.id", nullable=False)
 
+    parent_receipt_id: Optional[uuid.UUID] = Field(foreign_key="goods_receipt.id", nullable=True, default=None)
+
     # pending, approved, rejected, completed
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"), default="pending")
 
@@ -1418,9 +1468,6 @@ class GoodsReceipt(SQLModel, table=True):
 
     # Tổng giá trị hàng nhập thực tế (tính từ GoodsReceiptDetail, có thể khác PO).
     total_received_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
-
-    # Ngày hóa đơn được lập
-    invoice_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     # Số phiếu giao hàng (do NCC phát hành kèm theo lô hàng).
     delivery_note_number: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
@@ -1543,6 +1590,8 @@ class PurchaseOrder(SQLModel, table=True):
 
     notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
 
+    supplier_invoice_urls: Optional[List[str]] = Field(sa_column=Column(JSONB, nullable=True), default=None)
+
     created_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
     approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
 
@@ -1552,6 +1601,7 @@ class PurchaseOrder(SQLModel, table=True):
     confirmed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     completed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
     cancelled_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     cancellation_reason: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
 

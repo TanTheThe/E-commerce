@@ -158,7 +158,6 @@ const UpdatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, poId }) => {
             product_id: '',
             product_variant_id: '',
             quantity: 1,
-            unit_cost: 0,
             notes: '',
             products: [],
             variants: [],
@@ -248,7 +247,6 @@ const UpdatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, poId }) => {
             if (response.success) {
                 updateItem(index, 'variants', response.data || []);
                 updateItem(index, 'product_variant_id', '');
-                updateItem(index, 'unit_cost', 0);
             }
         } catch (error) {
             console.error('Error fetching variants:', error);
@@ -290,9 +288,6 @@ const UpdatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, poId }) => {
                 if (item.quantity <= 0) {
                     newErrors[`item_${index}_quantity`] = 'Số lượng phải lớn hơn 0';
                 }
-                if (item.unit_cost <= 0) {
-                    newErrors[`item_${index}_cost`] = 'Giá phải lớn hơn 0';
-                }
             });
         }
 
@@ -315,7 +310,6 @@ const UpdatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, poId }) => {
                     id: item.id || null,
                     product_variant_id: item.product_variant_id,
                     quantity: parseInt(item.quantity),
-                    unit_cost: parseInt(item.unit_cost),
                     notes: item.notes || null
                 }))
             };

@@ -52,7 +52,7 @@ class CreatePurchaseOrderService:
             if not variant:
                 ProductException.not_found_variant()
 
-            total_cost = item.unit_cost * item.quantity
+            total_cost = variant.price * item.quantity
             sub_total += total_cost
 
             product_snapshot = {
@@ -70,7 +70,7 @@ class CreatePurchaseOrderService:
                 product_variant_id=item.product_variant_id,
                 quantity=item.quantity,
                 received_quantity=0,
-                unit_cost=item.unit_cost,
+                unit_cost=variant.price,
                 total_cost=total_cost,
                 product_snapshot=product_snapshot,
                 notes=item.notes,

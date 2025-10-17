@@ -79,7 +79,7 @@ class GetPurchaseOrderByIDService:
                     "total_cost": detail.total_cost,
                     "product_snapshot": detail.product_snapshot,
                     "notes": detail.notes,
-                    "created_at": str(detail.created_at)
+                    "created_at": str(detail.created_at),
                 }
             )
 
@@ -114,6 +114,7 @@ class GetPurchaseOrderByIDService:
             "updated_at": str(po.updated_at),
             "cancelled_at": str(po.cancelled_at),
             "cancellation_reason": po.cancellation_reason,
+            "supplier_invoice_urls": po.supplier_invoice_urls,
             "items": items
         }
 

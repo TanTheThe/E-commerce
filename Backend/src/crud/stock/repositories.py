@@ -107,7 +107,8 @@ class StockRepository:
                              having_conditions: Optional[List[ColumnElement[bool]]] = None,
                              order_by: Optional[Any] = None,
                              skip: int = 0, limit: int = 10,
-                             options: Optional[list] = None):
+                             options: Optional[list] = None,
+                             for_update: bool = False):
 
         if select_columns is None:
             query = select(Stock)
@@ -140,6 +141,9 @@ class StockRepository:
         if order_by is not None:
             query = query.order_by(order_by)
 
+        if for_update:
+            query = query.with_for_update()
+
         query = query.offset(skip).limit(limit)
 
         result = await session.exec(query)
@@ -155,7 +159,8 @@ class StockRepository:
                             group_by_columns: Optional[List[Any]] = None,
                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
                             order_by: Optional[Any] = None,
-                            options: Optional[list] = None):
+                            options: Optional[list] = None,
+                            for_update: bool = False):
 
         if select_columns is None:
             query = select(Stock)
@@ -183,6 +188,9 @@ class StockRepository:
 
         if order_by is not None:
             query = query.order_by(order_by)
+
+        if for_update:
+            query = query.with_for_update()
 
         result = await session.exec(query)
         stock = result.one_or_none()

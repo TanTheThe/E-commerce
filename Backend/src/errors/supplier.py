@@ -72,3 +72,13 @@ class SupplierException:
             },
         )
 
+    @staticmethod
+    def supplier_not_match_with_po():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Nhà cung cấp không khớp với đơn đặt hàng",
+                "error_code": "supp_002",
+            },
+        )
+

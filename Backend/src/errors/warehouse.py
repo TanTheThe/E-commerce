@@ -102,3 +102,13 @@ class WareHouseException:
             },
         )
 
+    @staticmethod
+    def warehouse_not_match_with_po():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Kho nhận hàng không khớp với đơn đặt hàng",
+                "error_code": "warehouse_009",
+            },
+        )
+

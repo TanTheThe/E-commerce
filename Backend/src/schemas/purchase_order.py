@@ -23,7 +23,6 @@ class PaymentStatus(str, Enum):
 class PurchaseOrderDetailCreate(BaseModel):
     product_variant_id: str = Field(description="ID của product variant")
     quantity: int = Field(gt=0, description="Số lượng đặt hàng")
-    unit_cost: int = Field(gt=0, description="Giá mua một đơn vị (VND)")
     notes: Optional[str] = Field(None, description="Ghi chú cho item này")
 
 
@@ -37,7 +36,6 @@ class CreatePurchaseOrderRequest(BaseModel):
 class UpdatePurchaseOrderRequest(BaseModel):
     supplier_id: Optional[str] = Field(None, description="ID nhà cung cấp")
     warehouse_id: Optional[str] = Field(None, description="ID kho nhận hàng")
-    expected_delivery_date: Optional[datetime] = Field(None, description="Ngày dự kiến giao hàng")
     notes: Optional[str] = Field(None, description="Ghi chú")
     items: Optional[List[PurchaseOrderDetailCreate]] = Field(None, description="Danh sách sản phẩm (nếu cập nhật)")
 
@@ -49,4 +47,17 @@ class ApprovePurchaseOrderRequest(BaseModel):
 class SendPurchaseOrderRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Ghi chú khi gửi (optional)")
     supplier_email: Optional[str] = Field(None, description="Email NCC (nếu khác với email mặc định)")
+
+class PurchaseOrderDetailUpdate(BaseModel):
+    product_variant_id: str = Field(description="ID của product variant")
+    quantity: int = Field(gt=0, description="Số lượng sau thương lượng")
+    notes: Optional[str] = Field(None, description="Ghi chú cho item này")
+
+class UpdatePurchaseOrderAfterNegotiationRequest(BaseModel):
+    expected_delivery_date: Optional[datetime] = Field(description="Ngày giao hàng dự kiến sau thương lượng")
+    discount_amount: Optional[int] = Field(None, ge=0, description="Số tiền giảm giá cho toàn đơn")
+    shipping_cost: Optional[int] = Field(None, ge=0, description="Phí vận chuyển")
+    supplier_invoice_urls: List[str] = Field(description="Danh sách URLs bill/invoice từ NCC gửi")
+    notes: Optional[str] = Field(None, description="Ghi chú đơn hàng")
+    items: Optional[List[PurchaseOrderDetailUpdate]] = Field(None, description="Danh sách sản phẩm sau thương lượng")
 

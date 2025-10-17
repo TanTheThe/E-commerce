@@ -207,9 +207,6 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId }) =
                 if (item.quantity <= 0) {
                     newErrors[`item_${index}_quantity`] = 'Số lượng phải lớn hơn 0';
                 }
-                if (item.unit_cost <= 0) {
-                    newErrors[`item_${index}_cost`] = 'Giá phải lớn hơn 0';
-                }
             });
         }
 
@@ -232,7 +229,6 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId }) =
                 items: formData.items.map(item => ({
                     product_variant_id: item.product_variant_id,
                     quantity: parseInt(item.quantity),
-                    unit_cost: parseInt(item.unit_cost),
                     notes: item.notes || null
                 }))
             };

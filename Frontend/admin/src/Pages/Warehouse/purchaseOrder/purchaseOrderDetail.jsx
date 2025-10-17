@@ -15,8 +15,6 @@ const formatDate = (dateString) => {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
     });
 };
 
@@ -54,15 +52,105 @@ const PaymentStatusBadge = ({ status }) => {
     );
 };
 
+const ImageViewer = ({ imageBase64, onClose }) => {
+    const [zoom, setZoom] = useState(1);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+    const handleWheel = (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setZoom(prev => Math.min(Math.max(0.5, prev + delta), 3));
+    };
+
+    const handleMouseDown = (e) => {
+        if (zoom > 1) {
+            setIsDragging(true);
+            setDragStart({
+                x: e.clientX - position.x,
+                y: e.clientY - position.y
+            });
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (isDragging && zoom > 1) {
+            setPosition({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    useEffect(() => {
+        if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            return () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+        }
+    }, [isDragging, dragStart, position]);
+
+    return (
+        <div
+            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60]"
+            onClick={onClose}
+        >
+            <div className="relative w-full h-full flex items-center justify-center p-8">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onClose();
+                    }}
+                    className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2 z-10"
+                >
+                    <X className="w-8 h-8" />
+                </button>
+                <div className="text-white absolute top-4 left-4 bg-black bg-opacity-50 px-3 py-1 rounded">
+                    Zoom: {Math.round(zoom * 100)}% {zoom > 1 && '- Kéo để di chuyển'}
+                </div>
+                <div
+                    className="overflow-hidden max-w-full max-h-full flex items-center justify-center"
+                    onWheel={handleWheel}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <img
+                        src={imageBase64}
+                        alt="Hóa đơn nhà cung cấp"
+                        style={{
+                            transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
+                            transition: isDragging ? 'none' : 'transform 0.1s',
+                            cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                        }}
+                        className="max-w-none select-none"
+                        onMouseDown={handleMouseDown}
+                        draggable={false}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const PurchaseOrderDetailModal = ({ poId, onClose }) => {
     const [poDetail, setPoDetail] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [imageZoom, setImageZoom] = useState(1);
 
     useEffect(() => {
         const fetchDetail = async () => {
             setIsLoading(true);
             try {
                 const response = await getDataApi(`/admin/purchase-orders/${poId}`);
+                console.log(response);
                 if (response.success) {
                     setPoDetail(response.data);
                 }
@@ -215,6 +303,31 @@ const PurchaseOrderDetailModal = ({ poId, onClose }) => {
                         </div>
                     </div>
 
+                    <div>
+                        <h3 className="font-semibold text-gray-900 mb-3">Hóa đơn nhà cung cấp</h3>
+                        {!poDetail.supplier_invoice_urls || poDetail.supplier_invoice_urls.length === 0 ? (
+                            <p className="text-sm text-red-500 bg-red-50 p-3 rounded border border-red-200">
+                                Chưa thống nhất với nhà cung cấp
+                            </p>
+                        ) : (
+                            <div className="flex gap-3 flex-wrap">
+                                {poDetail.supplier_invoice_urls.map((base64Image, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative cursor-pointer group"
+                                        onClick={() => setSelectedImage(base64Image)}
+                                    >
+                                        <img
+                                            src={base64Image}
+                                            alt={`Hóa đơn ${index + 1}`}
+                                            className="w-24 h-24 object-cover rounded border-2 border-gray-200 hover:border-blue-500 transition-all"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="bg-gray-50 rounded-lg p-4">
                         <div className="max-w-md ml-auto space-y-2">
                             <div className="flex justify-between text-sm">
@@ -291,6 +404,13 @@ const PurchaseOrderDetailModal = ({ poId, onClose }) => {
                     )}
                 </div>
             </div>
+
+            {selectedImage && (
+                <ImageViewer
+                    imageBase64={selectedImage}
+                    onClose={() => setSelectedImage(null)}
+                />
+            )}
         </div>
     );
 };

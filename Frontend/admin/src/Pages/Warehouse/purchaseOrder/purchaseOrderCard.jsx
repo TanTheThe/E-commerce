@@ -1,6 +1,7 @@
-import { Edit, Eye, Send, Trash2 } from "lucide-react";
+import { Check, Edit, Eye, Send, Trash2 } from "lucide-react";
 import useAuth from "../../Verify/auth";
 import { useState } from "react";
+import { putDataApi } from "../../../utils/api";
 
 const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -17,8 +18,6 @@ const formatDate = (dateString) => {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
     });
 };
 
@@ -135,7 +134,7 @@ const SendPurchaseOrderModal = ({ isOpen, onClose, onConfirm, isLoading }) => {
     );
 };
 
-const PurchaseOrderCard = ({ po, onViewDetail, onUpdate, onDelete, onSend, userRole }) => {
+const PurchaseOrderCard = ({ po, onViewDetail, onUpdate, onDelete, onSend, onConfirm, userRole, onUpdateAfterNegotiation }) => {
     const [showSendModal, setShowSendModal] = useState(false);
     const [isSending, setIsSending] = useState(false);
 
@@ -154,6 +153,17 @@ const PurchaseOrderCard = ({ po, onViewDetail, onUpdate, onDelete, onSend, userR
             console.error('Error sending PO:', error);
         } finally {
             setIsSending(false);
+        }
+    };
+
+    const handleConfirmClick = async () => {
+        setIsConfirming(true);
+        try {
+            await onConfirm(po.id);
+        } catch (error) {
+            console.error('Error confirming PO:', error);
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -231,6 +241,28 @@ const PurchaseOrderCard = ({ po, onViewDetail, onUpdate, onDelete, onSend, userR
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
+                        </>
+                    )}
+
+                    {po.status === 'sent' && (
+                        <>
+                            <button
+                                onClick={() => onUpdateAfterNegotiation(po.id)}
+                                className="flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                                title="Cập nhật sau thương lượng"
+                            >
+                                <Edit className="w-4 h-4" />
+                            </button>
+
+                            {po.supplier_invoice_urls && (
+                                <button
+                                    onClick={() => onConfirm(po.id)}
+                                    className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                                    title="Xác nhận đơn hàng"
+                                >
+                                    <Check className="w-4 h-4" />
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
