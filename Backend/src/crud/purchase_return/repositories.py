@@ -188,3 +188,21 @@ class PurchaseReturnRepository:
         return_details = result.all()
 
         return return_details, total
+
+    async def delete_purchase_return(self, session: AsyncSession, purchase_return_id: str):
+        condition = [PurchaseReturn.id == purchase_return_id]
+        pr = await self.get_purchase_return(session=session, where_conditions=condition)
+        if not pr:
+            return False
+
+        detail_statement = select(PurchaseReturnDetail).where(
+            PurchaseReturnDetail.purchase_return_id == purchase_return_id
+        )
+        result = await session.exec(detail_statement)
+        details = result.all()
+        for detail in details:
+            await session.delete(detail)
+
+        await session.delete(pr)
+        await session.commit()
+        return True

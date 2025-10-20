@@ -123,11 +123,31 @@ class GoodsReceiptException:
         )
         
     @staticmethod
-    def error_while_delete_pr():
+    def error_while_delete_gr():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": f"Có lỗi xảy ra khi xóa phiếu nhập kho",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def gr_parent_must_have_discrepancy():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Phiếu nhập kho cha phải đang có vấn đề",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def invalid_quantity_calculation():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Tổng số lượng chấp nhận và từ chối không bằng số lượng nhập",
                 "error_code": "gr_001",
             },
         )

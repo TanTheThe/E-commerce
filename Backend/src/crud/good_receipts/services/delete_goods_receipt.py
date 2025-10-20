@@ -23,7 +23,7 @@ class DeleteGoodsReceiptService:
         
         success = await goods_receipt_repository.delete_goods_receipt(goods_receipt_id=goods_receipt_id, session=session)
         if not success:
-            GoodsReceiptException.error_while_delete_pr()
+            GoodsReceiptException.error_while_delete_gr()
 
 
 

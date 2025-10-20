@@ -1284,7 +1284,7 @@ class PurchaseReturn(SQLModel, table=True):
     # Kho xuất hàng trả
     warehouse_id: uuid.UUID = Field(foreign_key="warehouse.id", nullable=False)
 
-    # Trạng thái: draft, pending, approved, completed, rejected
+    # Trạng thái: draft, approved, completed, rejected
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="draft"), default="draft")
 
     # Loại trả hàng: return_to_supplier (trả về NCC), exchange (đổi hàng), refund (hoàn tiền)

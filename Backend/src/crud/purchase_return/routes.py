@@ -4,15 +4,18 @@ from fastapi import APIRouter, Query, status, Depends
 from src.crud.purchase_return.services.approve_purchase_return import PurchaseReturnApprovalService
 from src.crud.purchase_return.services.complete_purchase_return import CompletePurchaseReturnService
 from src.crud.purchase_return.services.create_purchase_return import CreatePurchaseReturnService
+from src.crud.purchase_return.services.delete_purchase_return import DeletePurchaseReturnService
+from src.crud.purchase_return.services.get_detail_purchase_return import GetDetailPurchaseReturnService
 from src.crud.purchase_return.services.get_purchase_returns import GetPurchaseReturnsService
 from src.crud.purchase_return.services.send_purchase_return import SendPurchaseReturnService
+from src.crud.purchase_return.services.update_purchase_return import UpdatePurchaseReturnService
 from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.errors.user import UserException
-from src.schemas.purchase_order import CreatePurchaseOrderRequest
-from src.schemas.purchase_return import CompletePurchaseReturnRequest, CreatePurchaseReturnRequest, SortBy
+from src.schemas.purchase_return import CompletePurchaseReturnRequest, CreatePurchaseReturnRequest, SortBy, \
+    UpdatePurchaseReturnRequest
 
 return_purchase_admin_router = APIRouter(prefix="/return-purchase")
 return_purchase_customer_router = APIRouter(prefix="/return-purchase")
@@ -23,6 +26,9 @@ approve_purchase_return_service = PurchaseReturnApprovalService()
 send_purchase_return_service = SendPurchaseReturnService()
 complete_purchase_return_service = CompletePurchaseReturnService()
 get_purchase_returns_service = GetPurchaseReturnsService()
+get_detail_purchase_return_service = GetDetailPurchaseReturnService()
+update_purchase_return_service = UpdatePurchaseReturnService()
+delete_purchase_return_service = DeletePurchaseReturnService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -166,6 +172,7 @@ async def get_all_purchase_returns(warehouse_id: str,
         UserException.role_invalid()
     
     purchase_returns = await get_purchase_returns_service.get_purchase_returns(session=session, status_pr=status_pr,
+                                                                               warehouse_id=warehouse_id,
                                                                               purchase_order_id=purchase_order_id,
                                                                               goods_receipt_id=goods_receipt_id,
                                                                               supplier_id=supplier_id, from_date=from_date,
@@ -190,17 +197,55 @@ async def get_detail_purchase_return(purchase_return_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
         
-    purchase_returns = await get_purchase_returns_service.get_purchase_returns(session=session, status_pr=status_pr,
-                                                                              purchase_order_id=purchase_order_id,
-                                                                              goods_receipt_id=goods_receipt_id,
-                                                                              supplier_id=supplier_id, from_date=from_date,
-                                                                              to_date=to_date, search=search, 
-                                                                              sort_by=sort_by, skip=skip, limit=limit)
+    purchase_return = await get_detail_purchase_return_service.get_purchase_return_by_id(purchase_return_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin các phiếu hoàn trả tại kho",
-            "content": purchase_returns
+            "message": "Thông tin chi tiết phiếu hoàn trả",
+            "content": purchase_return
         }
     )
+
+
+@return_purchase_admin_router.put("/{purchase_return_id}")
+async def update_purchase_return(purchase_return_id: str, request: UpdatePurchaseReturnRequest,
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    update_data = request.model_dump(exclude_none=True)
+
+    pr = await update_purchase_return_service.update_purchase_return(session, purchase_return_id, update_data)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Cập nhật phiếu hoàn trả thành công",
+            "content": pr
+        }
+    )
+
+
+@return_purchase_admin_router.delete("/{purchase_return_id}")
+async def delete_purchase_return(purchase_return_id: str,
+                               token_details: dict = Depends(access_token_bearer),
+                               session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    await delete_purchase_return_service.delete_purchase_return(session, purchase_return_id)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Xóa phiếu hoàn trả thành công"
+        }
+    )
+
+

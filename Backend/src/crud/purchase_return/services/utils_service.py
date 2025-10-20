@@ -27,3 +27,22 @@ class UtilsPRService:
             PurchaseReturnException.pr_not_found()
 
         return pr
+
+
+    async def validate_draft_status(self, session: AsyncSession, purchase_return_id: str):
+        condition = [PurchaseReturn.id == purchase_return_id]
+        options = [selectinload(PurchaseReturn.return_details)]
+
+        pr = await purchase_return_repository.get_purchase_return(
+            session=session,
+            where_conditions=condition,
+            options=options
+        )
+
+        if not pr:
+            PurchaseReturnException.pr_not_found()
+
+        if pr.status != "draft":
+            PurchaseReturnException.only_update_when_draft()
+
+        return pr

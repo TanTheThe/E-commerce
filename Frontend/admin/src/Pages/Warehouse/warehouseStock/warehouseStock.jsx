@@ -17,6 +17,7 @@ import ProductsListSkeleton from './productListSkeleton';
 import ProductCard from './productCard';
 import { getDataApi } from '../../../utils/api';
 import PurchaseOrdersManagement from '../purchaseOrder/purchaseOrderManagement';
+import GoodsReceiptsManagement from '../goodsReceipt/goodsReceiptManagement';
 
 
 function debounce(func, wait) {
@@ -233,10 +234,13 @@ const WarehouseStock = ({ warehouse, onClose }) => {
                         Quản lý đơn đặt hàng
                     </button>
                     <button
-                        className="px-6 py-2 font-medium text-sm text-gray-400 cursor-not-allowed"
-                        disabled
+                        className={`px-6 py-2 font-medium text-sm transition-colors ${activeTab === 'receipts'
+                            ? 'text-blue-600 border-b-2 border-blue-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        onClick={() => setActiveTab('receipts')}
                     >
-                        Cảnh báo
+                        Quản lý phiếu nhập kho
                     </button>
                     <button
                         className="px-6 py-2 font-medium text-sm text-gray-400 cursor-not-allowed"
@@ -448,6 +452,8 @@ const WarehouseStock = ({ warehouse, onClose }) => {
                     </div>
                 ) : activeTab === 'orders' ? (
                     <PurchaseOrdersManagement warehouse={warehouse} />
+                ) : activeTab === 'receipts' ? ( 
+                    <GoodsReceiptsManagement warehouse={warehouse} /> 
                 ) : null}
             </div>
         </div>

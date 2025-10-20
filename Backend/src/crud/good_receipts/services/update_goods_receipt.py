@@ -88,7 +88,6 @@ class UpdateGoodsReceiptService:
                 updated_detail_ids.add(detail_id)
             else:
                 new_detail = GoodsReceiptDetail(
-                    id=uuid.uuid4(),
                     goods_receipt_id=gr.id,
                     product_variant_id=detail_data["product_variant_id"],
                     po_detail_id=detail_data["po_detail_id"],
@@ -103,3 +102,11 @@ class UpdateGoodsReceiptService:
                 )
                 session.add(new_detail)
                 gr.receipt_details.append(new_detail)
+
+
+        details_to_delete = existing_detail_ids - updated_detail_ids
+        if details_to_delete:
+            for detail in gr.receipt_details[:]:
+                if str(detail.id) in details_to_delete:
+                    await session.delete(detail)
+                    gr.receipt_details.remove(detail)

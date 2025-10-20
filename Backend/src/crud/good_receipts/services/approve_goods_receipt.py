@@ -1,5 +1,4 @@
-from datetime import date, datetime
-from sqlmodel import or_
+from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
@@ -21,11 +20,9 @@ class ApproveGoodsReceiptService:
             session, goods_receipt_id
         )
 
-        variant_summary = utils_GR_service.calculate_total_accepted_quantity(
-            all_related_grs, gr)
+        variant_summary = utils_GR_service.calculate_total_accepted_quantity(all_related_grs, gr)
         po_details_map = {str(detail.id): detail for detail in po.po_details}
-        status_info = utils_GR_service.determine_status_based_on_po(
-            variant_summary, po_details_map)
+        status_info = utils_GR_service.determine_status_based_on_po(variant_summary, po_details_map)
 
         gr.status = status_info['gr_status']
         gr.approved_by = approved_by

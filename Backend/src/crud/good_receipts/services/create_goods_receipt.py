@@ -28,9 +28,7 @@ purchase_return_repository = PurchaseReturnRepository()
 
 class CreateGoodsReceiptService:
     async def create_goods_receipt(self, request: CreateGoodsReceiptRequest, created_by: str, session: AsyncSession):
-        condition_po = [
-            PurchaseOrder.id == request.purchase_order_id
-        ]
+        condition_po = [PurchaseOrder.id == request.purchase_order_id]
         options_po = [
             selectinload(PurchaseOrder.supplier),
             selectinload(PurchaseOrder.warehouse),
@@ -77,7 +75,6 @@ class CreateGoodsReceiptService:
         if str(purchase_order.warehouse_id) != request.warehouse_id:
             WareHouseException.warehouse_not_match_with_po()
 
-        parent_receipt = None
         if request.parent_receipt_id:
             condition_parent = [GoodsReceipt.id == request.parent_receipt_id]
             parent_receipt = await goods_receipt_repository.get_goods_receipt(
@@ -88,27 +85,11 @@ class CreateGoodsReceiptService:
             if not parent_receipt:
                 GoodsReceiptException.gr_parent_not_exist()
 
-            if parent_receipt.status not in ['has_issue']:
-                GoodsReceiptException.gr_parent_not_has_issue()
+            if not parent_receipt.has_discrepancy:
+                GoodsReceiptException.gr_parent_must_have_discrepancy()
 
             if str(parent_receipt.purchase_order_id) != request.purchase_order_id:
                 GoodsReceiptException.gr_child_must_same_po_with_parent()
-
-        if request.related_purchase_return_id:
-            condition_pr = [
-                PurchaseReturn.id == request.related_purchase_return_id
-            ]
-
-            purchase_return = await purchase_return_repository.get_purchase_return(
-                session=session,
-                where_conditions=condition_pr
-            )
-
-            if not purchase_return:
-                PurchaseReturnException.pr_not_found()
-
-            if purchase_return.status != "confirmed":
-                PurchaseReturnException.pr_must_be_in_confirmed()
 
         receipt_details = []
         total_received_amount = 0
@@ -127,7 +108,11 @@ class CreateGoodsReceiptService:
                 selectinload(Product_Variant.product),
                 selectinload(Product_Variant.color)
             ]
-            variant = await product_variant_repository.get_product_variant(condition_variant, session=session, joins=joins_variant)
+            variant = await product_variant_repository.get_product_variant(
+                condition_variant,
+                session=session,
+                joins=joins_variant
+            )
             if not variant:
                 ProductException.not_found_variant()
 
@@ -140,16 +125,17 @@ class CreateGoodsReceiptService:
             if item.received_quantity != item.ordered_quantity:
                 has_discrepancy = True
                 discrepancy_notes_list.append(
-                    f"SKU {variant.sku}: Đặt {item.ordered_quantity}, "
-                    f"nhận {item.received_quantity}"
+                    f"SKU {variant.sku}: Đặt {item.ordered_quantity}, nhận {item.received_quantity}"
                 )
 
             if item.rejected_quantity > 0:
                 has_discrepancy = True
                 discrepancy_notes_list.append(
-                    f"SKU {variant.sku}: Từ chối {item.rejected_quantity} - "
-                    f"{item.rejection_reason}"
+                    f"SKU {variant.sku}: Từ chối {item.rejected_quantity} - {item.rejection_reason or 'Không rõ lý do'}"
                 )
+
+            if item.accepted_quantity + item.rejected_quantity != item.received_quantity:
+                GoodsReceiptException.invalid_quantity_calculation()
 
             unit_cost = po_detail.unit_cost
             total_cost = item.accepted_quantity * unit_cost
@@ -174,7 +160,6 @@ class CreateGoodsReceiptService:
             receipt_detail = GoodsReceiptDetail(
                 product_variant_id=item.product_variant_id,
                 po_detail_id=item.po_detail_id,
-                related_return_detail_id=None,           # Có thể set sau nếu cần
                 ordered_quantity=item.ordered_quantity,
                 received_quantity=item.received_quantity,
                 accepted_quantity=item.accepted_quantity,
@@ -197,13 +182,11 @@ class CreateGoodsReceiptService:
         goods_receipt = GoodsReceipt(
             receipt_number=receipt_number,
             purchase_order_id=request.purchase_order_id,
-            related_purchase_return_id=request.related_purchase_return_id,
-            parent_receipt_id = request.parent_receipt_id,
+            parent_receipt_id=request.parent_receipt_id,
             warehouse_id=request.warehouse_id,
             supplier_id=request.supplier_id,
             status="pending",
             receipt_date=request.receipt_date,
-            invoice_date=request.invoice_date,
             delivery_note_number=request.delivery_note_number,
             total_received_amount=total_received_amount,
             received_by=created_by,
@@ -224,7 +207,6 @@ class CreateGoodsReceiptService:
             "purchase_order_id": str(created_gr.purchase_order_id),
             "purchase_order_number": created_gr.purchase_order.po_number if created_gr.purchase_order else None,
             "parent_receipt_id": str(created_gr.parent_receipt_id) if created_gr.parent_receipt_id else None,
-            "related_purchase_return_id": str(created_gr.related_purchase_return_id) if created_gr.related_purchase_return_id else None,
             "supplier_id": str(created_gr.supplier_id),
             "supplier_name": created_gr.supplier.name if created_gr.supplier else None,
             "warehouse_id": str(created_gr.warehouse_id),
@@ -236,8 +218,3 @@ class CreateGoodsReceiptService:
             "discrepancy_notes": created_gr.discrepancy_notes,
             "created_at": created_gr.created_at.isoformat()
         }
-
-
-
-
-

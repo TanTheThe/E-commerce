@@ -35,7 +35,6 @@ class CreateGoodsReceiptRequest(BaseModel):
     receipt_date: datetime = Field(default_factory=datetime.now, description="Ngày nhận hàng")
     delivery_note_number: Optional[str] = Field(None, description="Số phiếu giao hàng")
     parent_receipt_id: Optional[str] = Field(None, description="ID của GR cha (cho GR2, GR3...)")
-    related_purchase_return_id: Optional[str] = Field(None, description="ID của PRO tương ứng (nếu là hàng thay thế)")
     notes: Optional[str] = Field(None, description="Ghi chú chung")
     items: List[GoodsReceiptDetailCreate] = Field(min_length=1, description="Danh sách sản phẩm nhập kho")
     

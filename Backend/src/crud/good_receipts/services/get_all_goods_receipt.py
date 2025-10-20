@@ -1,14 +1,16 @@
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import selectinload
-from sqlmodel import asc, desc
+from sqlmodel import asc, desc, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
 from src.database.models import GoodsReceipt
 from src.schemas.purchase_return import SortBy
 
 
-purchase_return_repository = PurchaseReturnRepository()
+goods_receipt_repository = GoodsReceiptRepository()
 
 class GetAllGoodsReceiptService:
     async def get_all_goods_receipts(self, session: AsyncSession, warehouse_id: str, status_gr: Optional[str] = None,
@@ -22,8 +24,7 @@ class GetAllGoodsReceiptService:
             conditions.append(GoodsReceipt.status == status_gr)
 
         if purchase_order_id:
-            conditions.append(
-                GoodsReceipt.purchase_order_id == purchase_order_id)
+            conditions.append(GoodsReceipt.purchase_order_id == purchase_order_id)
 
         if supplier_id:
             conditions.append(GoodsReceipt.supplier_id == supplier_id)
@@ -35,8 +36,10 @@ class GetAllGoodsReceiptService:
             conditions.append(GoodsReceipt.receipt_date <= to_date)
 
         if search:
-            conditions.append(
-                GoodsReceipt.receipt_number.ilike(f"%{search}%")
+            conditions.append(or_(
+                    GoodsReceipt.receipt_number.ilike(f"%{search}%"),
+                    GoodsReceipt.delivery_note_number.ilike(f"%{search}%")
+                )
             )
 
         options = [
@@ -62,9 +65,14 @@ class GetAllGoodsReceiptService:
         elif sort_by == "total_amount_desc":
             sort_by_result = desc(GoodsReceipt.total_received_amount)
 
-        grs, total = await purchase_return_repository.get_all_purchase_returns(session=session, where_conditions=conditions,
-                                                                               order_by=sort_by_result, skip=skip,
-                                                                               limit=limit, options=options)
+        grs, total = await goods_receipt_repository.get_all_goods_receipt(
+            session=session,
+            where_conditions=conditions,
+            order_by=sort_by_result,
+            skip=skip,
+            limit=limit,
+            options=options
+        )
 
         items = []
         for gr in grs:
@@ -89,6 +97,7 @@ class GetAllGoodsReceiptService:
                 "status": gr.status,
                 "total_received_amount": gr.total_received_amount,
                 "total_items": len(gr.receipt_details) if gr.receipt_details else 0,
+                "has_discrepancy": gr.has_discrepancy,
                 "parent_receipt_id": str(gr.parent_receipt_id) if gr.parent_receipt_id else None,
                 "approved_by": str(gr.approved_by) if gr.approved_by else None,
                 "approved_at": gr.approved_at.isoformat() if gr.approved_at else None,

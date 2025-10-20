@@ -91,3 +91,43 @@ class PurchaseReturnException:
                 "error_code": "pr_001",
             },
         )
+
+    @staticmethod
+    def only_update_when_draft():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có thể cập nhật phiếu đang ở trạng thái draft",
+                "error_code": "pr_001",
+            },
+        )
+
+    @staticmethod
+    def cant_delete_shipped_return():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xóa phiếu trả hàng khi đơn hàng đã được gửi trả",
+                "error_code": "pr_001",
+            },
+        )
+
+    @staticmethod
+    def only_delete_when_draft():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có thể xóa phiếu đang ở trạng thái draft",
+                "error_code": "pr_001",
+            },
+        )
+
+    @staticmethod
+    def error_while_delete_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi xóa phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )

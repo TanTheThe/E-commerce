@@ -29,7 +29,6 @@ const DashBoardBoxes = () => {
         const fetchNewOrders = async () => {
             try {
                 const res = await getDataApi(`/admin/order/statistics/count-orders`);
-                console.log("dajw0d9a9w0j");
                 if (res.success) {
                     setNewOrders(res.data.count_orders);
                 } else {

@@ -121,9 +121,9 @@ async def get_goods_receipt_detail(goods_receipt_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    goods_receipt = await get_detail_goods_receipt_service.get_goods_receipt_by_id(
+    goods_receipt = await get_detail_goods_receipt_service.get_goods_receipt(
         session=session,
-        goods_receipt_id=goods_receipt_id
+        gr_id=goods_receipt_id
     )
 
     return JSONResponse(

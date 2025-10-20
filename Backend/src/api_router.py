@@ -2,11 +2,15 @@ from fastapi import APIRouter
 
 from src.crud.cart.routes import cart_admin_router, cart_customer_router, cart_staff_router
 from src.crud.color.routes import color_admin_router, color_customer_router, color_staff_router
+from src.crud.good_receipts.routes import goods_receipt_admin_router, goods_receipt_customer_router, \
+    goods_receipt_staff_router
 from src.crud.material.routes import material_admin_router, material_customer_router, material_staff_router
 from src.crud.notification.routes import notification_admin_router, notification_customer_router, \
     notification_staff_router
 from src.crud.purchase_order.routes import purchase_orders_admin_router, purchase_orders_customer_router, \
     purchase_orders_staff_router
+from src.crud.purchase_return.routes import return_purchase_admin_router, return_purchase_customer_router, \
+    return_purchase_staff_router
 from src.crud.return_order.routes import return_order_admin_router, return_order_customer_router, \
     return_order_staff_router
 from src.crud.size.routes import size_admin_router, size_customer_router, size_staff_router
@@ -50,6 +54,8 @@ admin_router.include_router(warehouse_admin_router)
 admin_router.include_router(stock_admin_router)
 admin_router.include_router(purchase_orders_admin_router)
 admin_router.include_router(suppliers_admin_router)
+admin_router.include_router(goods_receipt_admin_router)
+admin_router.include_router(return_purchase_admin_router)
 
 customer_router = APIRouter(prefix="/customer", tags=["user-customer"])
 customer_router.include_router(user_customer_router)
@@ -73,6 +79,8 @@ customer_router.include_router(warehouse_customer_router)
 customer_router.include_router(stock_customer_router)
 customer_router.include_router(purchase_orders_customer_router)
 customer_router.include_router(suppliers_customer_router)
+customer_router.include_router(goods_receipt_customer_router)
+customer_router.include_router(return_purchase_customer_router)
 
 staff_router = APIRouter(prefix="/staff", tags=["user-staff"])
 staff_router.include_router(user_staff_router)
@@ -96,3 +104,5 @@ staff_router.include_router(warehouse_staff_router)
 staff_router.include_router(stock_staff_router)
 staff_router.include_router(purchase_orders_staff_router)
 staff_router.include_router(suppliers_staff_router)
+staff_router.include_router(goods_receipt_staff_router)
+staff_router.include_router(return_purchase_staff_router)
