@@ -9,16 +9,12 @@ from datetime import datetime
 class StockRepository:
     async def get_warehouse_summary(self, warehouse_id: str, session: AsyncSession) -> dict:
         select_columns = [
-            # Tổng số products
             func.count(func.distinct(Product_Variant.product_id)).label('total_products'),
 
-            # Tổng số variants
             func.count(func.distinct(Product_Variant.id)).label('total_variants'),
 
-            # Tổng số lượng hàng
             func.sum(Stock.quantity).label('total_quantity'),
 
-            # Tổng giá trị kho (quantity * cost_price)
             func.sum(
                 Stock.quantity * func.coalesce(Stock.cost_price, 0)
             ).label('total_value'),

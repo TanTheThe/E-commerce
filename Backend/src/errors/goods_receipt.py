@@ -61,6 +61,16 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
+        
+    @staticmethod
+    def gr_detail_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy chi tiết nhập hàng",
+                "error_code": "gr_001",
+            },
+        )
 
     @staticmethod
     def only_approved_when_pending():
@@ -82,5 +92,43 @@ class GoodsReceiptException:
             },
         )
 
-
+    @staticmethod
+    def only_update_delete_when_draft():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có thể cập nhật/xóa phiếu ở trạng thái draft",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def cant_delete_receipt_have_child():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xóa phiếu nhập này vì có phiếu nhập con liên quan",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def cant_delete_receipt_have_returns():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xóa phiếu nhập này vì đã có phiếu trả hàng liên quan",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_delete_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi xóa phiếu nhập kho",
+                "error_code": "gr_001",
+            },
+        )
 

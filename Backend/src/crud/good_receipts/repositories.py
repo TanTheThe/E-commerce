@@ -171,20 +171,20 @@ class GoodsReceiptRepository:
         await session.exec(stmt)
 
 
-    async def delete_purchase_order(self, session: AsyncSession, po_id: str):
-        condition = [PurchaseOrder.id == po_id]
-        po = await self.get_purchase_order(session=session, where_conditions=condition)
-        if not po:
+    async def delete_goods_receipt(self, session: AsyncSession, goods_receipt_id: str):
+        condition = [GoodsReceipt.id == goods_receipt_id]
+        pr = await self.get_goods_receipt(session=session, where_conditions=condition)
+        if not pr:
             return False
 
-        detail_statement = select(PurchaseOrderDetail).where(
-            PurchaseOrderDetail.purchase_order_id == po_id
+        detail_statement = select(GoodsReceiptDetail).where(
+            GoodsReceiptDetail.goods_receipt_id == goods_receipt_id
         )
         result = await session.exec(detail_statement)
         details = result.all()
         for detail in details:
             await session.delete(detail)
 
-        await session.delete(po)
+        await session.delete(pr)
         await session.commit()
         return True

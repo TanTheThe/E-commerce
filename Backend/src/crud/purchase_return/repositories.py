@@ -1,34 +1,65 @@
 from typing import Optional, List, Any, Tuple, Dict
 from sqlalchemy import ColumnElement, delete, update
-from src.database.models import PurchaseOrder, PurchaseOrderDetail, GoodsReceipt, GoodsReceiptDetail, PurchaseReturn
+from src.database.models import PurchaseOrder, PurchaseOrderDetail, GoodsReceipt, GoodsReceiptDetail, PurchaseReturn, PurchaseReturnDetail
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func
 from datetime import datetime
 
 
 class PurchaseReturnRepository:
-    async def create_goods_receipt(self, goods_receipt: GoodsReceipt, receipt_details: List[GoodsReceiptDetail], session: AsyncSession):
-        session.add(goods_receipt)
+    async def generate_return_number(self, session: AsyncSession) -> str:
+        today = datetime.now().strftime("%Y%m%d")
+        prefix = f"PR{today}"
+
+        statement = select(func.count(PurchaseReturn.id)).where(
+            PurchaseReturn.return_number.like(f"{prefix}%")
+        )
+        result = await session.exec(statement)
+
+        count = result.one_or_none()
+
+        sequence = str(count + 1).zfill(3)
+        return f"{prefix}{sequence}"
+    
+    
+    async def generate_delivery_note_number(self, session: AsyncSession) -> str:
+        today = datetime.now().strftime("%Y%m%d")
+        prefix = f"DN{today}"
+
+        statement = select(func.count(PurchaseReturn.id)).where(
+            PurchaseReturn.delivery_note_number.like(f"{prefix}%")
+        )
+        result = await session.exec(statement)
+        count = result.one_or_none() or 0
+
+        sequence = str(count + 1).zfill(3)
+        return f"{prefix}{sequence}"
+    
+    
+    async def create_purchase_return(self, pr_data: Dict[str, Any], session: AsyncSession):
+        pr = PurchaseReturn(**pr_data)
+        
+        session.add(pr)
         await session.flush()
-
-        for detail in receipt_details:
-            detail.goods_receipt_id = goods_receipt.id
-            session.add(detail)
-
-        await session.commit()
-        await session.refresh(goods_receipt)
-
-        return goods_receipt
-
+        
+        return pr
+    
+    async def create_purchase_return_detail(self, session: AsyncSession, detail_data: Dict[str, Any]):
+        detail = PurchaseReturnDetail(**detail_data)
+        
+        session.add(detail)
+        await session.flush()
+        
+        return detail
 
     async def get_purchase_return(self, session: AsyncSession,
-                                select_columns: Optional[List[Any]] = None,
-                                joins: Optional[List[Tuple[Any, dict]]] = None,
-                                where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                                group_by_columns: Optional[List[Any]] = None,
-                                having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                                order_by: Optional[Any] = None,
-                                options: Optional[list] = None):
+                                  select_columns: Optional[List[Any]] = None,
+                                  joins: Optional[List[Tuple[Any, dict]]] = None,
+                                  where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                  group_by_columns: Optional[List[Any]] = None,
+                                  having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                  order_by: Optional[Any] = None,
+                                  options: Optional[list] = None):
 
         if select_columns is None:
             query = select(PurchaseReturn)
@@ -61,21 +92,21 @@ class PurchaseReturnRepository:
         pr = result.one_or_none()
 
         return pr
-
-    async def get_all_goods_receipt(self, session: AsyncSession,
-                                    select_columns: Optional[List[Any]] = None,
-                                    joins: Optional[List[Tuple[Any, dict]]] = None,
-                                    where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                                    group_by_columns: Optional[List[Any]] = None,
-                                    having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                                    order_by: Optional[Any] = None,
-                                    skip: int = 0, limit: int = 10,
-                                    options: Optional[list] = None):
+    
+    async def get_all_purchase_returns(self, session: AsyncSession,
+                                     select_columns: Optional[List[Any]] = None,
+                                     joins: Optional[List[Tuple[Any, dict]]] = None,
+                                     where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                     group_by_columns: Optional[List[Any]] = None,
+                                     having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                     order_by: Optional[Any] = None,
+                                     skip: int = 0, limit: int = 10,
+                                     options: Optional[list] = None):
 
         if select_columns is None:
-            query = select(GoodsReceipt)
+            query = select(PurchaseReturn)
         else:
-            query = select(*select_columns).select_from(GoodsReceipt)
+            query = select(*select_columns).select_from(PurchaseReturn)
 
         if joins:
             for table, config in joins:
@@ -106,71 +137,54 @@ class PurchaseReturnRepository:
         query = query.offset(skip).limit(limit)
 
         result = await session.exec(query)
-        grs = result.all()
+        prs = result.all()
 
-        return grs, total
+        return prs, total
 
+    async def get_all_return_details(self, session: AsyncSession,
+                                     select_columns: Optional[List[Any]] = None,
+                                     joins: Optional[List[Tuple[Any, dict]]] = None,
+                                     where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                     group_by_columns: Optional[List[Any]] = None,
+                                     having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                     order_by: Optional[Any] = None,
+                                     skip: int = 0, limit: int = 10,
+                                     options: Optional[list] = None):
 
-    async def update_purchase_order(self, session: AsyncSession, po: PurchaseOrder,
-                                    new_details: Optional[List[PurchaseOrderDetail]] = None):
-        if new_details is not None:
-            if po.po_details:
-                for detail in po.po_details:
-                    session.expunge(detail)
-                po.po_details.clear()
+        if select_columns is None:
+            query = select(PurchaseReturnDetail)
+        else:
+            query = select(*select_columns).select_from(PurchaseReturnDetail)
 
-            statement = delete(PurchaseOrderDetail).where(
-                PurchaseOrderDetail.purchase_order_id == po.id
-            )
-            await session.exec(statement)
-            await session.flush()
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-            for d in new_details:
-                new_detail = PurchaseOrderDetail(
-                    purchase_order_id=po.id,
-                    product_variant_id=d.product_variant_id,
-                    quantity=d.quantity,
-                    received_quantity=0,
-                    unit_cost=d.unit_cost,
-                    total_cost=d.total_cost,
-                    product_snapshot=d.product_snapshot,
-                    created_at=datetime.now(),
-                    notes=d.notes,
-                )
-                session.add(new_detail)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
 
-        po.updated_at = datetime.now()
-        session.add(po)
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
 
-        await session.commit()
-        await session.refresh(po)
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
 
-        return po
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
 
+        if options:
+            query = query.options(*options)
 
-    async def update_po_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
-        stmt = (
-            update(PurchaseOrder)
-            .where(condition)
-            .values(**values)
-        )
-        await session.exec(stmt)
+        if order_by is not None:
+            query = query.order_by(order_by)
 
+        query = query.offset(skip).limit(limit)
 
-    async def delete_purchase_order(self, session: AsyncSession, po_id: str):
-        condition = [PurchaseOrder.id == po_id]
-        po = await self.get_purchase_order(session=session, where_conditions=condition)
-        if not po:
-            return False
+        result = await session.exec(query)
+        return_details = result.all()
 
-        detail_statement = select(PurchaseOrderDetail).where(
-            PurchaseOrderDetail.purchase_order_id == po_id
-        )
-        result = await session.exec(detail_statement)
-        details = result.all()
-        for detail in details:
-            await session.delete(detail)
-
-        await session.delete(po)
-        await session.commit()
-        return True
+        return return_details, total

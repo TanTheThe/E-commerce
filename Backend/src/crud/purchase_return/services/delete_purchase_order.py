@@ -1,5 +1,5 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.crud.goods_receipt.repositories import GoodsReceiptRepository
+from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.supplier.repositories import SupplierRepository
 from src.crud.user.repositories import UserRepository
