@@ -3,7 +3,7 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { getDataApi, postDataApi } from '../../../utils/api';
 import { MyContext } from '../../../App';
 
-const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId }) => {
+const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, openAlertBox }) => {
     const [formData, setFormData] = useState({
         supplier_id: '',
         warehouse_id: warehouseId || '',
@@ -16,8 +16,6 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId }) =
     const [categories, setCategories] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
-
-    const context = useContext(MyContext)
 
     useEffect(() => {
         if (isOpen) {
@@ -236,15 +234,14 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId }) =
             const response = await postDataApi('/admin/purchase-orders', submitData);
 
             if (response.success) {
-                context.openAlertBox("success", response.message || 'Tạo đơn nhập hàng thành công');
+                openAlertBox?.("success", response.message || 'Tạo đơn nhập hàng thành công');
                 onSuccess?.();
                 handleClose();
             } else {
-                context.openAlertBox("error", response?.data?.detail.message || "Có lỗi xảy ra khi tạo đơn");
+                openAlertBox?.("error", response?.data?.detail.message || "Có lỗi xảy ra khi tạo đơn");
             }
         } catch (error) {
             console.error('Error creating purchase order:', error);
-            context.openAlertBox("error", response?.data?.detail.message || "Có lỗi xảy ra khi tạo đơn");
         } finally {
             setIsSubmitting(false);
         }

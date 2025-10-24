@@ -48,26 +48,6 @@ class GetDetailPurchaseReturnService:
 
         items = []
         for detail in pr.return_details:
-            if detail.product_snapshot:
-                product_name = detail.product_snapshot.get("product_name")
-                variant_sku = detail.product_snapshot.get("variant_sku")
-                variant_size = detail.product_snapshot.get("variant_size")
-                variant_color_name = detail.product_snapshot.get("variant_color_name")
-                variant_image = detail.product_snapshot.get("variant_image")
-            else:
-                product_name = detail.product_variant.product.name if detail.product_variant and detail.product_variant.product else None
-                variant_sku = detail.product_variant.sku if detail.product_variant else None
-                variant_size = detail.product_variant.size if detail.product_variant else None
-
-                variant_color_name = None
-                variant_image = None
-                if detail.product_variant:
-                    if detail.product_variant.color_name:
-                        variant_color_name = detail.product_variant.color_name
-                    elif detail.product_variant.color:
-                        variant_color_name = detail.product_variant.color.name
-                    variant_image = detail.product_variant.image
-
             items.append(
                 {
                     "id": str(detail.id),
@@ -75,11 +55,6 @@ class GetDetailPurchaseReturnService:
                     "product_variant_id": str(detail.product_variant_id),
                     "goods_receipt_detail_id": str(
                         detail.goods_receipt_detail_id) if detail.goods_receipt_detail_id else None,
-                    "product_name": product_name,
-                    "variant_sku": variant_sku,
-                    "variant_size": variant_size,
-                    "variant_color_name": variant_color_name,
-                    "variant_image": variant_image,
                     "return_quantity": detail.return_quantity,
                     "unit_cost": detail.unit_cost,
                     "total_cost": detail.total_cost,
@@ -120,6 +95,7 @@ class GetDetailPurchaseReturnService:
             "created_at": str(pr.created_at),
             "approved_at": str(pr.approved_at) if pr.approved_at else None,
             "completed_at": str(pr.completed_at) if pr.completed_at else None,
+            "confirmed_at": str(pr.confirmed_at) if pr.confirmed_at else None,
             "updated_at": str(pr.updated_at) if pr.updated_at else None,
             "items": items
         }

@@ -3,25 +3,23 @@ import { Plus, Package } from 'lucide-react';
 import { MyContext } from '../../../App';
 import useAuth from '../../Verify/auth';
 import { deleteDataApi, getDataApi, postDataApi } from '../../../utils/api';
-import GoodsReceiptCard from './goodsReceiptCard';
-import UpdateGoodsReceiptModal from './updateGoodsReceipt';
-import GoodsReceiptDetailModal from './goodsReceiptDetail';
-import ApprovalPreviewModal from './approvalPreview';
-import CreateGoodsReceiptModal from './createGoodsReceipt';
+import ReturnPurchaseCard from './returnPurchaseCard';
+import UpdateReturnPurchaseModal from './updateReturnPurchase';
+import PurchaseReturnDetailModal from './returnPurchaseDetail';
+import CreatePurchaseReturnModal from './createPurchaseReturn';
 
-const GoodsReceiptsManagement = ({ warehouse }) => {
+const ReturnPurchaseManagement = ({ warehouse }) => {
     const [activeTab, setActiveTab] = useState('all');
-    const [goodsReceipts, setGoodsReceipts] = useState([]);
+    const [returnPurchases, setReturnPurchases] = useState([]);
     const [total, setTotal] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedGrId, setSelectedGrId] = useState(null);
+    const [selectedReturnId, setSelectedReturnId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [grToUpdateId, setGrToUpdateId] = useState(null);
+    const [returnToUpdateId, setReturnToUpdateId] = useState(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
-    const [approvalPreviewGrId, setApprovalPreviewGrId] = useState(null);
 
     const { userRole } = useAuth();
     const context = useContext(MyContext);
@@ -30,13 +28,14 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
 
     const tabs = [
         { key: 'all', label: 'Tất cả', status: null },
-        { key: 'pending', label: 'Chờ duyệt', status: 'pending' },
+        { key: 'draft', label: 'Nháp', status: 'draft' },
         { key: 'approved', label: 'Đã duyệt', status: 'approved' },
-        { key: 'completed', label: 'Hoàn thành', status: 'completed' },
-        { key: 'has_issue', label: 'Đang có vấn đề', status: 'has_issue' }
+        { key: 'sent', label: 'Đã gửi', status: 'sent' },
+        { key: 'confirmed', label: 'Đã xác nhận', status: 'confirmed' },
+        { key: 'completed', label: 'Hoàn thành', status: 'completed' }
     ];
 
-    const fetchGoodsReceipts = async () => {
+    const fetchReturnPurchases = async () => {
         setIsLoading(true);
         try {
             const skip = (currentPage - 1) * limit;
@@ -47,7 +46,7 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
 
             const currentTab = tabs.find(t => t.key === activeTab);
             if (currentTab?.status) {
-                queryParams.append('status_gr', currentTab.status);
+                queryParams.append('status_pr', currentTab.status);
             }
 
             if (warehouse?.id) {
@@ -58,21 +57,21 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                 queryParams.append('search', searchQuery.trim());
             }
 
-            const response = await getDataApi(`/admin/goods-receipt?${queryParams.toString()}`);
+            const response = await getDataApi(`/admin/return-purchase?${queryParams.toString()}`);
 
             if (response.success) {
-                setGoodsReceipts(response.data.data || []);
+                setReturnPurchases(response.data.data || []);
                 setTotal(response.data.total || 0);
             }
         } catch (error) {
-            console.error('Error fetching goods receipts:', error);
+            console.error('Error fetching return purchases:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchGoodsReceipts();
+        fetchReturnPurchases();
     }, [activeTab, currentPage, warehouse?.id, searchQuery]);
 
     useEffect(() => {
@@ -81,32 +80,65 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
 
     const totalPages = Math.ceil(total / limit);
 
-    const handleViewDetail = (grId) => {
-        setSelectedGrId(grId);
+    const handleViewDetail = (returnId) => {
+        setSelectedReturnId(returnId);
     };
 
-    const handleUpdate = (grId) => {
-        setGrToUpdateId(grId);
+    const handleUpdate = (returnId) => {
+        setReturnToUpdateId(returnId);
     };
 
-    const handleViewApprovalPreview = (grId) => {
-        setApprovalPreviewGrId(grId);
+    const handleSendEmail = async (returnId, requestData) => {
+        try {
+            const response = await postDataApi(
+                `/admin/return-purchase/${returnId}/send-email`,
+                requestData
+            );
+
+            if (response.success) {
+                fetchReturnPurchases();
+                context.openAlertBox("success", response.message || "Đã gửi email thông báo hoàn trả đến nhà cung cấp");
+            } else {
+                context.openAlertBox("error", response?.data?.detail?.message || "Gửi email thất bại");
+            }
+        } catch (error) {
+            console.error('Error sending return email:', error);
+            context.openAlertBox("error", "Đã xảy ra lỗi khi gửi email");
+        }
     };
 
-    const handleApprove = (grId) => {
+    const handleApprove = (returnId) => {
         setConfirmAction({
-            action: 'approveGr',
-            grId,
-            message: 'Bạn có chắc muốn duyệt phiếu nhập kho này không?'
+            action: 'approveReturn',
+            returnId,
+            message: 'Bạn có chắc muốn duyệt phiếu trả hàng này không?'
         });
         setShowConfirmModal(true);
     };
 
-    const handleDelete = (grId) => {
+    const handleDelete = (returnId) => {
         setConfirmAction({
-            action: 'deleteGr',
-            grId,
-            message: 'Bạn có chắc muốn xóa phiếu nhập kho này không?'
+            action: 'deleteReturn',
+            returnId,
+            message: 'Bạn có chắc muốn xóa phiếu trả hàng này không?'
+        });
+        setShowConfirmModal(true);
+    };
+
+    const handleConfirm = (returnId) => {
+        setConfirmAction({
+            action: 'confirmReturn',
+            returnId,
+            message: 'Bạn có chắc muốn xác nhận đã nhận hàng trả từ NCC không?'
+        });
+        setShowConfirmModal(true);
+    };
+
+    const handleComplete = (returnId) => {
+        setConfirmAction({
+            action: 'completeReturn',
+            returnId,
+            message: 'Bạn có chắc muốn hoàn thành phiếu trả hàng này không?'
         });
         setShowConfirmModal(true);
     };
@@ -116,35 +148,65 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
 
         setShowConfirmModal(false);
 
-        if (confirmAction.action === 'deleteGr') {
-            const grId = confirmAction.grId;
+        if (confirmAction.action === 'deleteReturn') {
+            const returnId = confirmAction.returnId;
             try {
-                const response = await deleteDataApi(`/admin/goods-receipt/${grId}`);
+                const response = await deleteDataApi(`/admin/return-purchase/${returnId}`);
 
                 if (response.success) {
-                    context.openAlertBox("success", response.message || "Xóa phiếu nhập kho thành công");
-                    fetchGoodsReceipts();
+                    context.openAlertBox("success", response.message || "Xóa phiếu trả hàng thành công");
+                    fetchReturnPurchases();
                 } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Xóa phiếu nhập kho thất bại");
+                    context.openAlertBox("error", response?.data?.detail?.message || "Xóa phiếu trả hàng thất bại");
                 }
             } catch (error) {
-                console.error('Error deleting goods receipt:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi xóa phiếu nhập kho");
+                console.error('Error deleting return purchase:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi xóa phiếu trả hàng");
             }
-        } else if (confirmAction.action === 'approveGr') {
-            const grId = confirmAction.grId;
+        } else if (confirmAction.action === 'approveReturn') {
+            const returnId = confirmAction.returnId;
             try {
-                const response = await postDataApi(`/admin/goods-receipt/${grId}/approve`, {});
+                const response = await postDataApi(`/admin/return-purchase/${returnId}/approve`, {});
 
                 if (response.success) {
-                    context.openAlertBox("success", response.message || "Duyệt phiếu nhập kho thành công");
-                    fetchGoodsReceipts();
+                    context.openAlertBox("success", response.message || "Duyệt phiếu trả hàng thành công");
+                    fetchReturnPurchases();
                 } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Duyệt phiếu nhập kho thất bại");
+                    context.openAlertBox("error", response?.data?.detail?.message || "Duyệt phiếu trả hàng thất bại");
                 }
             } catch (error) {
-                console.error('Error approving goods receipt:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi duyệt phiếu nhập kho");
+                console.error('Error approving return purchase:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi duyệt phiếu trả hàng");
+            }
+        } else if (confirmAction.action === 'confirmReturn') {
+            const returnId = confirmAction.returnId;
+            try {
+                const response = await postDataApi(`/admin/return-purchase/${returnId}/confirmed`, {});
+
+                if (response.success) {
+                    context.openAlertBox("success", response.message || "Xác nhận nhận hàng thành công");
+                    fetchReturnPurchases();
+                } else {
+                    context.openAlertBox("error", response?.data?.detail?.message || "Xác nhận nhận hàng thất bại");
+                }
+            } catch (error) {
+                console.error('Error confirming return purchase:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi xác nhận nhận hàng");
+            }
+        } else if (confirmAction.action === 'completeReturn') {
+            const returnId = confirmAction.returnId;
+            try {
+                const response = await postDataApi(`/admin/return-purchase/${returnId}/complete`, {});
+
+                if (response.success) {
+                    context.openAlertBox("success", response.message || "Hoàn thành phiếu trả hàng thành công");
+                    fetchReturnPurchases();
+                } else {
+                    context.openAlertBox("error", response?.data?.detail?.message || "Hoàn thành phiếu trả hàng thất bại");
+                }
+            } catch (error) {
+                console.error('Error completing return purchase:', error);
+                context.openAlertBox("error", "Đã xảy ra lỗi khi hoàn thành phiếu trả hàng");
             }
         }
 
@@ -176,7 +238,7 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                     <div className="flex items-center gap-3">
                         <input
                             type="text"
-                            placeholder="Tìm theo số phiếu..."
+                            placeholder="Tìm theo số phiếu trả hàng..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -186,7 +248,7 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Tạo phiếu nhập kho</span>
+                            <span>Tạo phiếu trả hàng</span>
                         </button>
                     </div>
                 </div>
@@ -204,24 +266,27 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                             </div>
                         ))}
                     </div>
-                ) : goodsReceipts.length === 0 ? (
+                ) : returnPurchases.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-sm p-12 text-center">
                         <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500 text-lg">Không có phiếu nhập kho nào</p>
+                        <p className="text-gray-500 text-lg">Không có phiếu trả hàng nào</p>
                     </div>
                 ) : (
                     <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                            {goodsReceipts.map((gr) => (
-                                <GoodsReceiptCard
-                                    key={gr.id}
-                                    gr={gr}
+                            {returnPurchases.map((returnPurchase) => (
+                                <ReturnPurchaseCard
+                                    key={returnPurchase.id}
+                                    returnPurchase={returnPurchase}
                                     onViewDetail={handleViewDetail}
                                     onUpdate={handleUpdate}
                                     onDelete={handleDelete}
+                                    onSendEmail={handleSendEmail}
                                     onApprove={handleApprove}
-                                    onViewApprovalPreview={handleViewApprovalPreview}
+                                    onConfirm={handleConfirm}
+                                    onComplete={handleComplete}
                                     userRole={userRole}
+                                    openAlertBox={context.openAlertBox}
                                 />
                             ))}
                         </div>
@@ -253,29 +318,22 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                 )}
             </div>
 
-            {grToUpdateId && (
-                <UpdateGoodsReceiptModal
-                    isOpen={!!grToUpdateId}
-                    grId={grToUpdateId}
-                    onClose={() => setGrToUpdateId(null)}
+            {returnToUpdateId && (
+                <UpdateReturnPurchaseModal
+                    isOpen={!!returnToUpdateId}
+                    prId={returnToUpdateId}
+                    onClose={() => setReturnToUpdateId(null)}
                     onSuccess={() => {
-                        setGrToUpdateId(null);
-                        fetchGoodsReceipts();
+                        setReturnToUpdateId(null);
+                        fetchReturnPurchases();
                     }}
                 />
             )}
 
-            {selectedGrId && (
-                <GoodsReceiptDetailModal
-                    grId={selectedGrId}
-                    onClose={() => setSelectedGrId(null)}
-                />
-            )}
-
-            {approvalPreviewGrId && (
-                <ApprovalPreviewModal
-                    grId={approvalPreviewGrId}
-                    onClose={() => setApprovalPreviewGrId(null)}
+            {selectedReturnId && (
+                <PurchaseReturnDetailModal
+                    prId={selectedReturnId}
+                    onClose={() => setSelectedReturnId(null)}
                 />
             )}
 
@@ -306,17 +364,16 @@ const GoodsReceiptsManagement = ({ warehouse }) => {
                 </div>
             )}
 
-            <CreateGoodsReceiptModal
+            <CreatePurchaseReturnModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={fetchGoodsReceipts}
+                onSuccess={fetchReturnPurchases}
                 warehouseId={warehouse?.id}
-                purchaseOrderId={null}
                 openAlertBox={context.openAlertBox}
             />
         </div>
     );
-}
+};
 
-export default GoodsReceiptsManagement;
+export default ReturnPurchaseManagement;
 

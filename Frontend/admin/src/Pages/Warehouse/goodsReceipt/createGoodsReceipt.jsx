@@ -1,9 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { MyContext } from '../../../App';
 import { getDataApi, postDataApi } from '../../../utils/api';
 
-const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purchaseOrderId }) => {
+const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purchaseOrderId, openAlertBox }) => {
     const [formData, setFormData] = useState({
         purchase_order_id: purchaseOrderId || '',
         warehouse_id: warehouseId || '',
@@ -18,11 +17,11 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
     const [suppliers, setSuppliers] = useState([]);
     const [warehouses, setWarehouses] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
+    const [parentReceipts, setParentReceipts] = useState([]);
     const [poDetails, setPoDetails] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
-
-    const context = useContext(MyContext);
+    const [parentReceiptDetails, setParentReceiptDetails] = useState(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -45,13 +44,39 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
         }
     }, [purchaseOrderId]);
 
+    useEffect(() => {
+        if (formData.parent_receipt_id) {
+            fetchParentReceiptDetails(formData.parent_receipt_id);
+        } else {
+            setParentReceiptDetails(null);
+            setFormData(prev => ({
+                ...prev,
+                items: prev.items.map(item => {
+                    const poDetail = poDetails.find(d => d.po_detail_id === item.po_detail_id);
+                    if (poDetail) {
+                        return { ...item, ordered_quantity: poDetail.ordered_quantity };
+                    }
+                    return item;
+                })
+            }));
+        }
+    }, [formData.parent_receipt_id]);
+
+    useEffect(() => {
+        if (formData.purchase_order_id && formData.warehouse_id) {
+            fetchParentReceipts();
+        } else {
+            setParentReceipts([]);
+        }
+    }, [formData.purchase_order_id, formData.warehouse_id]);
+
     const fetchSuppliers = async () => {
         try {
             const response = await getDataApi('/admin/suppliers?limit=1000');
             if (response.success) {
                 setSuppliers(response.data.data || []);
             } else {
-                context.openAlertBox("error", response.data.detail.message)
+                openAlertBox?.("error", response.data.detail.message)
             }
         } catch (error) {
             console.error('Error fetching suppliers:', error);
@@ -64,7 +89,7 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
             if (response.success) {
                 setWarehouses(response.data.data || []);
             } else {
-                context.openAlertBox("error", response.data.detail.message)
+                openAlertBox?.("error", response.data.detail.message)
             }
         } catch (error) {
             console.error('Error fetching warehouses:', error);
@@ -73,14 +98,29 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
 
     const fetchPurchaseOrders = async () => {
         try {
-            const response = await getDataApi('/admin/purchase-orders/all?limit=1000');
+            const response = await getDataApi('/admin/purchase-orders/all?po_status=confirmed,partial_received&limit=1000');
             if (response.success) {
                 setPurchaseOrders(response.data.data || []);
             } else {
-                context.openAlertBox("error", response.data.detail.message)
+                openAlertBox?.("error", response.data.detail.message)
             }
         } catch (error) {
-            console.error('Error fetching warehouses:', error);
+            console.error('Error fetching purchase orders:', error);
+        }
+    };
+
+    const fetchParentReceipts = async () => {
+        try {
+            const response = await getDataApi(
+                `/admin/goods-receipt?warehouse_id=${formData.warehouse_id}&status_gr=has_issue&purchase_order_id=${formData.purchase_order_id}&limit=1000`
+            );
+            if (response.success) {
+                setParentReceipts(response.data.data || []);
+            } else {
+                openAlertBox?.("error", response.data.detail.message)
+            }
+        } catch (error) {
+            console.error('Error fetching parent receipts:', error);
         }
     };
 
@@ -88,7 +128,7 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
         try {
             const response = await getDataApi(`/admin/purchase-orders/${poId}`);
             if (response.success) {
-                const details = data.content.items.map(item => ({
+                const details = response.data.items.map(item => ({
                     po_detail_id: item.id,
                     product_variant_id: item.product_variant_id,
                     product_name: item.product_name,
@@ -99,10 +139,46 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                 }));
                 setPoDetails(details);
             } else {
-                context.openAlertBox("error", response.data.detail.message)
+                openAlertBox?.("error", response.data.detail.message)
             }
         } catch (error) {
             console.error('Error fetching PO details:', error);
+        }
+    };
+
+    const fetchParentReceiptDetails = async (parentId) => {
+        try {
+            const response = await getDataApi(`/admin/goods-receipt/${parentId}`);
+            if (response.success) {
+                setParentReceiptDetails(response.data);
+
+                setFormData(prev => ({
+                    ...prev,
+                    items: prev.items.map(item => {
+                        const parentItem = response.data.items.find(
+                            pi => pi.po_detail_id === item.po_detail_id
+                        );
+
+                        if (parentItem) {
+                            return {
+                                ...item,
+                                ordered_quantity: parentItem.rejected_quantity,
+                                received_quantity: 0,
+                                accepted_quantity: 0,
+                                rejected_quantity: 0,
+                                rejection_reason: '',
+                                notes: ''
+                            };
+                        }
+                        return item;
+                    })
+                }));
+            } else {
+                openAlertBox?.("error", response.data.detail.message);
+            }
+        } catch (error) {
+            console.error('Error fetching parent receipt details:', error);
+            openAlertBox?.("error", "Không thể tải thông tin GR cha");
         }
     };
 
@@ -139,10 +215,24 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                     const updated = { ...item, [field]: value };
 
                     if (field === 'po_detail_id' && value) {
-                        const detail = poDetails.find(d => d.po_detail_id === value);
-                        if (detail) {
-                            updated.product_variant_id = detail.product_variant_id;
-                            updated.ordered_quantity = detail.ordered_quantity;
+                        if (parentReceiptDetails) {
+                            const parentItem = parentReceiptDetails.items.find(
+                                pi => pi.po_detail_id === value
+                            );
+
+                            if (parentItem) {
+                                updated.product_variant_id = parentItem.product_variant_id;
+                                updated.ordered_quantity = parentItem.rejected_quantity;
+                            } else {
+                                openAlertBox?.("warning", "Sản phẩm này không có trong GR cha");
+                                return item;
+                            }
+                        } else {
+                            const detail = poDetails.find(d => d.po_detail_id === value);
+                            if (detail) {
+                                updated.product_variant_id = detail.product_variant_id;
+                                updated.ordered_quantity = detail.ordered_quantity;
+                            }
                         }
                     }
 
@@ -184,7 +274,31 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                 if (item.rejected_quantity < 0) {
                     newErrors[`item_${index}_rejected`] = 'Số lượng từ chối không thể âm';
                 }
-                if (item.received_quantity > 0 && item.accepted_quantity + item.rejected_quantity !== item.received_quantity) {
+
+                if (parentReceiptDetails) {
+                    const parentItem = parentReceiptDetails.items.find(
+                        pi => pi.po_detail_id === item.po_detail_id
+                    );
+
+                    if (parentItem) {
+                        const maxAcceptable = parentItem.rejected_quantity;
+
+                        if (item.accepted_quantity > maxAcceptable) {
+                            newErrors[`item_${index}_accepted`] =
+                                `Số lượng chấp nhận không được vượt quá ${maxAcceptable} (số lượng từ chối của GR cha)`;
+                        }
+
+                        if (item.ordered_quantity !== maxAcceptable) {
+                            newErrors[`item_${index}_ordered`] =
+                                `Số lượng đặt phải bằng ${maxAcceptable} (từ GR cha)`;
+                        }
+                    }
+                }
+
+                if (
+                    item.received_quantity > 0 &&
+                    (Number(item.accepted_quantity) + Number(item.rejected_quantity)) !== Number(item.received_quantity)
+                ) {
                     newErrors[`item_${index}_total`] = 'Tổng chấp nhận + từ chối phải bằng số lượng nhận';
                 }
                 if (item.rejected_quantity > 0 && !item.rejection_reason) {
@@ -228,11 +342,11 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
             const response = await postDataApi('/admin/goods-receipt', submitData);
 
             if (response.success) {
-                context.openAlertBox("success", response.message);
+                openAlertBox?.("success", response.message);
                 onSuccess?.();
                 handleClose();
             } else {
-                context.openAlertBox("error", response?.data?.detail.message);
+                openAlertBox?.("error", response?.data?.detail.message);
             }
         } catch (error) {
             console.error('Error creating goods receipt:', error);
@@ -294,7 +408,7 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                 >
                                     <option value="">Chọn đơn đặt hàng</option>
                                     {purchaseOrders.map(po => (
-                                        <option key={po.id} value={po.id}>{po.number}</option>
+                                        <option key={po.id} value={po.id}>{po.po_number}</option>
                                     ))}
                                 </select>
                                 {errors.purchase_order_id && <p className="mt-1 text-sm text-red-500">{errors.purchase_order_id}</p>}
@@ -356,15 +470,22 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Nhập kho lần (nếu có)
+                                    Chọn GR cha (nếu có)
                                 </label>
-                                <input
-                                    type="text"
+                                <select
                                     value={formData.parent_receipt_id}
                                     onChange={(e) => setFormData({ ...formData, parent_receipt_id: e.target.value })}
-                                    placeholder="ID GR cha (GR1, GR2...)"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                >
+                                    <option value="">
+                                        {parentReceipts.length === 0
+                                            ? 'Không có GR cha khả dụng'
+                                            : 'Chọn GR cha (tùy chọn)'}
+                                    </option>
+                                    {parentReceipts.map(gr => (
+                                        <option key={gr.id} value={gr.id}>{gr.receipt_number}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
@@ -425,14 +546,50 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`item_${index}_po`] ? 'border-red-500' : 'border-gray-300'}`}
                                                 >
                                                     <option value="">Chọn sản phẩm từ PO</option>
-                                                    {poDetails.map(detail => (
-                                                        <option key={detail.po_detail_id} value={detail.po_detail_id}>
-                                                            {detail.product_name} - {detail.variant_name} (Đặt: {detail.ordered_quantity})
-                                                        </option>
-                                                    ))}
+                                                    {poDetails
+                                                        .filter(detail => {
+                                                            if (parentReceiptDetails) {
+                                                                const parentItem = parentReceiptDetails.items.find(
+                                                                    pi => pi.po_detail_id === detail.po_detail_id
+                                                                );
+                                                                return parentItem && parentItem.rejected_quantity > 0;
+                                                            }
+                                                            return true;
+                                                        })
+                                                        .map(detail => {
+                                                            let displayQty = detail.ordered_quantity;
+                                                            if (parentReceiptDetails) {
+                                                                const parentItem = parentReceiptDetails.items.find(
+                                                                    pi => pi.po_detail_id === detail.po_detail_id
+                                                                );
+                                                                if (parentItem) {
+                                                                    displayQty = parentItem.rejected_quantity;
+                                                                }
+                                                            }
+
+                                                            return (
+                                                                <option key={detail.po_detail_id} value={detail.po_detail_id}>
+                                                                    {detail.product_name} - {detail.variant_name}
+                                                                    {parentReceiptDetails
+                                                                        ? ` (Từ chối từ GR cha: ${displayQty})`
+                                                                        : ` (Đặt: ${displayQty})`
+                                                                    }
+                                                                </option>
+                                                            );
+                                                        })
+                                                    }
                                                 </select>
                                                 {errors[`item_${index}_po`] && <p className="mt-1 text-sm text-red-500">{errors[`item_${index}_po`]}</p>}
                                             </div>
+
+                                            {formData.parent_receipt_id && (
+                                                <div className="md:col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                                    <p className="text-sm text-blue-800">
+                                                        <strong>💡 Lưu ý:</strong> Bạn đang tạo GR con. Số lượng đặt được tính từ số lượng từ chối của GR cha.
+                                                        Số lượng chấp nhận không được vượt quá số lượng từ chối của GR cha.
+                                                    </p>
+                                                </div>
+                                            )}
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">

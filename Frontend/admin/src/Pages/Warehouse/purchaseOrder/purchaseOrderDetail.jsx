@@ -24,7 +24,7 @@ const StatusBadge = ({ status }) => {
         sent: { label: 'Đã gửi', color: 'bg-blue-100 text-blue-700' },
         confirmed: { label: 'Đã xác nhận', color: 'bg-yellow-100 text-yellow-700' },
         completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
-        cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' }
+        partial_received: { label: 'Đã nhận một phần', color: 'bg-orange-100 text-orange-700' }
     };
 
     const config = statusConfig[status] || statusConfig.draft;
@@ -183,10 +183,11 @@ const PurchaseOrderDetailModal = ({ poId, onClose }) => {
 
     if (!poDetail) return null;
 
+    console.log(poDetail);
     const orderDate = formatDate(poDetail.order_date);
     const expectedDate = formatDate(poDetail.expected_delivery_date);
     const createdAt = formatDate(poDetail.created_at);
-    const approvedAt = formatDate(poDetail.approved_at);
+    const confirmedAt = formatDate(poDetail.confirmed_at);
 
     return (
         <div
@@ -382,8 +383,8 @@ const PurchaseOrderDetailModal = ({ poId, onClose }) => {
                             <div className="space-y-2">
                                 <label className="text-sm text-gray-600">Người duyệt</label>
                                 <p className="font-medium">{poDetail.approved_by_name}</p>
-                                <p className={`text-xs ${!approvedAt ? 'text-red-500' : 'text-gray-500'}`}>
-                                    {approvedAt || 'Chưa thống nhất với nhà cung cấp'}
+                                <p className={`text-xs ${!confirmedAt ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {confirmedAt || 'Chưa thống nhất với nhà cung cấp'}
                                 </p>
                             </div>
                         )}

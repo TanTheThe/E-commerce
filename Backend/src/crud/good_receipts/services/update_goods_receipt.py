@@ -17,7 +17,7 @@ class UpdateGoodsReceiptService:
         gr = await utils_gr_service.validate_draft_status(session, goods_receipt_id)
 
         if "receipt_date" in update_data:
-            gr.receipt_date = update_data["receipt_date"]
+            gr.receipt_date = update_data["receipt_date"].replace(tzinfo=None)
 
         if "delivery_note_number" in update_data:
             gr.delivery_note_number = update_data["delivery_note_number"]
@@ -50,7 +50,7 @@ class UpdateGoodsReceiptService:
             "id": str(gr.id),
             "receipt_number": gr.receipt_number,
             "total_received_amount": gr.total_received_amount,
-            "updated_at": gr.updated_at
+            "updated_at": str(gr.updated_at)
         }
 
     async def update_receipt_details(self, session: AsyncSession, gr: GoodsReceipt,

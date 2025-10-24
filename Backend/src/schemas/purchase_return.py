@@ -19,12 +19,6 @@ class CreatePurchaseReturnRequest(BaseModel):
     return_reason: str
     return_type: str = Field(default="exchange")
     notes: Optional[str] = None
-
-
-class CompletePurchaseReturnRequest(BaseModel):
-    shipped_date: Optional[datetime] = None
-    refund_amount: Optional[int] = None
-    notes: Optional[str] = None
     
 class SortBy(str, Enum):
     return_date_asc = "return_date_asc"

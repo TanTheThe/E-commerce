@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import selectinload
 from sqlmodel import desc
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -13,7 +13,7 @@ user_repository = UserRepository()
 
 class GetPurchaseOrdersService:
     async def get_purchase_orders(self, session: AsyncSession,
-                                  status: Optional[str] = None,
+                                  status_list: Optional[List[str]] = None,
                                   supplier_id: Optional[str] = None,
                                   warehouse_id: Optional[str] = None,
                                   payment_status: Optional[str] = None,
@@ -22,8 +22,8 @@ class GetPurchaseOrdersService:
                                   skip: int = 0, limit: int = 10):
         conditions = []
 
-        if status:
-            conditions.append(PurchaseOrder.status == status)
+        if status_list:
+            conditions.append(PurchaseOrder.status.in_(status_list))
 
         if supplier_id:
             conditions.append(PurchaseOrder.supplier_id == supplier_id)

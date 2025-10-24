@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle, AlertTriangle, Package, TrendingUp, FileText } from 'lucide-react';
+import { getDataApi } from '../../../utils/api';
 
 const StatusBadge = ({ status, isPreview = false }) => {
     const statusConfig = {
-        pending: { label: 'Chờ duyệt', color: 'bg-yellow-100 text-yellow-700' },
-        approved: { label: 'Đã duyệt', color: 'bg-blue-100 text-blue-700' },
+        pending: { label: 'Chờ xử lý', color: 'bg-yellow-100 text-yellow-700' },
+        approved: { label: 'Đã chấp nhận', color: 'bg-blue-100 text-blue-700' },
         completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
-        has_issue: { label: 'Đang có vấn đề', color: 'bg-orange-100 text-orange-700' },
-        cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' }
+        cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' },
+        has_issue: { label: 'Có vấn đề', color: 'bg-orange-100 text-orange-700' },
+        partial_received: { label: 'Nhận một nữa', color: 'bg-orange-100 text-orange-700' }
     };
 
     const config = statusConfig[status] || { label: status, color: 'bg-gray-100 text-gray-700' };
@@ -57,8 +59,8 @@ const VariantComparisonCard = ({ variant }) => {
                     </span>
                 </div>
                 <span className={`text-xs font-medium px-2 py-1 rounded ${percentage === 100 ? 'bg-green-200 text-green-800' :
-                        percentage >= 50 ? 'bg-orange-200 text-orange-800' :
-                            'bg-red-200 text-red-800'
+                    percentage >= 50 ? 'bg-orange-200 text-orange-800' :
+                        'bg-red-200 text-red-800'
                     }`}>
                     {percentage}%
                 </span>
@@ -100,72 +102,14 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Mock getDataApi - replace with your actual API call
-    const getDataApi = async (url) => {
-        // Simulated API response for demo
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    success: true,
-                    data: {
-                        goods_receipt: {
-                            id: "gr-001",
-                            receipt_number: "GR-2025-001",
-                            current_status: "inspected",
-                            predicted_status: "has_issue",
-                            warehouse: {
-                                id: "wh-001",
-                                name: "Kho trung tâm"
-                            }
-                        },
-                        purchase_order: {
-                            id: "po-001",
-                            po_number: "PO-2025-001",
-                            current_status: "confirmed",
-                            predicted_status: "partial_received"
-                        },
-                        summary: {
-                            all_completed: false,
-                            will_update_stock: false,
-                            total_variants: 3,
-                            message: "Nếu duyệt phiếu này, phiếu sẽ có trạng thái 'có vấn đề' và cần tạo phiếu hoàn trả"
-                        },
-                        variant_details: [
-                            {
-                                variant_id: "var-001",
-                                po_detail_id: "pod-001",
-                                ordered: 100,
-                                total_accepted: 95,
-                                is_complete: false
-                            },
-                            {
-                                variant_id: "var-002",
-                                po_detail_id: "pod-002",
-                                ordered: 50,
-                                total_accepted: 50,
-                                is_complete: true
-                            },
-                            {
-                                variant_id: "var-003",
-                                po_detail_id: "pod-003",
-                                ordered: 75,
-                                total_accepted: 60,
-                                is_complete: false
-                            }
-                        ]
-                    }
-                });
-            }, 500);
-        });
-    };
-
     useEffect(() => {
+        if (!grId) return;
+
         const fetchPreview = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                const response = await getDataApi(`/admin/goods-receipts/${grId}/approval-preview`);
-                console.log(response);
+                const response = await getDataApi(`/admin/goods-receipt/${grId}/approval-preview`);
                 if (response.success) {
                     setPreviewData(response.data);
                 } else {
@@ -184,8 +128,15 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
 
     if (isLoading) {
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 w-full max-w-4xl">
+            <div
+                className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50"
+                onClick={onClose}
+                style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
+            >
+                <div
+                    className="bg-white rounded-lg p-8 w-full max-w-5xl max-h-[90vh] overflow-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="animate-pulse space-y-4">
                         <div className="h-8 bg-gray-200 rounded w-1/3"></div>
                         <div className="h-4 bg-gray-200 rounded w-2/3"></div>
@@ -200,10 +151,14 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
     if (error) {
         return (
             <div
-                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+                className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50"
                 onClick={onClose}
+                style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
             >
-                <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <div
+                    className="bg-white rounded-lg p-6 w-full max-w-md"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="flex items-center gap-3 mb-4">
                         <AlertTriangle className="w-8 h-8 text-red-500" />
                         <h3 className="text-lg font-semibold text-gray-900">Lỗi</h3>
@@ -228,14 +183,14 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
 
     return (
         <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 p-4"
             onClick={onClose}
+            style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
         >
             <div
-                className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-auto"
+                className="bg-white rounded-lg w-full max-w-5xl max-h-[85vh] overflow-auto"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-start z-10">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">
@@ -252,8 +207,8 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
 
                 <div className="p-6 space-y-6">
                     <div className={`rounded-lg p-4 flex items-start gap-3 ${summary.all_completed
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-orange-50 border border-orange-200'
+                        ? 'bg-green-50 border border-green-200'
+                        : 'bg-orange-50 border border-orange-200'
                         }`}>
                         {summary.all_completed ? (
                             <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
@@ -334,9 +289,13 @@ const ApprovalPreviewModal = ({ grId, onClose }) => {
                             Chi tiết từng biến thể ({variant_details.length})
                         </h3>
                         <div className="space-y-3">
-                            {variant_details.map((variant, index) => (
-                                <VariantComparisonCard key={variant.variant_id || index} variant={variant} />
-                            ))}
+                            {variant_details && variant_details.length > 0 ? (
+                                variant_details.map((variant, index) => (
+                                    <VariantComparisonCard key={variant.variant_id || index} variant={variant} />
+                                ))
+                            ) : (
+                                <p className="text-center text-gray-500 py-4">Không có biến thể nào</p>
+                            )}
                         </div>
                     </div>
 

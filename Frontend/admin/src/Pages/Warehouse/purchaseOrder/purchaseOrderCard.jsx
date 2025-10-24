@@ -27,7 +27,7 @@ const StatusBadge = ({ status }) => {
         sent: { label: 'Đã gửi', color: 'bg-blue-100 text-blue-700' },
         confirmed: { label: 'Đã xác nhận', color: 'bg-yellow-100 text-yellow-700' },
         completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-700' },
-        cancelled: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' }
+        partial_received: { label: 'Đã nhận một phần', color: 'bg-orange-100 text-orange-700' }
     };
 
     const config = statusConfig[status] || statusConfig.draft;

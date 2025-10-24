@@ -111,6 +111,7 @@ class GetPurchaseReturnsService:
                 "approved_by": str(pr.approved_by) if pr.approved_by else None,
                 "approved_at": pr.approved_at.isoformat() if pr.approved_at else None,
                 "completed_at": pr.completed_at.isoformat() if pr.completed_at else None,
+                "confirmed_at": pr.confirmed_at.isoformat() if pr.confirmed_at else None,
                 "created_at": pr.created_at.isoformat()
             })
 

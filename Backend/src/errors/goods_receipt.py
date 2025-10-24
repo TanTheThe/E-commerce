@@ -152,3 +152,73 @@ class GoodsReceiptException:
             },
         )
 
+    @staticmethod
+    def circular_gr_error():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Phát hiện lỗi khi gán GR cha cho GR này",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def return_quantity_greater_than_remaining_qty():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng hoàn vượt quá số lỗi cho phép",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def total_returned_greater_than_accepted_quantity():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Tổng số lượng trả vượt quá số lượng accepted",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def total_returned_greater_than_rejected_quantity():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Tổng số lượng trả vượt quá số lượng rejected",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def po_detail_not_exist_in_parent_receipt():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"PO Detail không tồn tại trong parent receipt",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def ordered_quantity_must_equal_expected_qty(expected_qty):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"ordered_quantity phải bằng {expected_qty}",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def accept_greater_than_reject_parent():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"accepted_quantity không được vượt quá rejected_quantity của parent",
+                "error_code": "gr_001",
+            },
+        )
+

@@ -1,22 +1,9 @@
 from datetime import datetime
 from typing import Dict, Any, List
-
-from sqlalchemy.orm import selectinload
-from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.purchase_return.services.utils_service import UtilsPRService
-from src.crud.supplier.repositories import SupplierRepository
-from src.crud.user.repositories import UserRepository
-from src.crud.warehouse.repositories import WareHouseRepository
-from src.database.models import PurchaseOrder, PurchaseOrderDetail, Product_Variant, Supplier, Warehouse, \
-    PurchaseReturn, PurchaseReturnDetail
-from src.errors.product import ProductException
-from src.errors.purchase_order import PurchaseOrderException
-from src.errors.supplier import SupplierException
-from src.errors.warehouse import WareHouseException
-from src.schemas.purchase_order import UpdatePurchaseOrderRequest
+from src.database.models import PurchaseReturn, PurchaseReturnDetail
+
 
 utils_pr_service = UtilsPRService()
 
@@ -51,7 +38,6 @@ class UpdatePurchaseReturnService:
 
         total_return_amount = sum(d.total_cost for d in pr.return_details)
         pr.total_return_amount = total_return_amount
-
         pr.updated_at = datetime.now()
 
         await session.commit()
@@ -62,7 +48,7 @@ class UpdatePurchaseReturnService:
             "return_number": pr.return_number,
             "total_return_amount": pr.total_return_amount,
             "refund_amount": pr.refund_amount,
-            "updated_at": pr.updated_at
+            "updated_at": str(pr.updated_at)
         }
 
     async def update_return_details(self, session: AsyncSession, pr: PurchaseReturn, details_data: List[Dict[str, Any]]):
@@ -71,6 +57,7 @@ class UpdatePurchaseReturnService:
 
         for detail_data in details_data:
             detail_id = detail_data.get("id")
+            gr_detail_id = detail_data.get("goods_receipt_detail_id")
 
             return_qty = detail_data["return_quantity"]
             unit_cost = detail_data["unit_cost"]
@@ -78,10 +65,11 @@ class UpdatePurchaseReturnService:
 
             if detail_id and detail_id in existing_detail_ids:
                 detail = next(d for d in pr.return_details if str(d.id) == detail_id)
+
                 detail.product_variant_id = detail_data["product_variant_id"]
-                detail.goods_receipt_detail_id = detail_data.get("goods_receipt_detail_id")
-                detail.return_quantity = detail_data["return_quantity"]
-                detail.unit_cost = detail_data["unit_cost"]
+                detail.goods_receipt_detail_id = gr_detail_id
+                detail.return_quantity = return_qty
+                detail.unit_cost = unit_cost
                 detail.total_cost = total_cost
                 detail.condition = detail_data.get("condition")
                 detail.rejection_evidence = detail_data.get("rejection_evidence")
@@ -92,9 +80,9 @@ class UpdatePurchaseReturnService:
                 new_detail = PurchaseReturnDetail(
                     purchase_return_id=pr.id,
                     product_variant_id=detail_data["product_variant_id"],
-                    goods_receipt_detail_id=detail_data.get("goods_receipt_detail_id"),
-                    return_quantity=detail_data["return_quantity"],
-                    unit_cost=detail_data["unit_cost"],
+                    goods_receipt_detail_id=gr_detail_id,
+                    return_quantity=return_qty,
+                    unit_cost=unit_cost,
                     total_cost=total_cost,
                     condition=detail_data.get("condition"),
                     rejection_evidence=detail_data.get("rejection_evidence"),
@@ -103,13 +91,13 @@ class UpdatePurchaseReturnService:
                 session.add(new_detail)
                 pr.return_details.append(new_detail)
 
-        # Xóa các details không còn trong danh sách update
         details_to_delete = existing_detail_ids - updated_detail_ids
         if details_to_delete:
-            for detail in pr.return_details[:]:  # Copy list to avoid modification during iteration
+            for detail in pr.return_details[:]:
                 if str(detail.id) in details_to_delete:
                     await session.delete(detail)
                     pr.return_details.remove(detail)
+
 
 
 

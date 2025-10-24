@@ -137,8 +137,7 @@ async def get_goods_receipt_detail(goods_receipt_id: str,
 
 @goods_receipt_admin_router.post("/{goods_receipt_id}/approve", dependencies=[Depends(admin_role_middleware)])
 async def approve_goods_receipt(goods_receipt_id: str,
-                                token_details: dict = Depends(
-                                    access_token_bearer),
+                                token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
 

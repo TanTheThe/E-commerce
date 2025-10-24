@@ -57,7 +57,7 @@ async def create_purchase_order(request: CreatePurchaseOrderRequest,
 
 
 @purchase_orders_admin_router.get("/all")
-async def get_purchase_orders(po_status: Optional[str] = Query(None, description="Lọc theo trạng thái: draft, sent, confirmed, completed, cancelled"),
+async def get_purchase_orders(po_status: Optional[str] = Query(None, description="Lọc theo trạng thái: draft, sent, confirmed, completed, partial_received"),
                              supplier_id: Optional[str] = None,
                              warehouse_id: Optional[str] = None,
                              payment_status: Optional[str] = Query(None, description="Lọc theo trạng thái thanh toán: unpaid, partially_paid, paid"),
@@ -71,7 +71,9 @@ async def get_purchase_orders(po_status: Optional[str] = Query(None, description
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    purchase_orders = await get_purchase_orders_service.get_purchase_orders(session, po_status, supplier_id, warehouse_id,
+    po_status_list = [s.strip() for s in po_status.split(',')] if po_status else None
+
+    purchase_orders = await get_purchase_orders_service.get_purchase_orders(session, po_status_list, supplier_id, warehouse_id,
                                                                            payment_status, from_date, to_date, skip, limit)
 
     return JSONResponse(

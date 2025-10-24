@@ -1315,10 +1315,16 @@ class PurchaseReturn(SQLModel, table=True):
     # Nhân viên duyệt phiếu trả
     approved_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
 
+    # Nhân viên nhận hàng
+    confirmed_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+
+    completed_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+
     notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
 
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    confirmed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     completed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
@@ -1413,6 +1419,9 @@ class GoodsReceiptDetail(SQLModel, table=True):
 
     # Số lượng từ chối nhập (hàng lỗi, hư, sai mẫu...). Thường = received_quantity - accepted_quantity
     rejected_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
+
+    # Số lượng đã hoàn trả (tổng cộng qua các phiếu hoàn)
+    returned_quantity: int = Field(sa_column=Column(pg.INTEGER, nullable=False), default=0)
 
     # Giá nhập trên mỗi đơn vị hàng hóa (theo hóa đơn hoặc PO)
     unit_cost: int = Field(sa_column=Column(pg.INTEGER, nullable=False))

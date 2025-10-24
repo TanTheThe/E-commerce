@@ -20,7 +20,7 @@ class StockUpdateCompletedReceiptService:
                                                   approved_by: str, session: AsyncSession) -> list:
         stock_updates = []
 
-        variant_totals = self.aggregate_variant_quantities(all_related_grs)
+        variant_totals = await self.aggregate_variant_quantities(all_related_grs, session)
 
         variant_ids = list(variant_totals.keys())
         if not variant_ids:
@@ -76,7 +76,7 @@ class StockUpdateCompletedReceiptService:
             Stock.product_variant_id.in_(variant_ids)
         ]
 
-        existing_stocks = await stock_repository.get_all_stocks(
+        existing_stocks, _ = await stock_repository.get_all_stocks(
             session=session,
             where_conditions=condition_stocks,
             for_update=True
@@ -141,7 +141,6 @@ class StockUpdateCompletedReceiptService:
             "status": "available",
             "cost_price": None,
             "last_cost_price": None,
-            "created_at": datetime.now()
         }
         stock = await stock_repository.create_stock(
             session=session, 

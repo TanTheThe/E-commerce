@@ -38,6 +38,7 @@ class SendPurchaseReturnService:
             supplier_email=supplier_email
         )
 
+        pr.status = "sent"
         pr.notes = (pr.notes or "") + \
             f"\n[{datetime.now().strftime('%d/%m/%Y %H:%M')}] Đã gửi email cho NCC: {supplier_email}"
         pr.updated_at = datetime.now()
@@ -48,7 +49,8 @@ class SendPurchaseReturnService:
             "id": str(pr.id),
             "return_number": pr.return_number,
             "supplier_email": supplier_email,
-            "delivery_note_number": pr.delivery_note_number
+            "delivery_note_number": pr.delivery_note_number,
+            "status": pr.status
         }
 
     async def send_pr_email_to_supplier(self, pr: PurchaseReturn, supplier_email: str):

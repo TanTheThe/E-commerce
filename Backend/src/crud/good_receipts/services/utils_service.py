@@ -14,15 +14,12 @@ class UtilsGRService:
 
         condition = [
             GoodsReceipt.purchase_order_id == po_id,
-            or_(
-                GoodsReceipt.id == root_id,
-                GoodsReceipt.parent_receipt_id == root_id
-            )
+            GoodsReceipt.id == root_id
         ]
 
         options = [selectinload(GoodsReceipt.receipt_details)]
 
-        grs = await goods_receipt_repository.get_all_goods_receipt(
+        grs, _ = await goods_receipt_repository.get_all_goods_receipt(
             session=session,
             where_conditions=condition,
             options=options
@@ -33,42 +30,72 @@ class UtilsGRService:
         return all_grs
 
     async def find_root_receipt(self, current_gr: GoodsReceipt, session: AsyncSession):
-        if not current_gr.parent_receipt_id:
-            return str(current_gr.id)
+        visited = set()
+        current = current_gr
 
-        parent = await goods_receipt_repository.get_goods_receipt(
-            session=session,
-            where_conditions=[GoodsReceipt.id == current_gr.parent_receipt_id]
-        )
+        while current and current.parent_receipt_id is not None:
+            parent_id_str = str(current.parent_receipt_id)
 
-        if not parent:
-            return str(current_gr.id)
+            if parent_id_str in visited:
+                GoodsReceiptException.circular_gr_error()
 
-        return await self.find_root_receipt(parent, session)
+            visited.add(parent_id_str)
 
-    async def get_all_descendants_recursively(self, current_grs: list, po_id: str, session: AsyncSession):
+            parent = await goods_receipt_repository.get_goods_receipt(
+                session=session,
+                where_conditions=[GoodsReceipt.id == current.parent_receipt_id],
+            )
+
+            if not parent:
+                return str(current.id)
+
+            current = parent
+
+            if parent.parent_receipt_id is None:
+                return str(parent.id)
+
+            await session.refresh(current)
+
+        return str(current.id)
+
+
+    async def get_all_descendants_recursively(self, current_grs, po_id: str, session: AsyncSession):
         all_grs = list(current_grs)
-        current_ids = [str(gr.id) for gr in current_grs]
 
-        condition = [
-            GoodsReceipt.purchase_order_id == po_id,
-            GoodsReceipt.parent_receipt_id.in_(current_ids)
-        ]
+        visited_ids = set(str(gr.id) for gr in current_grs)
 
-        options = [selectinload(GoodsReceipt.receipt_details)]
+        current_batch = list(current_grs)
 
-        children = await goods_receipt_repository.get_all_goods_receipt(
-            session=session,
-            where_conditions=condition,
-            options=options
-        )
+        while current_batch:
+            current_ids = [str(gr.id) for gr in current_batch]
 
-        if not children:
-            return all_grs
+            condition = [
+                GoodsReceipt.purchase_order_id == po_id,
+                GoodsReceipt.parent_receipt_id.in_(current_ids)
+            ]
 
-        all_grs.extend(children)
+            options = [selectinload(GoodsReceipt.receipt_details)]
 
-        all_grs = await self.get_all_descendants_recursively(children, po_id, session)
+            children, _ = await goods_receipt_repository.get_all_goods_receipt(
+                session=session,
+                where_conditions=condition,
+                options=options
+            )
+
+            if not children:
+                break
+
+            new_children = []
+            for child in children:
+                child_id = str(child.id)
+                if child_id in visited_ids:
+                    GoodsReceiptException.circular_gr_error()
+
+                visited_ids.add(child_id)
+                new_children.append(child)
+
+            all_grs.extend(new_children)
+            current_batch = new_children
 
         return all_grs
 
@@ -139,7 +166,7 @@ class UtilsGRService:
         if not gr:
             GoodsReceiptException.gr_not_found()
 
-        if gr.status != "draft":
+        if gr.status != "pending":
             GoodsReceiptException.only_update_delete_when_draft()
 
         return gr

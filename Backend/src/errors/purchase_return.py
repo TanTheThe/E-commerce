@@ -13,6 +13,16 @@ class PurchaseReturnException:
         )
 
     @staticmethod
+    def no_return_details_found():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chi tiết phiếu hoàn trả không tồn tại",
+                "error_code": "pr_001",
+            },
+        )
+
+    @staticmethod
     def pr_must_be_in_confirmed():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -61,6 +71,16 @@ class PurchaseReturnException:
                 "error_code": "pr_001",
             },
         )
+
+    @staticmethod
+    def only_confirmed_when_sent():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có thể nhận đơn hàng khi trước đó là sent",
+                "error_code": "pr_001",
+            },
+        )
         
     @staticmethod
     def only_send_mail_when_approved():
@@ -83,11 +103,11 @@ class PurchaseReturnException:
         )
 
     @staticmethod
-    def only_complete_when_approved():
+    def only_complete_when_confirmed():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": f"Chỉ có thể hoàn tất phiếu đã được duyệt",
+                "message": f"Chỉ có thể hoàn tất phiếu đang ở trạng thái confirmed",
                 "error_code": "pr_001",
             },
         )

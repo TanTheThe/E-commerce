@@ -1,6 +1,32 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { getDataApi, putDataApi } from '../../../utils/api';
+import { MyContext } from "../../../App";
+
+const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+
+    try {
+        if (typeof dateString === 'string') {
+            const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (match) {
+                return match[0];
+            }
+        }
+
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        return `${year}-${month}-${day}`;
+    } catch (e) {
+        console.error('Error formatting date:', dateString, e);
+        return '';
+    }
+};
 
 const UpdateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, grId }) => {
     const [formData, setFormData] = useState({
@@ -32,7 +58,7 @@ const UpdateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, grId }) => {
                 setOriginalData(gr);
 
                 setFormData({
-                    receipt_date: gr.receipt_date ? new Date(gr.receipt_date).toISOString().split('T')[0] : '',
+                    receipt_date: gr.receipt_date ? formatDateForInput(gr.receipt_date) : '',
                     delivery_note_number: gr.delivery_note_number || '',
                     has_discrepancy: gr.has_discrepancy || false,
                     discrepancy_notes: gr.discrepancy_notes || '',
@@ -124,8 +150,11 @@ const UpdateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, grId }) => {
 
         setIsSubmitting(true);
         try {
+            const [year, month, day] = formData.receipt_date.split('-');
+            const dateObj = new Date(year, parseInt(month) - 1, day);
+
             const submitData = {
-                receipt_date: new Date(formData.receipt_date).toISOString(),
+                receipt_date: dateObj.toISOString(),
                 delivery_note_number: formData.delivery_note_number || null,
                 has_discrepancy: formData.has_discrepancy,
                 discrepancy_notes: formData.discrepancy_notes || null,
@@ -195,7 +224,7 @@ const UpdateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, grId }) => {
             className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 p-4"
             style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
         >
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[85vh] flex flex-col">
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-800">Cập nhật phiếu nhập kho</h2>

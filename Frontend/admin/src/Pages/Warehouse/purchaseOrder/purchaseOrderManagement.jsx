@@ -35,7 +35,7 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
         { key: 'sent', label: 'Đã gửi', status: 'sent' },
         { key: 'confirmed', label: 'Đã xác nhận', status: 'confirmed' },
         { key: 'completed', label: 'Hoàn thành', status: 'completed' },
-        { key: 'cancelled', label: 'Đã hủy', status: 'cancelled' }
+        { key: 'partial_received', label: 'Nhận một phần', status: 'partial_received' }
     ];
 
     const fetchPurchaseOrders = async () => {
@@ -314,6 +314,7 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
                         setPoToUpdateAfterNegotiationId(null);
                         fetchPurchaseOrders();
                     }}
+                    openAlertBox={context.openAlertBox}
                 />
             )}
 
@@ -322,6 +323,7 @@ const PurchaseOrdersManagement = ({ warehouse }) => {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSuccess={fetchPurchaseOrders}
                 warehouseId={warehouse?.id}
+                openAlertBox={context.openAlertBox}
             />
         </div>
     );

@@ -89,6 +89,7 @@ class GetDetailGoodsReceiptService:
                     "received_quantity": detail.received_quantity,
                     "accepted_quantity": detail.accepted_quantity,
                     "rejected_quantity": detail.rejected_quantity,
+                    "returned_quantity": detail.returned_quantity,
                     "unit_cost": detail.unit_cost,
                     "total_cost": detail.total_cost,
                     "rejection_reason": detail.rejection_reason,

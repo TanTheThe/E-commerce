@@ -3,7 +3,7 @@ import { MyContext } from "../../../App";
 import { getDataApi, postDataApi, putDataApi } from "../../../utils/api";
 import { Upload, X } from "lucide-react";
 
-const UpdatePurchaseOrderAfterNegotiationModal = ({ isOpen, onClose, onSuccess, poId }) => {
+const UpdatePurchaseOrderAfterNegotiationModal = ({ isOpen, onClose, onSuccess, poId, openAlertBox }) => {
     const [formData, setFormData] = useState({
         expected_delivery_date: '',
         discount_amount: 0,
@@ -93,7 +93,7 @@ const UpdatePurchaseOrderAfterNegotiationModal = ({ isOpen, onClose, onSuccess, 
             }
         } catch (error) {
             console.error('Error fetching purchase order:', error);
-            context.openAlertBox("error", "Có lỗi xảy ra khi tải thông tin đơn hàng");
+            openAlertBox?.("error", "Có lỗi xảy ra khi tải thông tin đơn hàng");
         } finally {
             setIsLoading(false);
         }
@@ -196,11 +196,11 @@ const UpdatePurchaseOrderAfterNegotiationModal = ({ isOpen, onClose, onSuccess, 
                     ...prev,
                     supplier_invoice_urls: [...prev.supplier_invoice_urls, ...base64Urls]
                 }));
-                context.openAlertBox("success", `Đã thêm ${base64Urls.length} ảnh`);
+                openAlertBox?.("success", `Đã thêm ${base64Urls.length} ảnh`);
             })
             .catch((error) => {
                 console.error('Error reading images:', error);
-                context.openAlertBox("error", "Có lỗi xảy ra khi đọc ảnh");
+                openAlertBox?.("error", "Có lỗi xảy ra khi đọc ảnh");
             })
             .finally(() => {
                 setUploadingImages(false);
@@ -288,16 +288,18 @@ const UpdatePurchaseOrderAfterNegotiationModal = ({ isOpen, onClose, onSuccess, 
 
             const response = await putDataApi(`/admin/purchase-orders/${poId}/after-negotiation`, submitData);
 
+            console.log(response);
+
             if (response.success) {
-                context.openAlertBox("success", response.message || 'Cập nhật đơn hàng sau thương lượng thành công');
+                openAlertBox?.("success", response.message || 'Cập nhật đơn hàng sau thương lượng thành công');
                 onSuccess?.();
                 handleClose();
             } else {
-                context.openAlertBox("error", response?.data?.detail?.message || "Có lỗi xảy ra khi cập nhật đơn");
+                openAlertBox?.("error", response?.data?.detail?.message || "Có lỗi xảy ra khi cập nhật đơn");
             }
         } catch (error) {
             console.error('Error updating purchase order after negotiation:', error);
-            context.openAlertBox("error", "Có lỗi xảy ra khi cập nhật đơn");
+            openAlertBox?.("error", "Có lỗi xảy ra khi cập nhật đơn");
         } finally {
             setIsSubmitting(false);
         }

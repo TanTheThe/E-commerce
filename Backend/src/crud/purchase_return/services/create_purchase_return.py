@@ -1,11 +1,14 @@
 from datetime import datetime
 from typing import Dict, List, Optional
+
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
-from sqlmodel import and_
+from sqlmodel import and_, select
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
+from src.crud.purchase_return.services.utils_service import UtilsPRService
 from src.database.models import GoodsReceipt, Product_Variant, PurchaseReturn, PurchaseReturnDetail
 from src.errors.goods_receipt import GoodsReceiptException
 from src.errors.purchase_return import PurchaseReturnException
@@ -13,6 +16,7 @@ from src.errors.purchase_return import PurchaseReturnException
 goods_receipt_repository = GoodsReceiptRepository()
 purchase_return_repository = PurchaseReturnRepository()
 product_variant_repository = ProductVariantRepository()
+utils_pr_service = UtilsPRService()
 
 
 class CreatePurchaseReturnService:
@@ -20,13 +24,10 @@ class CreatePurchaseReturnService:
                                                return_reason: str, return_type: str = "exchange", created_by: str = None,
                                                notes: Optional[str] = None):
         gr = await self.validate_and_get_gr(session, goods_receipt_id)
-
         validated_items = await self.validate_return_items(session, gr, return_items)
 
         return_number = await purchase_return_repository.generate_return_number(session)
-
-        total_return_amount = sum(item['total_cost']
-                                  for item in validated_items)
+        total_return_amount = sum(item['total_cost'] for item in validated_items)
 
         pr_data = {
             "return_number": return_number,
@@ -41,13 +42,11 @@ class CreatePurchaseReturnService:
             "refund_amount": 0,
             "return_reason": return_reason,
             "created_by": created_by,
-            "notes": notes
+            "notes": notes,
+            "created_at": datetime.now(),
         }
 
-        pr = await purchase_return_repository.create_purchase_return(
-            session=session,
-            pr_data=pr_data
-        )
+        pr = await purchase_return_repository.create_purchase_return(session=session, pr_data=pr_data)
 
         pr_details = []
         for item in validated_items:
@@ -61,7 +60,8 @@ class CreatePurchaseReturnService:
                 "condition": item['condition'],
                 "rejection_evidence": item.get('rejection_evidence'),
                 "product_snapshot": item['product_snapshot'],
-                "notes": item.get('notes')
+                "notes": item.get('notes'),
+                "created_at": datetime.now(),
             }
 
             detail = await purchase_return_repository.create_purchase_return_detail(
@@ -141,16 +141,16 @@ class CreatePurchaseReturnService:
             if return_quantity <= 0:
                 PurchaseReturnException.return_quantity_must_greater_than_0()
 
-            already_returned = await self.get_already_returned_quantity(session, gr_detail_id)
+            already_returned = await utils_pr_service.get_already_returned_quantity(session, gr_detail_id, include_draft=True)
 
             max_returnable = gr_detail.accepted_quantity - already_returned
 
             if return_quantity > max_returnable:
                 PurchaseReturnException.return_quantity_greater_than_max_returnable()
 
-            condition_variant = and_(
-                Product_Variant.id == gr_detail.product_variant_id)
-            variant = await product_variant_repository.get_product_variant(condition_variant, session)
+            condition_variant = and_(Product_Variant.id == gr_detail.product_variant_id)
+            options = [selectinload(Product_Variant.product), selectinload(Product_Variant.color)]
+            variant = await product_variant_repository.get_product_variant(condition_variant, session, options)
 
             validated_items.append({
                 "gr_detail_id": gr_detail_id,
@@ -162,36 +162,25 @@ class CreatePurchaseReturnService:
                 "rejection_evidence": item.get('rejection_evidence'),
                 "notes": item.get('notes'),
                 "product_snapshot": {
+                    "product_id": str(variant.product.id) if variant and variant.product else None,
+                    "variant_id": str(variant.id),
                     "sku": variant.sku if variant else None,
-                    "name": variant.name if variant else None,
-                    "unit_cost": gr_detail.unit_cost
+                    "name": variant.product.name if variant and variant.product else None,
+                    "unit_cost": gr_detail.unit_cost,
+                    "size": variant.size,
+                    "color_name": variant.color_name if variant.color_name else variant.color.name,
+                    "variant_image": variant.image
                 }
             })
 
         return validated_items
 
-    async def get_already_returned_quantity(self, session: AsyncSession, gr_detail_id: str):
-        joins = [
-            (
-                PurchaseReturn,
-                {
-                    'on': PurchaseReturnDetail.purchase_return_id == PurchaseReturn.id,
-                    'type': 'inner'
-                }
-            )
-        ]
 
-        condition = [
-            PurchaseReturnDetail.goods_receipt_detail_id == gr_detail_id,
-            PurchaseReturn.status.in_(['approved', 'completed'])
-        ]
 
-        details, _ = await purchase_return_repository.get_all_return_details(
-            session=session,
-            joins=joins,
-            where_conditions=condition,
-            skip=0,
-            limit=999999
-        )
 
-        return sum(d.return_quantity for d in details)
+
+
+
+
+
+
