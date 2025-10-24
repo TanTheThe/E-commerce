@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import ColumnElement
 from src.database.models import Product, Order_Detail, Order
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -22,6 +22,22 @@ class OrderDetailRepository:
 
         session.add_all(new_order_details)
         await session.flush()
+
+    async def get_all_order_detail(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
+                                   skip: int = 0, limit: int = 10, joins: list = None):
+        count_stmt = select(func.count(Order_Detail.id)).where(*conditions)
+        total_result = await session.exec(count_stmt)
+        total = total_result.one()
+
+        statement = select(Order_Detail).where(*conditions).options(
+            *joins if joins else []
+        ).offset(skip).limit(limit)
+
+        result = await session.exec(statement)
+
+        colors = result.all()
+
+        return colors, total
 
     async def get_order_detail(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession,
                                joins: list = None):

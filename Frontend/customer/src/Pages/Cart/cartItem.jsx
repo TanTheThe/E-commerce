@@ -5,31 +5,7 @@ import { MdOutlineDeleteOutline } from 'react-icons/md';
 const CartItems = () => {
     const {
         checkoutItems,
-        updateCheckoutItemQuantity,
-        removeCheckoutItem
     } = useContext(MyContext);
-
-    const QuantityControls = ({ item }) => {
-        return (
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => updateCheckoutItemQuantity(item.cart_item_id, item.quantity - 1)}
-                    disabled={item.quantity <= 1}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    -
-                </button>
-                <span className="mx-2 min-w-[30px] text-center">{item.quantity}</span>
-                <button
-                    onClick={() => updateCheckoutItemQuantity(item.cart_item_id, item.quantity + 1)}
-                    disabled={item.quantity >= item.max_quantity}
-                    className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded text-sm hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    +
-                </button>
-            </div>
-        );
-    };
 
     if (!checkoutItems || checkoutItems.length === 0) {
         return (
@@ -55,7 +31,7 @@ const CartItems = () => {
                         />
                     </div>
 
-                    <div className='info w-[75%] pr-5 relative'>
+                    <div className='info w-[75%] pr-5'>
                         <h4 className="text-[14px] font-[600] text-gray-800 mb-1">
                             {item.product_name}
                         </h4>
@@ -68,7 +44,7 @@ const CartItems = () => {
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-[12px] text-gray-500">Số lượng:</span>
-                                <QuantityControls item={item} />
+                                <span className="mx-2 min-w-[30px] text-center font-semibold">{item.quantity}</span>
                             </div>
                             <div className="text-right">
                                 <div className="text-[14px] text-[#ff5252] font-bold">
@@ -79,11 +55,6 @@ const CartItems = () => {
                                 </div>
                             </div>
                         </div>
-
-                        <MdOutlineDeleteOutline
-                            className="absolute top-[5px] right-[5px] cursor-pointer text-[18px] link transition-all hover:text-red-500"
-                            onClick={() => removeCheckoutItem(item.cart_item_id)}
-                        />
                     </div>
                 </div>
             ))}

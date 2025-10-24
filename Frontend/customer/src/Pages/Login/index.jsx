@@ -60,8 +60,6 @@ const Login = () => {
         const response = await postDataApi("/customer/auth/login", formFields);
 
         if (response?.success === true) {
-
-            localStorage.setItem("userEmail", formFields.email)
             localStorage.setItem("accesstoken", response?.data?.access_token)
             localStorage.setItem("refreshtoken", response?.data?.refresh_token)
 

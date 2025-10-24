@@ -1,14 +1,13 @@
 from datetime import datetime
-from typing import Optional
-from sqlalchemy.orm import noload
+from typing import Any, Dict, Optional, List
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
 from src.database.models import User
 from src.crud.authentication.utils import generate_password_hash
-from sqlmodel import select, desc, update, func, or_, distinct
+from sqlmodel import select, update, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
-from src.schemas.user import UserDeleteModel, FilterUserInputModel
+from src.schemas.user import UserCreateModel, UserDeleteModel, UserRole
 
 
 class UserRepository:
@@ -28,15 +27,31 @@ class UserRepository:
         return result.first()
 
 
-    async def get_all_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, order_by: list = None, skip: int = 0, limit: int = 10,
-                           joins: list = None):
-        count_stmt = select(func.count(User.id)).select_from(User).where(conditions)
+    async def get_all_users(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
+                            skip: int = 0, limit: int = 10, order_by: list = None, joins: list = None,
+                            options: list = None):
+        count_stmt = select(func.count(User.id))
+        if joins:
+            for join_table, join_condition in joins:
+                count_stmt = count_stmt.outerjoin(join_table, join_condition)
+
+        if conditions:
+            count_stmt = count_stmt.where(*conditions)
+
         total_result = await session.exec(count_stmt)
         total = total_result.one()
 
-        statement = select(User).options(
-            *joins if joins else []
-        ).where(conditions)
+        statement = select(User)
+
+        if joins:
+            for join_table, join_condition in joins:
+                statement = statement.outerjoin(join_table, join_condition)
+
+        if conditions:
+            statement = statement.where(*conditions)
+
+        if options:
+            statement = statement.options(*options)
 
         if order_by:
             statement = statement.order_by(*order_by, User.id)
@@ -44,6 +59,7 @@ class UserRepository:
             statement = statement.order_by(User.id)
 
         statement = statement.offset(skip).limit(limit)
+
         result = await session.exec(statement)
         users = result.all()
 
@@ -57,21 +73,43 @@ class UserRepository:
         data_need_update.updated_at = datetime.now()
 
         return data_need_update
+    
+    
+    async def update_user_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
+        stmt = (
+            update(User)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)
 
 
-    async def create_user(self, user_data, session: AsyncSession):
+    async def create_user(self, user_data: UserCreateModel, role: UserRole, session: AsyncSession):
         user_data_dict = user_data.model_dump()
         user_data_dict['password'] = generate_password_hash(user_data_dict['password'])
+        
+        if role == UserRole.CUSTOMER:
+            user_data_dict['is_customer'] = True
+            user_data_dict['customer_status'] = "active"
+        elif role == UserRole.STAFF:
+            user_data_dict['is_staff'] = True
+            user_data_dict['staff_status'] = "active"
 
-        new_user = User(
-            **user_data_dict,
-            customer_status="active",
-            created_at=datetime.now()
-        )
-        session.add(new_user)
-        await session.commit()
+        current_time = datetime.now()
+        user_data_dict['created_at'] = current_time
+        user_data_dict['updated_at'] = current_time
+        
+        try:
+            new_user = User(**user_data_dict)
+            session.add(new_user)
+            await session.commit()
+            await session.refresh(new_user)  
+            
+            return new_user
+        except Exception as e:
+            await session.rollback()
+            raise e
 
-        return new_user
 
     async def delete_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         user_to_delete = await self.get_user(condition, session)
@@ -89,6 +127,7 @@ class UserRepository:
 
         return str(user_to_delete.id)
 
+
     async def delete_multiple_user(self, data: UserDeleteModel, session: AsyncSession):
         condition = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None))
         users = await self.get_all_user(condition, session, None, 0, 1000)
@@ -105,7 +144,8 @@ class UserRepository:
 
         return data.user_ids
 
-    async def change_status_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
+
+    async def change_status_user(self, condition: Optional[ColumnElement[bool]], role: UserRole, session: AsyncSession):
         user_to_block = await self.get_user(condition, session)
 
         if user_to_block is None:
@@ -116,14 +156,29 @@ class UserRepository:
                     "error_code": "product_006",
                 },
             )
-        if user_to_block.customer_status == "active":
-            user_to_block.customer_status = "inactive"
-        else:
-            user_to_block.customer_status = "active"
+
+        status_key = ""
+        new_status = ""
+
+        if role == UserRole.CUSTOMER:
+            if user_to_block.customer_status == "active":
+                user_to_block.customer_status = "inactive"
+            else:
+                user_to_block.customer_status = "active"
+            new_status = user_to_block.customer_status
+            status_key = "customer_status"
+
+        elif role == UserRole.STAFF:
+            if user_to_block.staff_status == "active":
+                user_to_block.staff_status = "inactive"
+            else:
+                user_to_block.staff_status = "active"
+            new_status = user_to_block.staff_status
+            status_key = "staff_status"
 
         await session.commit()
 
         return {
             "id": str(user_to_block.id),
-            "new_status": user_to_block.customer_status
+            status_key: new_status
         }

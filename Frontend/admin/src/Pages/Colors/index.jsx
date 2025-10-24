@@ -62,7 +62,7 @@ const Colors = () => {
                 setColors(response.data.data || []);
                 setTotalColors(response.data.total || 0);
             } else {
-                context.openAlertBox("error", response.message);
+                context.openAlertBox("error", response.data.detail.message);
             }
         } catch (error) {
             console.error('Error fetching colors:', error);

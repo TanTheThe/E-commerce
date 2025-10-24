@@ -1,12 +1,13 @@
 import { Rating } from "@mui/material";
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import Button from "@mui/material/Button"
 import QtyBox from "../../components/QtyBox";
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { FaRegHeart } from "react-icons/fa";
 import { IoGitCompareOutline } from "react-icons/io5";
-import { postDataApi } from "../../utils/api";
+import { getDataApi, postDataApi } from "../../utils/api";
 import toast from "react-hot-toast";
+import { MyContext } from "../../App";
 
 const ProductDetailsComponent = ({ product, onProductUpdated }) => {
     const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
@@ -15,6 +16,8 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
     const [quantity, setQuantity] = useState(1);
     const [isAddingToCart, setIsAddingToCart] = useState(false);
     const [animatingImage, setAnimatingImage] = useState(null);
+
+    const context = useContext(MyContext)
 
     if (!product) {
         return (
@@ -162,44 +165,129 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
         }
     };
 
-    const getAvailableOptions = () => {
-        if (selectedSize && !selectedColor) {
-            return {
-                availableSizes,
-                availableColors: availableColors.filter(color => {
-                    return product.product_variant.some(v => {
-                        if (color.id === null) {
-                            return v.size === selectedSize && v.color_name === color.name && !v.color_id;
-                        } else {
-                            return v.size === selectedSize && v.color_id === color.id;
-                        }
-                    });
-                })
-            };
-        }
+    const sortSizes = (sizes) => {
+        if (!sizes || !Array.isArray(sizes)) return [];
 
-        if (selectedColor && !selectedSize) {
-            return {
-                availableSizes: [...new Set(product.product_variant
-                    ?.filter(v => {
-                        let colorMatch = false;
-                        if (selectedColor.startsWith('custom_')) {
-                            const colorName = selectedColor.replace('custom_', '');
-                            colorMatch = v.color_name === colorName && !v.color_id;
-                        } else {
-                            colorMatch = v.color_id === selectedColor;
-                        }
-                        return colorMatch && v.size;
-                    })
-                    .map(v => v.size))] || [],
-                availableColors
-            };
-        }
+        const sizeOrder = {
+            'XXS': 1, 'XS': 2, 'S': 3, 'M': 4, 'L': 5, 'XL': 6, 'XXL': 7, 'XXXL': 8,
+            'xs': 2, 's': 3, 'm': 4, 'l': 5, 'xl': 6, 'xxl': 7
+        };
 
-        return { availableSizes, availableColors };
+        return [...sizes].sort((a, b) => {
+            const sizeA = a?.toString().trim();
+            const sizeB = b?.toString().trim();
+
+            if (!sizeA && !sizeB) return 0;
+            if (!sizeA) return 1;
+            if (!sizeB) return -1;
+
+            const numA = parseFloat(sizeA);
+            const numB = parseFloat(sizeB);
+
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+            }
+
+            if (isNaN(numA) && isNaN(numB)) {
+                const orderA = sizeOrder[sizeA] || sizeOrder[sizeA.toUpperCase()] || 999;
+                const orderB = sizeOrder[sizeB] || sizeOrder[sizeB.toUpperCase()] || 999;
+
+                if (orderA !== orderB) {
+                    return orderA - orderB;
+                }
+                return sizeA.localeCompare(sizeB);
+            }
+
+            if (!isNaN(numA) && isNaN(numB)) return -1;
+            if (isNaN(numA) && !isNaN(numB)) return 1;
+
+            return 0;
+        });
     };
 
-    const { availableSizes: displaySizes, availableColors: displayColors } = getAvailableOptions();
+    const getAvailableOptions = () => {
+        const filteredSizes = selectedColor
+            ? [...new Set(product.product_variant
+                ?.filter(v => {
+                    let colorMatch = false;
+                    if (selectedColor.startsWith('custom_')) {
+                        const colorName = selectedColor.replace('custom_', '');
+                        colorMatch = v.color_name === colorName && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === selectedColor;
+                    }
+                    return colorMatch && v.size;
+                })
+                .map(v => v.size))] || []
+            : availableSizes;
+
+        const sizeStockInfo = {};
+        filteredSizes.forEach(size => {
+            if (selectedColor) {
+                const variant = product.product_variant.find(v => {
+                    const sizeMatch = v.size === size;
+                    let colorMatch = false;
+                    if (selectedColor.startsWith('custom_')) {
+                        const colorName = selectedColor.replace('custom_', '');
+                        colorMatch = v.color_name === colorName && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === selectedColor;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+                sizeStockInfo[size] = variant ? variant.quantity === 0 : true;
+            } else {
+                sizeStockInfo[size] = false;
+            }
+        });
+
+        const processedColors = availableColors.map(color => {
+            if (selectedSize) {
+                const variant = product.product_variant.find(v => {
+                    const sizeMatch = v.size === selectedSize;
+                    let colorMatch = false;
+                    if (color.id === null) {
+                        colorMatch = v.color_name === color.name && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === color.id;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+                return {
+                    ...color,
+                    isOutOfStock: variant ? variant.quantity === 0 : true
+                };
+            } else {
+                return {
+                    ...color,
+                    isOutOfStock: false
+                };
+            }
+        });
+
+        const filteredColors = selectedSize
+            ? processedColors.filter(color => {
+                return product.product_variant.some(v => {
+                    const sizeMatch = v.size === selectedSize;
+                    let colorMatch = false;
+                    if (color.id === null) {
+                        colorMatch = v.color_name === color.name && !v.color_id;
+                    } else {
+                        colorMatch = v.color_id === color.id;
+                    }
+                    return sizeMatch && colorMatch;
+                });
+            })
+            : processedColors;
+
+        return {
+            availableSizes: sortSizes(filteredSizes),
+            availableColors: filteredColors,
+            sizeStockInfo
+        };
+    };
+
+    const { availableSizes: displaySizes, availableColors: displayColors, sizeStockInfo } = getAvailableOptions();
 
     const createFlyingAnimation = (sourceElement, targetElement, imageUrl) => {
         const sourceRect = sourceElement.getBoundingClientRect();
@@ -284,9 +372,18 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                     }
                 }
 
+                try {
+                    const cartCountRes = await getDataApi("/customer/cart/count");
+                    if (cartCountRes.success) {
+                        context.setCartItemsCount(cartCountRes.data.count_cart_items);
+                    }
+                } catch (error) {
+                    console.error("Error updating cart count:", error);
+                }
+
                 toast.success(response.message || 'Đã thêm vào giỏ hàng');
             } else {
-                toast.error(response.message || 'Có lỗi xảy ra');
+                toast.error(response.data.detail.message || 'Có lỗi xảy ra');
             }
         } catch (error) {
             console.error('Add to cart error:', error);
@@ -378,15 +475,20 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                 <div className="flex items-center gap-3 pt-3">
                     <span className="text-[16px]">Kích thước:</span>
                     <div className="flex items-center gap-1 actions">
-                        {displaySizes.map((size) => (
-                            <Button
-                                key={size}
-                                className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''}`}
-                                onClick={() => handleSizeSelect(size)}
-                            >
-                                {size}
-                            </Button>
-                        ))}
+                        {displaySizes.map((size) => {
+                            const isOutOfStock = sizeStockInfo[size] || false;
+                            return (
+                                <Button
+                                    key={size}
+                                    className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''} ${isOutOfStock ? 'cursor-not-allowed opacity-50' : ''
+                                        }`}
+                                    onClick={() => !isOutOfStock && handleSizeSelect(size)}
+                                    disabled={isOutOfStock}
+                                >
+                                    {size}
+                                </Button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -399,9 +501,10 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                             <div
                                 key={color.id}
                                 data-color-id={getColorIdentifier(color)}
-                                className={`flex items-center gap-2 p-2 border rounded cursor-pointer ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'
+                                className={`flex items-center gap-2 p-2 border rounded ${color.isOutOfStock ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                    } ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'
                                     }`}
-                                onClick={() => handleColorSelect(color)}
+                                onClick={() => !color.isOutOfStock && handleColorSelect(color)}
                             >
                                 <img
                                     src={color.image}

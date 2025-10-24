@@ -45,6 +45,12 @@ const ProductItemListView = ({ product = null }) => {
         return Math.round(((originalPrice - discountedPrice) / originalPrice) * 100);
     };
 
+    const getProductUrl = (product) => {
+        const identifier = product.slug || product.id;
+        console.log(identifier);
+        return `/product/${identifier}`;
+    };
+
     if (!product) {
         return (
             <div className="productItem shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)] flex items-center">
@@ -71,7 +77,7 @@ const ProductItemListView = ({ product = null }) => {
     return (
         <div className="productItem shadow-lg rounded-md overflow-hidden border-1 border-[rgba(0,0,0,0.1)] flex items-center">
             <div className="group imgWrapper w-[30%] overflow-hidden rounded-md relative">
-                <Link to={`/product/${product.id}`}>
+                <Link to={getProductUrl(product)}>
                     <div className="img h-[250px] overflow-hidden relative">
                         {mainImage ? (
                             <>
@@ -122,7 +128,7 @@ const ProductItemListView = ({ product = null }) => {
                 </h6>
 
                 <h3 className="text-[18px] title mt-2 font-[500] mb-2 text-[#000]">
-                    <Link to={`/product/${product.id}`} className="link transition-all hover:text-[#ff5252]">
+                    <Link to={getProductUrl(product)} className="link transition-all hover:text-[#ff5252]">
                         {product.name}
                     </Link>
                 </h3>

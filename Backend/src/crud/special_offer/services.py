@@ -1,5 +1,6 @@
 from src.crud.product.repositories import ProductRepository
 from src.crud.user.repositories import UserRepository
+from src.crud.notification.services import NotificationService
 from src.database.models import Special_Offer, Product, User, UserSpecialOffer
 from src.errors.authentication import AuthException
 from src.errors.special_offer import SpecialOfferException
@@ -7,15 +8,16 @@ from src.errors.user import UserException
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
     SetOfferToProduct, AssignOfferToUsers
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, or_
+from sqlmodel import and_, or_, select
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from sqlalchemy.orm import noload
 
 special_offer_repository = SpecialOfferRepository()
 product_repository = ProductRepository()
 user_repository = UserRepository()
+notification_service = NotificationService()
 
 
 class SpecialOfferService:
@@ -90,6 +92,50 @@ class SpecialOfferService:
             conditions.append(Special_Offer.end_time < now)
 
         special_offers, total = await special_offer_repository.get_all_special_offer(conditions, session, skip=skip, limit=limit)
+
+        response = []
+        for offer in special_offers:
+            offer_dict = {
+                "id": str(offer.id),
+                "code": offer.code,
+                "name": offer.name,
+                "discount": offer.discount,
+                "type": offer.type,
+                "scope": offer.scope,
+                "condition": offer.condition,
+                "total_quantity": offer.total_quantity,
+                "used_quantity": offer.used_quantity,
+                "start_time": str(offer.start_time),
+                "end_time": str(offer.end_time),
+            }
+            response.append(offer_dict)
+
+        return {
+            "data": response,
+            "total": total
+        }
+
+
+    async def get_all_special_offer_customer_service(self, user_id: str, session: AsyncSession, search: Optional[str], skip: int = 0, limit: int = 10):
+        condition_offers = [Special_Offer.deleted_at.is_(None), Special_Offer.scope == 'order',
+                            Special_Offer.start_time <= datetime.now(), Special_Offer.end_time >= datetime.now(),
+                            Special_Offer.total_quantity > Special_Offer.used_quantity]
+
+        if search:
+            search_term = f"%{search}%"
+            condition_offers.append(or_(
+                Special_Offer.name.ilike(search_term),
+                Special_Offer.code.ilike(search_term),
+            ))
+
+        subquery = (
+            select(UserSpecialOffer.special_offer_id)
+            .where(UserSpecialOffer.user_id == user_id)
+        )
+
+        condition_offers.append(Special_Offer.id.in_(subquery))
+
+        special_offers, total = await special_offer_repository.get_all_special_offer(condition_offers, session, skip, limit)
 
         response = []
         for offer in special_offers:
@@ -188,6 +234,9 @@ class SpecialOfferService:
         if not (special_offer.start_time <= now <= special_offer.end_time):
             SpecialOfferException.expired_or_not_started()
 
+        if special_offer.used_quantity >= special_offer.total_quantity:
+            SpecialOfferException.insufficient_quantity()
+
         condition_product = Product.id.in_(data.product_id)
         await product_repository.update_product_some_field(
             condition_product,
@@ -208,8 +257,8 @@ class SpecialOfferService:
         if not (special_offer.start_time <= now <= special_offer.end_time):
             SpecialOfferException.expired_or_not_started()
 
-        condition_user = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None), User.customer_status == 'active')
-        existing_users, _ = await user_repository.get_all_user(condition_user, session=session)
+        condition_user = [User.id.in_(data.user_ids), User.deleted_at.is_(None), User.customer_status == 'active']
+        existing_users, _ = await user_repository.get_all_users(condition_user, session, 0, 1000)
         existing_user_ids = {user.id for user in existing_users}
 
         missing_user_ids = set(data.user_ids) - existing_user_ids
@@ -229,11 +278,21 @@ class SpecialOfferService:
             UserSpecialOffer(
                 special_offer_id=data.special_offer_id,
                 user_id=user_id,
-                created_at=datetime.now()
             )
             for user_id in existing_user_ids
         ]
         await special_offer_repository.bulk_create_user_special_offer(user_offers, session=session)
+
+        for user_id in existing_user_ids:
+            await notification_service.create_assign_special_offer_notification(
+                session=session,
+                special_offer_id=str(data.special_offer_id),
+                special_offer_name=special_offer.name,
+                customer_id=str(user_id),
+                admin_note=data.admin_note  # Nếu có admin_note trong data
+            )
+
+        await session.commit()
 
         return {
             "special_offer_id": str(data.special_offer_id),

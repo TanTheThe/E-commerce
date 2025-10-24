@@ -12,7 +12,6 @@ const TopDiscountSection = () => {
             try {
                 setLoading(true);
                 const res = await getDataApi("/customer/product/top-discount");
-                console.log(res);
 
                 if (res.success) {
                     setProducts(res.data || []);

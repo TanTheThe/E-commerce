@@ -11,7 +11,7 @@ from src.dependencies import admin_role_middleware, customer_role_middleware
 
 evaluate_admin_router = APIRouter(prefix="/evaluate")
 evaluate_customer_router = APIRouter(prefix="/evaluate")
-evaluate_common_router = APIRouter(prefix="/evaluate")
+evaluate_staff_router = APIRouter(prefix="/evaluate")
 
 evaluate_service = EvaluateService()
 access_token_bearer = AccessTokenBearer()
@@ -47,7 +47,6 @@ async def get_my_evaluates(token_details: dict = Depends(access_token_bearer),
             "content": evaluate_dict
         }
     )
-
 
 @evaluate_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def get_all_evaluate_admin(search: Optional[str] = None,
@@ -87,7 +86,8 @@ async def get_detail_evaluate_admin(id: str,
 async def get_detail_evaluate_customer(id: str,
                                        token_details: dict = Depends(access_token_bearer),
                                        session: AsyncSession = Depends(get_session)):
-    evaluate_dict = await evaluate_service.get_detail_evaluate_customer(id, session)
+    customer_id = token_details["user"]["id"]
+    evaluate_dict = await evaluate_service.get_detail_evaluate_customer(id, customer_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

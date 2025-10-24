@@ -34,8 +34,10 @@ const ResetPassword = () => {
         const response = await postDataApi(`/admin/auth/confirm-reset`, {
             token,
             new_password: newPassword,
-            confirm_new_password: confirmPassword
+            new_password_confirm: confirmPassword
         });
+
+        console.log(response);
 
         if (response?.success === true) {
             setIsLoading(false)

@@ -1,9 +1,9 @@
 import './App.css'
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
+import { createBrowserRouter, RouterProvider, useNavigate } from "react-router-dom"
 import DashBoard from './Pages/DashBoard'
 import Header from './Components/Header'
 import Sidebar from './Components/Sidebar'
-import React, { createContext, useState } from 'react'
+import React, { createContext, useEffect, useState } from 'react'
 import Login from './Pages/Login'
 import SignUp from './Pages/SignUp'
 import Products from './Pages/Products'
@@ -40,6 +40,12 @@ import EditProduct from './Pages/Products/editProduct'
 import SpecialOffer from './Pages/SpecialOffer'
 import Colors from './Pages/Colors'
 import Reviews from './Pages/Review'
+import Brands from './Pages/Brands'
+import Materials from './Pages/Materials'
+import Tags from './Pages/Tags'
+import Staffs from './Pages/Staffs'
+import Warehouse from './Pages/Warehouse'
+import Suppliers from './Pages/Suppliers'
 
 const Transition = React.forwardRef(function Transition(
   props, ref) {
@@ -47,6 +53,25 @@ const Transition = React.forwardRef(function Transition(
 });
 
 const MyContext = createContext()
+
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const { userData, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (userData && !allowedRoles.includes(userData.role)) {
+        navigate('/');
+      }
+    }
+  }, [userData, isLoading, allowedRoles, navigate]);
+
+  if (isLoading || (userData && !allowedRoles.includes(userData.role))) {
+    return null;
+  }
+
+  return children;
+};
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -64,7 +89,7 @@ function App() {
       exact: true,
       element: (
         <>
-          <section className='main'>
+          <section className='main overflow-x-hidden'>
             <Header />
             <div className='contentMain flex'>
               <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
@@ -154,7 +179,7 @@ function App() {
       path: "/products",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -166,14 +191,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/homeSlider/list",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -185,14 +210,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/category/list",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -204,14 +229,33 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/staffs",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin']}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Staffs />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
       )
     },
     {
       path: "/users",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -223,14 +267,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/orders",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -242,14 +286,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/profile",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -261,14 +305,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/special-offer/list",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -280,14 +324,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/reviews/list",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -299,14 +343,14 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
       )
     },
     {
       path: "/colors/list",
       exact: true,
       element: (
-        <>
+        <ProtectedRoute allowedRoles={['admin']}>
           <section className='main'>
             <Header />
             <div className='contentMain flex'>
@@ -318,7 +362,102 @@ function App() {
               </div>
             </div>
           </section>
-        </>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/brands/list",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin']}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Brands />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/materials/list",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin']}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Materials />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/tags/list",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin']}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Tags />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/warehouses/list",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin', "staff"]}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Warehouse />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
+      )
+    },
+    {
+      path: "/suppliers/list",
+      exact: true,
+      element: (
+        <ProtectedRoute allowedRoles={['admin', "staff"]}>
+          <section className='main'>
+            <Header />
+            <div className='contentMain flex'>
+              <div className={`overflow-hidden sidebarWrapper ${isSidebarOpen === true ? 'w-[15%]' : 'w-[0px] opacity-0'} transition-all`}>
+                <Sidebar />
+              </div>
+              <div className={`contentRight py-4 px-5 ${isSidebarOpen === false ? 'w-[100%]' : 'w-[85%]'} transition-all`}>
+                <Suppliers />
+              </div>
+            </div>
+          </section>
+        </ProtectedRoute>
       )
     },
   ])

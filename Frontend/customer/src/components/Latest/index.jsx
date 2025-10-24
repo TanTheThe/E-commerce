@@ -12,8 +12,7 @@ const LatestSection = () => {
             try {
                 setLoading(true);
                 const res = await getDataApi("/customer/product/latest");
-                console.log(res);
-
+                
                 if (res.success) {
                     setProducts(res.data || []);
                 }

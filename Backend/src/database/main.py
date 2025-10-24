@@ -24,7 +24,7 @@ engine: AsyncEngine = create_async_engine(
 #     def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
 #         total = time.time() - context._query_start_time
 #         print(f"[SQL END] Took: {total:.4f} seconds")
-#
+
 # setup_query_logger(engine)
 
 async def init_db():

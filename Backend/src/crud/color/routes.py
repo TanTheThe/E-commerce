@@ -10,7 +10,7 @@ from src.dependencies import admin_role_middleware
 
 color_admin_router = APIRouter(prefix="/color")
 color_customer_router = APIRouter(prefix="/color")
-color_common_router = APIRouter(prefix="/color")
+color_staff_router = APIRouter(prefix="/color")
 
 color_service = ColorService()
 access_token_bearer = AccessTokenBearer()

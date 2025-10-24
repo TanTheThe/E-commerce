@@ -1,9 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload, load_only
-from src.database.models import Order
+from src.database.models import Order, OrderStatusHistory
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, distinct
+from sqlmodel import select, desc, and_, func, distinct, update
 from datetime import datetime
 
 
@@ -16,7 +16,6 @@ class OrderRepository:
 
         new_order = Order(
             **order_data_dict,
-            status="Pending",
             created_at=datetime.now()
         )
 
@@ -91,6 +90,13 @@ class OrderRepository:
         value = result.one_or_none()
         return value
 
+    async def get_new_status_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+        statement = select(OrderStatusHistory).where(conditions).order_by(desc(OrderStatusHistory.created_at)).limit(1)
+
+        result = await session.exec(statement)
+
+        return result.first()
+
     async def update_order(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
             if v is not None:
@@ -100,3 +106,12 @@ class OrderRepository:
         await session.commit()
 
         return data_need_update
+
+    async def update_order_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
+                                      session: AsyncSession, get_result_back: bool = False):
+        stmt = (
+            update(Order)
+            .where(condition)
+            .values(**values)
+        )
+        await session.exec(stmt)

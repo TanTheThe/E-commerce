@@ -11,7 +11,7 @@ from typing import Optional
 
 special_offer_admin_router = APIRouter(prefix="/special-offer")
 special_offer_customer_router = APIRouter(prefix="/special-offer")
-special_offer_common_router = APIRouter(prefix="/special-offer")
+special_offer_staff_router = APIRouter(prefix="/special-offer")
 
 special_offer_service = SpecialOfferService()
 access_token_bearer = AccessTokenBearer()
@@ -82,27 +82,17 @@ async def set_offer_to_product(data: SetOfferToProduct,
 
 @special_offer_customer_router.get('/', dependencies=[Depends(customer_role_middleware)])
 async def get_all_special_offer_customer(session: AsyncSession = Depends(get_session),
-                                         token_details: dict = Depends(access_token_bearer)):
-    special_offers = await special_offer_service.get_all_special_offer_service(session)
-
-    filtered_special_offers = [
-        {
-            "code": special_offer.code,
-            "name": special_offer.name,
-            "discount": special_offer.discount,
-            "condition": special_offer.condition,
-            "type": special_offer.type,
-            "start_time": str(special_offer.start_time),
-            "end_time": str(special_offer.end_time),
-        }
-        for special_offer in special_offers
-    ]
+                                         token_details: dict = Depends(access_token_bearer),
+                                         search: Optional[str] = None,
+                                         skip: int = 0, limit: int = 10):
+    user_id = token_details['user']['id']
+    special_offers = await special_offer_service.get_all_special_offer_customer_service(user_id, session, search, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin các voucher",
-            "content": filtered_special_offers
+            "content": special_offers
         }
     )
 

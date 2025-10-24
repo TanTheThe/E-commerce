@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { MyContext } from "../../App";
 import { fetchWithAutoRefresh, getDataApi, putDataApi } from "../../utils/api";
-import { Button, Checkbox, ListItemText, MenuItem, Select } from "@mui/material";
+import { Button, Checkbox, FormControl, ListItemText, MenuItem, Select } from "@mui/material";
 import { IoMdClose } from "react-icons/io";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import { FaCloudUploadAlt, FaCopy, FaPlus } from "react-icons/fa";
@@ -34,6 +34,13 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
     });
     const [collapsedVariants, setCollapsedVariants] = useState({});
 
+    const [brands, setBrands] = useState([]);
+    const [selectedBrand, setSelectedBrand] = useState('');
+    const [materials, setMaterials] = useState([]);
+    const [selectedMaterials, setSelectedMaterials] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]);
+
     const { isOpenFullScreenPanel, setIsOpenFullScreenPanel } = useContext(MyContext);
     const context = useContext(MyContext);
 
@@ -60,6 +67,45 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
             }
         };
         fetchCategories();
+    }, []);
+
+    useEffect(() => {
+        const fetchBrands = async () => {
+            try {
+                const response = await getDataApi('/admin/brand/all');
+                if (response.success === true) {
+                    setBrands(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching brands:', error);
+            }
+        };
+
+        const fetchMaterials = async () => {
+            try {
+                const response = await getDataApi('/admin/material/all');
+                if (response.success === true) {
+                    setMaterials(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching materials:', error);
+            }
+        };
+
+        const fetchTags = async () => {
+            try {
+                const response = await getDataApi('/admin/tag/all');
+                if (response.success === true) {
+                    setTags(response.data.data || []);
+                }
+            } catch (error) {
+                console.error('Error fetching tags:', error);
+            }
+        };
+
+        fetchBrands();
+        fetchMaterials();
+        fetchTags();
     }, []);
 
     useEffect(() => {
@@ -189,6 +235,17 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
 
                     setSelectedCategories(product.categories?.map(cat => String(cat.id)) || []);
 
+                    setSelectedBrand(product.brand?.id || '');
+
+                    if (product.materials && product.materials.length > 0) {
+                        setSelectedMaterials(product.materials.map(material => ({
+                            material_id: material.id,
+                            percentage: material.percentage || 0
+                        })));
+                    }
+
+                    setSelectedTags(product.tags?.map(tag => tag.id) || []);
+
                     const productImages = product.images?.map((img, index) => ({
                         id: Date.now() + index,
                         url: img,
@@ -282,6 +339,42 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
             URL.revokeObjectURL(removed.url);
         }
         setImages(prev => prev.filter(img => img.id !== id));
+    };
+
+    const handleMaterialChange = (materialId, field, value) => {
+        setSelectedMaterials(prev => {
+            const existing = prev.find(m => m.material_id === materialId);
+            if (existing) {
+                return prev.map(m =>
+                    m.material_id === materialId
+                        ? { ...m, [field]: value }
+                        : m
+                );
+            } else {
+                return [...prev, { material_id: materialId, percentage: field === 'percentage' ? value : 0 }];
+            }
+        });
+    };
+
+    const handleMaterialToggle = (materialId) => {
+        setSelectedMaterials(prev => {
+            const exists = prev.find(m => m.material_id === materialId);
+            if (exists) {
+                return prev.filter(m => m.material_id !== materialId);
+            } else {
+                return [...prev, { material_id: materialId, percentage: 0 }];
+            }
+        });
+    };
+
+    const handleTagToggle = (tagId) => {
+        setSelectedTags(prev => {
+            if (prev.includes(tagId)) {
+                return prev.filter(id => id !== tagId);
+            } else {
+                return [...prev, tagId];
+            }
+        });
     };
 
     const handleAddVariantGroup = () => {
@@ -625,6 +718,96 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
         );
     };
 
+    const renderMaterialsSelection = () => {
+        const totalPercentage = selectedMaterials.reduce((sum, material) => sum + (material.percentage || 0), 0);
+
+        return (
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-gray-700">Chọn chất liệu</h4>
+                    {selectedMaterials.length > 0 && (
+                        <span className={`text-sm font-medium ${totalPercentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
+                            Tổng: {totalPercentage}%
+                        </span>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {materials.map(material => {
+                        const selected = selectedMaterials.find(m => m.material_id === material.id);
+                        return (
+                            <div key={material.id} className={`p-3 border rounded-lg transition-all ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!selected}
+                                            onChange={() => handleMaterialToggle(material.id)}
+                                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="ml-2 text-sm font-medium text-gray-700">{material.name}</span>
+                                    </label>
+                                </div>
+
+                                {selected && (
+                                    <div>
+                                        <label className="block text-xs text-gray-600 mb-1">Phần trăm (%)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={selected.percentage || ''}
+                                            onChange={(e) => handleMaterialChange(material.id, 'percentage', parseFloat(e.target.value) || 0)}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const renderTagsSelection = () => {
+        return (
+            <div className="space-y-4">
+                <h4 className="text-sm font-medium text-gray-700">Chọn tags</h4>
+                <div className="grid grid-cols-3 gap-2">
+                    {tags.map(tag => (
+                        <label key={tag.id} className="flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={selectedTags.includes(tag.id)}
+                                onChange={() => handleTagToggle(tag.id)}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">{tag.name}</span>
+                        </label>
+                    ))}
+                </div>
+
+                {selectedTags.length > 0 && (
+                    <div className="mt-3">
+                        <p className="text-xs text-gray-600 mb-2">Tags đã chọn:</p>
+                        <div className="flex flex-wrap gap-2">
+                            {selectedTags.map(tagId => {
+                                const tag = tags.find(t => t.id === tagId);
+                                return tag ? (
+                                    <span key={tagId} className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
+                                        {tag.name}
+                                    </span>
+                                ) : null;
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const validateForm = () => {
         if (!formData.name.trim()) {
             context.openAlertBox("error", 'Tên sản phẩm không được để trống');
@@ -672,6 +855,22 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                 }
             }
         }
+
+        if (selectedMaterials.length > 0) {
+            const totalPercentage = selectedMaterials.reduce((sum, material) => sum + (material.percentage || 0), 0);
+            if (totalPercentage > 100) {
+                context.openAlertBox("error", 'Tổng phần trăm chất liệu không được vượt quá 100%');
+                return false;
+            }
+
+            for (let material of selectedMaterials) {
+                if (!material.percentage || material.percentage <= 0) {
+                    context.openAlertBox("error", 'Phần trăm chất liệu phải lớn hơn 0');
+                    return false;
+                }
+            }
+        }
+
         return true;
     };
 
@@ -722,7 +921,10 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                 images: images.map(img => img.base64),
                 categories_id: validCategoryIds,
                 product_variant: allVariants,
-                deleted_variant_ids: deletedVariantIds
+                deleted_variant_ids: deletedVariantIds,
+                brand_id: selectedBrand || null,
+                materials: selectedMaterials.length > 0 ? selectedMaterials : null,
+                tags_id: selectedTags.length > 0 ? selectedTags : null
             };
 
             const result = await putDataApi(`/admin/product/${productId}`, submitData);
@@ -814,6 +1016,47 @@ const EditProduct = ({ productId, onClose, onProductUpdated }) => {
                                         />
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-purple-500 rounded-full mr-3"></div>
+                                    Thương hiệu
+                                </h2>
+
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        value={selectedBrand}
+                                        onChange={(e) => setSelectedBrand(e.target.value)}
+                                        displayEmpty
+                                        className="!text-sm"
+                                    >
+                                        <MenuItem value="">Không chọn thương hiệu</MenuItem>
+                                        {brands.map((brand) => (
+                                            <MenuItem key={brand.id} value={brand.id}>
+                                                {brand.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-green-500 rounded-full mr-3"></div>
+                                    Chất liệu
+                                </h2>
+
+                                {renderMaterialsSelection()}
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <div className="w-2 h-6 bg-yellow-500 rounded-full mr-3"></div>
+                                    Tags
+                                </h2>
+
+                                {renderTagsSelection()}
                             </div>
 
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

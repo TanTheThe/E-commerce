@@ -18,3 +18,6 @@ pyotp
 qrcode
 Pillow
 psycopg2-binary
+httpx
+python-multipart
+Unidecode

@@ -1,89 +1,77 @@
-import Button from "@mui/material/Button";
-import React, { useContext, useState } from "react";
-import { RiMenu2Fill, RiMenu2Line, RiMenu3Fill } from "react-icons/ri";
-import Badge from '@mui/material/Badge';
-import { styled } from '@mui/material/styles';
-import IconButton from '@mui/material/IconButton';
-import { FaRegBell, FaRegUser } from "react-icons/fa";
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import Divider from '@mui/material/Divider';
-import { IoMdLogOut } from "react-icons/io";
-import { MyContext } from "../../App";
-import { AiOutlineMenuFold, AiOutlineMenuUnfold } from "react-icons/ai";
-import { fetchWithAutoRefresh } from "../../utils/api";
-import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
-
-const StyledBadge = styled(Badge)(({ theme }) => ({
-    '& .MuiBadge-badge': {
-        right: -3,
-        top: 13,
-        border: `2px solid ${theme.palette.background.paper}`,
-        padding: '0 4px',
-    },
-}));
+import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, IconButton, Menu, MenuItem, Divider, Tooltip } from '@mui/material';
+import { RiMenu2Fill, RiMenu3Fill } from 'react-icons/ri';
+import { FaRegUser } from 'react-icons/fa';
+import { IoMdLogOut } from 'react-icons/io';
+import { Link } from 'react-router-dom';
+import { MyContext } from '../../App';
+import { fetchWithAutoRefresh } from '../../utils/api'
+import NotificationDropdown from '../Notification/NotificationDropdown';
 
 const Header = () => {
     const [anchorMyAcc, setAnchorMyAcc] = useState(null);
     const openMyAcc = Boolean(anchorMyAcc);
-    const context = useContext(MyContext)
-    const navigate = useNavigate()
+    const context = useContext(MyContext);
+    const navigate = useNavigate();
+
     const handleClickMyAcc = (event) => {
         setAnchorMyAcc(event.currentTarget);
     };
+
     const handleCloseMyAcc = () => {
         setAnchorMyAcc(null);
     };
 
     const logout = async () => {
-        setAnchorMyAcc(null)
+        setAnchorMyAcc(null);
 
-        const response = await fetchWithAutoRefresh("/admin/auth/logout", "GET")
+        const response = await fetchWithAutoRefresh("/admin/auth/logout", "GET");
 
         if (response?.success === true) {
             localStorage.clear();
             sessionStorage.clear();
-
             context.setIsLogin(false);
             context.setUserData(null);
-
             navigate("/login");
         } else {
-            context.openAlertBox("error", response?.data?.detail.message)
-
+            context.openAlertBox("error", response?.data?.detail.message);
             localStorage.clear();
             sessionStorage.clear();
             context.setIsLogin(false);
             context.setUserData(null);
             navigate("/login");
         }
-    }
+    };
+
     return (
         <header className={`w-full h-[auto] py-2 ${context.isSidebarOpen === true ? 'pl-72' : 'pl-5'} pr-5 shadow-md bg-[#fff] flex items-center justify-between transition-all`}>
             <div className="part1">
-                <Button className="!w-[40px] !h-[40px] !rounded-full !min-w-[40px] !text-[rgba(0,0,0,0.8)]" onClick={() => context.setIsSidebarOpen(!context.isSidebarOpen)}>
-                    {
-                        context.isSidebarOpen === true ?
-                            <RiMenu2Fill className="text-[18px] text-[rgba(0,0,0,0.8)]" />
-                            :
-                            <RiMenu3Fill className="text-[18px] text-[rgba(0,0,0,0.8)]" />
+                <Button
+                    className="!w-[40px] !h-[40px] !rounded-full !min-w-[40px] !text-[rgba(0,0,0,0.8)]"
+                    onClick={() => context.setIsSidebarOpen(!context.isSidebarOpen)}
+                >
+                    {context.isSidebarOpen === true ?
+                        <RiMenu2Fill className="text-[18px] text-[rgba(0,0,0,0.8)]" />
+                        :
+                        <RiMenu3Fill className="text-[18px] text-[rgba(0,0,0,0.8)]" />
                     }
-
                 </Button>
             </div>
 
             <div className="part2 w-[40%] flex items-center justify-end gap-5">
-                <IconButton aria-label="cart">
-                    <StyledBadge badgeContent={4} color="secondary">
-                        <FaRegBell />
-                    </StyledBadge>
-                </IconButton>
+                <NotificationDropdown />
 
-                {
-                    context.isLogin === true ? <div className="relative">
-                        <div className="rounded-full w-[35px] h-[35px] overflow-hidden cursor-pointer" onClick={handleClickMyAcc}>
-                            <img src="https://thethaovanhoa.mediacdn.vn/372676912336973824/2022/12/16/avatar3-1671164179193908857633.jpg" className="w-full h-full object-cover" />
+                {context.isLogin === true ? (
+                    <div className="relative">
+                        <div
+                            className="rounded-full w-[35px] h-[35px] overflow-hidden cursor-pointer"
+                            onClick={handleClickMyAcc}
+                        >
+                            <img
+                                src="https://thethaovanhoa.mediacdn.vn/372676912336973824/2022/12/16/avatar3-1671164179193908857633.jpg"
+                                className="w-full h-full object-cover"
+                            />
                         </div>
 
                         <Menu
@@ -126,9 +114,11 @@ const Header = () => {
                             <MenuItem onClick={handleCloseMyAcc} className="!bg-white">
                                 <div className="flex items-center gap-3">
                                     <div className="rounded-full w-[35px] h-[35px] overflow-hidden cursor-pointer">
-                                        <img src="https://thethaovanhoa.mediacdn.vn/372676912336973824/2022/12/16/avatar3-1671164179193908857633.jpg" className="w-full h-full object-cover" />
+                                        <img
+                                            src="https://thethaovanhoa.mediacdn.vn/372676912336973824/2022/12/16/avatar3-1671164179193908857633.jpg"
+                                            className="w-full h-full object-cover"
+                                        />
                                     </div>
-
                                     <div className="info">
                                         <h3 className="text-[15px] font-[500] leading-5">
                                             {context?.userData?.content?.first_name || context?.userData?.first_name} {context?.userData?.content?.last_name || context?.userData?.last_name}
@@ -139,30 +129,30 @@ const Header = () => {
                                     </div>
                                 </div>
                             </MenuItem>
-
                             <Divider />
-
                             <Link to="/profile">
                                 <MenuItem onClick={handleCloseMyAcc} className="flex items-center gap-3">
                                     <FaRegUser className="text-[16px]" />
                                     <span className="text-[14px]">Profile</span>
                                 </MenuItem>
                             </Link>
-
                             <MenuItem onClick={logout} className="flex items-center gap-3">
                                 <IoMdLogOut className="text-[18px]" />
                                 <span className="text-[14px]">Sign Out</span>
                             </MenuItem>
                         </Menu>
                     </div>
-                        :
-                        <Button className="btn-blue btn-sm !rounded-full" onClick={() => navigate("/login")}>Sign In</Button>
-                }
-
-
+                ) : (
+                    <Button
+                        className="btn-blue btn-sm !rounded-full"
+                        onClick={() => navigate("/login")}
+                    >
+                        Sign In
+                    </Button>
+                )}
             </div>
         </header>
-    )
-}
+    );
+};
 
-export default Header
+export default Header;

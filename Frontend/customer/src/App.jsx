@@ -32,6 +32,11 @@ import ResetPasswordEmail from './Pages/ResetPasswordEmail'
 import ResetPasswordOtp from './Pages/ResetPasswordOtp'
 import EmailToChangePass from './Pages/EmailToChangePass'
 import useAuth from './Pages/Login/auth'
+import OrderSuccessPage from './Pages/Orders/orderSuccess'
+import VNPayPayment from './Pages/Payment'
+import PaymentReturn from './Pages/Payment/paymentReturn'
+import CartPanel from './components/CartPanel'
+import { Drawer } from '@mui/material'
 
 
 const MyContext = createContext()
@@ -45,6 +50,10 @@ function App() {
 
   const [checkoutItems, setCheckoutItems] = useState([]);
   const [checkoutTotal, setCheckoutTotal] = useState(0);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+
+  const [cartItemsCount, setCartItemsCount] = useState(0);
 
   const { isLogin, setIsLogin, userData, setUserData, isLoading, checkLogin } = useAuth();
 
@@ -52,8 +61,27 @@ function App() {
     setOpenProductDetailsModal(false);
   };
 
+  const updateCartCount = async () => {
+    try {
+      const res = await getDataApi("/customer/cart/count");
+      if (res.success) {
+        setCartItemsCount(res.data.count_cart_items);
+      }
+    } catch (error) {
+      console.error("Error updating cart count:", error);
+    }
+  };
+
   const toggleCartPanel = (newOpen) => () => {
+    if (!newOpen && openCartPanel) {
+      updateCartCount();
+    }
     setOpenCartPanel(newOpen);
+  };
+
+  const handleCloseCartPanel = async () => {
+    await updateCartCount();
+    setOpenCartPanel(false);
   };
 
   const openAlertBox = (status, msg) => {
@@ -73,6 +101,7 @@ function App() {
   const clearCheckout = () => {
     setCheckoutItems([]);
     setCheckoutTotal(0);
+    setSelectedVoucher(null);
   };
 
   const updateCheckoutItemQuantity = (cartItemId, newQuantity) => {
@@ -99,6 +128,7 @@ function App() {
     setCheckoutTotal(newTotal);
   };
 
+
   const values = {
     setOpenProductDetailsModal,
     setOpenCartPanel,
@@ -118,7 +148,14 @@ function App() {
     addItemsToCheckout,
     clearCheckout,
     updateCheckoutItemQuantity,
-    removeCheckoutItem
+    removeCheckoutItem,
+    selectedVoucher,
+    setSelectedVoucher,
+    selectedAddress,
+    setSelectedAddress,
+    cartItemsCount,
+    setCartItemsCount,
+    handleCloseCartPanel
   }
 
   return (
@@ -126,9 +163,17 @@ function App() {
       <BrowserRouter>
         <MyContext.Provider value={values}>
           <Header />
+          <Drawer open={openCartPanel} onClose={handleCloseCartPanel} anchor='right' className='cartPanel'>
+            <div className='flex items-center justify-between py-3 px-4 gap-3 border-b border-[rgba(0,0,0,0.1)] overflow-hidden'>
+              <h4>Shopping Cart</h4>
+              <IoCloseSharp className='text-[20px] hover:text-[#e53e3e] cursor-pointer' onClick={handleCloseCartPanel} />
+            </div>
+
+            <CartPanel />
+          </Drawer>
           <Routes>
             <Route path={"/"} exact={true} element={<Home />} />
-            <Route path={"/category/:categoryId"} exact={true} element={<ProductListing />} />
+            <Route path={"/category/:categoryIdentifier"} exact={true} element={<ProductListing />} />
             <Route path={"/product/:id"} exact={true} element={<ProductDetails />} />
             <Route path={"/login"} element={<Login />} />
             <Route path={"/signup"} exact={true} element={<Register />} />
@@ -136,12 +181,16 @@ function App() {
             <Route path={"/verify"} exact={true} element={<Verify />} />
             <Route path={"/reset-password/:token"} exact={true} element={<ChangePassword />} />
             <Route path={"/checkout"} exact={true} element={<Checkout />} />
+            <Route path={"/payment/:orderCode"} exact={true} element={<VNPayPayment />} />
+            <Route path={"/payment-return"} exact={true} element={<PaymentReturn />} />
             <Route path={"/my-account"} exact={true} element={<MyAccount />} />
             <Route path={"/my-list"} exact={true} element={<MyList />} />
             <Route path={"/my-orders"} exact={true} element={<Orders />} />
             <Route path={"/forgot-password-email"} element={<ResetPasswordEmail />} />
             <Route path={"/forgot-password-otp"} element={<ResetPasswordOtp />} />
             <Route path={"/send-mail"} element={<EmailToChangePass />} />
+            <Route path={"/order-success/:orderId"} exact={true} element={<OrderSuccessPage />} />
+            <Route path={"/order-detail/:orderId"} exact={true} element={<OrderSuccessPage />} />
           </Routes>
           <Footer />
         </MyContext.Provider>

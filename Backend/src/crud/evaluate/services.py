@@ -19,7 +19,7 @@ class EvaluateService:
     async def create_evaluate_service(self, customer_id, evaluate_data: EvaluateInputModel, session: AsyncSession):
         condition = and_(Order_Detail.id == evaluate_data.order_detail_id, Order_Detail.deleted_at.is_(None))
         joins = [
-            selectinload(Order_Detail.order).load_only(Order.user_id),
+            selectinload(Order_Detail.order).load_only(Order.user_id, Order.status),
         ]
         order_detail = await order_detail_repository.get_order_detail(condition, session, joins)
 
@@ -29,8 +29,11 @@ class EvaluateService:
         if str(customer_id) != str(order_detail.order.user_id):
             EvaluateException.user_not_allowed_to_review()
 
+        if order_detail.order.status not in ("delivered", "received"):
+            EvaluateException.order_not_delivered()
+
         existing_eval = await evaluate_repository.get_by_order_detail_id(evaluate_data.order_detail_id, session)
-        if existing_eval:
+        if existing_eval and existing_eval.deleted_at is None:
             EvaluateException.already_reviewed()
 
         evaluate_create_data = EvaluateCreateModel(
@@ -43,7 +46,7 @@ class EvaluateService:
         new_evaluate = await evaluate_repository.create_evaluate(evaluate_create_data, session)
 
         avg_rating = await evaluate_repository.get_average_rate(
-            Evaluate.product_id == order_detail.product_id,
+            and_(Evaluate.product_id == order_detail.product_id, Evaluate.deleted_at.is_(None)),
             session
         )
         avg_rating = avg_rating if avg_rating else 0.0
@@ -58,32 +61,13 @@ class EvaluateService:
             "id": str(new_evaluate.id),
             "comment": new_evaluate.comment,
             "rate": new_evaluate.rate,
-            "image": new_evaluate.image
+            "image": new_evaluate.image,
+            "created_at": str(new_evaluate.created_at),
+            "product_id": str(new_evaluate.product_id),
+            "order_detail_id": str(new_evaluate.order_detail_id)
         }
 
         await session.commit()
-
-        return new_evaluate_dict
-
-    async def create_additional_evaluate_service(self, customer_id, evaluate_data: EvaluateAdditionalModel, session: AsyncSession):
-        condition = and_(Evaluate.id == evaluate_data.id)
-        evaluate = await evaluate_repository.get_evaluate(condition, session)
-        if not evaluate or evaluate.user_id != customer_id:
-            EvaluateException.review_not_found()
-        if evaluate.additional_comment or evaluate.additional_image or evaluate.additional_created_at:
-            EvaluateException.user_not_allowed_to_review()
-
-        await evaluate_repository.update_evaluate_some_field(
-            condition,
-            {"additional_comment": evaluate_data.additional_comment, "additional_created_at": datetime.now(), "additional_image": evaluate_data.additional_image},
-            session
-        )
-
-        new_evaluate_dict = {
-            "additional_comment": evaluate_data.additional_comment,
-            "additional_created_at": datetime.now(),
-            "additional_image": evaluate_data.additional_image
-        }
 
         return new_evaluate_dict
 
@@ -322,7 +306,7 @@ class EvaluateService:
             "additional_created_at": evaluate.additional_created_at.isoformat() if evaluate.additional_created_at else None
         }
 
-    async def get_detail_evaluate_customer(self, id: str, session: AsyncSession):
+    async def get_detail_evaluate_customer(self, id: str, customer_id: str, session: AsyncSession):
         joins = [
             joinedload(Evaluate.user).load_only(
                 User.first_name,
@@ -337,15 +321,29 @@ class EvaluateService:
                 )
             ).load_only(
                 Product_Variant.color_name,
-                Product_Variant.size
+                Product_Variant.size,
+                Product_Variant.image
+            ),
+            joinedload(Evaluate.order_detail).options(
+                joinedload(Order_Detail.order).load_only(
+                    Order.code,
+                    Order.created_at
+                )
+            ).load_only(
+                Order_Detail.quantity
             )
         ]
 
-        condition = and_(Evaluate.id == id, Evaluate.deleted_at.is_(None))
+        condition = and_(Evaluate.id == id, Evaluate.deleted_at.is_(None), Evaluate.user_id == customer_id)
         evaluate = await evaluate_repository.get_evaluate(condition, session, joins)
 
         if not evaluate:
             EvaluateException.review_not_found()
+
+        has_additional_evaluation = (
+                evaluate.additional_comment is not None or
+                evaluate.additional_image is not None
+        )
 
         return {
             "id": str(evaluate.id),
@@ -355,22 +353,44 @@ class EvaluateService:
             "created_at": evaluate.created_at.isoformat() if evaluate.created_at else None,
             "product": {
                 "name": evaluate.product.name if evaluate.product else None,
+                "variant_image": evaluate.product_variant.image if evaluate.product_variant else None,
                 "size": evaluate.product_variant.size if evaluate.product_variant else None,
                 "color_name": (
                     evaluate.product_variant.color.name
                     if evaluate.product_variant and evaluate.product_variant.color
                     else evaluate.product_variant.color_name if evaluate.product_variant else None
+                ),
+                "quantity": evaluate.order_detail.quantity if evaluate.order_detail else None
+            },
+            "order": {
+                "code": evaluate.order_detail.order.code if evaluate.order_detail and evaluate.order_detail.order else None,
+                "created_at": (
+                    evaluate.order_detail.order.created_at.isoformat()
+                    if evaluate.order_detail and evaluate.order_detail.order and evaluate.order_detail.order.created_at
+                    else None
                 )
             },
             "customer": {
                 "first_name": evaluate.user.first_name if evaluate.user else None,
                 "last_name": evaluate.user.last_name if evaluate.user else None
             },
-            "additional_comment": evaluate.additional_comment,
-            "additional_image": evaluate.additional_image,
-            "additional_created_at": evaluate.additional_created_at.isoformat() if evaluate.additional_created_at else None,
-            "seller_reply": evaluate.seller_reply,
-            "seller_reply_at": evaluate.seller_reply_at.isoformat() if evaluate.seller_reply_at else None,
+            "additional_evaluation": {
+                "has_additional": has_additional_evaluation,
+                "comment": evaluate.additional_comment,
+                "image": evaluate.additional_image,
+                "created_at": evaluate.additional_created_at.isoformat() if evaluate.additional_created_at else None,
+            },
+            "seller_reply": {
+                "content": evaluate.seller_reply,
+                "replied_at": evaluate.seller_reply_at.isoformat() if evaluate.seller_reply_at else None,
+                "has_reply": evaluate.seller_reply is not None
+            },
+            "meta": {
+                "can_add_additional": not has_additional_evaluation,
+                "order_detail_id": str(evaluate.order_detail_id),
+                "product_id": str(evaluate.product_id),
+                "evaluation_status": "complete" if has_additional_evaluation else "basic_only"
+            }
         }
 
     async def get_evaluate_by_product(self, product_id: str, session: AsyncSession,
@@ -435,13 +455,14 @@ class EvaluateService:
                                   data: SupplementEvaluateModel, session: AsyncSession):
         condition = and_(
             Evaluate.id == evaluate_id,
-            Evaluate.user_id == customer_id
+            Evaluate.user_id == customer_id,
+            Evaluate.deleted_at.is_(None)
         )
         evaluate = await evaluate_repository.get_evaluate(condition, session)
         if not evaluate:
             EvaluateException.review_not_found()
 
-        if evaluate.additional_comment:
+        if evaluate.additional_comment or evaluate.additional_image:
             EvaluateException.already_supplemented()
 
         await evaluate_repository.update_evaluate_some_field(condition,

@@ -28,6 +28,16 @@ class CartException:
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "message": "Chỉ được chọn 1 trong 2 kiểu chọn màu",
-                "error_code": "color_002",
+                "error_code": "cart_003",
+            },
+        )
+
+    @staticmethod
+    def fail_create_cart():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Có lỗi xảy ra trong quá trình thêm vào giỏ hàng",
+                "error_code": "cart_004",
             },
         )

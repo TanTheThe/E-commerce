@@ -7,11 +7,10 @@ from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
 from typing import Optional
-import time
 
 categories_admin_router = APIRouter(prefix="/categories")
 categories_customer_router = APIRouter(prefix="/categories")
-categories_common_router = APIRouter(prefix="/categories")
+categories_staff_router = APIRouter(prefix="/categories")
 
 categories_service = CategoriesService()
 access_token_bearer = AccessTokenBearer()
@@ -74,10 +73,25 @@ async def get_all_categories_customer(search: Optional[str] = None, session: Asy
     )
 
 
+@categories_customer_router.get('/{category_identifier}/id')
+async def get_category_id(category_identifier: str, session: AsyncSession = Depends(get_session)):
+    category_id = await categories_service.resolve_category_id(category_identifier, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin id của danh mục",
+            "content": {
+                "category_id": category_id
+            }
+        }
+    )
+
+
 @categories_admin_router.get('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def get_detail_category(id: str,
-                                token_details: dict = Depends(access_token_bearer),
-                                session: AsyncSession = Depends(get_session)):
+                              token_details: dict = Depends(access_token_bearer),
+                              session: AsyncSession = Depends(get_session)):
     categories_dict = await categories_service.get_detail_category_service(id, session)
 
     return JSONResponse(
@@ -85,6 +99,20 @@ async def get_detail_category(id: str,
         content={
             "message": "Danh mục đang tìm kiếm",
             "content": categories_dict
+        }
+    )
+
+
+@categories_admin_router.get('/all/select-box')
+async def get_categories_select_box(session: AsyncSession = Depends(get_session),
+                                   token_details: dict = Depends(access_token_bearer)):
+    categories = await categories_service.get_categories_select_box_service(session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin các danh mục",
+            "content": categories
         }
     )
 

@@ -48,6 +48,7 @@ const Verify = () => {
                     const response = await postDataApi("/admin/auth/login/2fa", {
                         token: loginToken
                     });
+
                     setQrCodeBase64(response?.data?.qr_code_base64)
                     setIsShowQR(true)
                 }

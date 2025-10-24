@@ -6,7 +6,8 @@ def register_middleware(app: FastAPI):
     origins = [
         "http://localhost:5173",
         "http://localhost:8000",  # nếu dùng React
-        "http://127.0.0.1:8000",  # production
+        "http://127.0.0.1:8000",
+        "http://localhost:5174",
     ]
 
     app.add_middleware(

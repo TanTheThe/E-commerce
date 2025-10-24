@@ -24,22 +24,28 @@ const MyAccount = () => {
     const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
     const [isShowChangePassword, setIsShowChangePassword] = useState(false);
 
-    const confirmPasswordRef = useRef(null);
-
     const [formFields, setFormFields] = useState({
         first_name: '',
         last_name: '',
         phone: ''
     })
 
+    useEffect(() => {
+        if (context?.userData?.content) {
+            setFormFields({
+                first_name: context.userData.content.first_name || '',
+                last_name: context.userData.content.last_name || '',
+                phone: context.userData.content.phone || ''
+            });
+        }
+    }, [context?.userData]);
+
     const onChangeInput = (e) => {
         const { name, value } = e.target
-        setFormFields(() => {
-            return {
-                ...formFields,
-                [name]: value
-            }
-        })
+        setFormFields(prevFields => ({
+            ...prevFields,
+            [name]: value
+        }))
     }
 
     const isValidVietnamesePhone = (phone) => {
@@ -54,39 +60,33 @@ const MyAccount = () => {
     const handleSubmit = async (e) => {
         e.preventDefault()
 
+        if (!validateValue) return;
+
         setIsLoading(true)
 
-        const response = await putDataApi("/customer/user", formFields);
+        try {
+            const response = await putDataApi("/customer/user", formFields);
 
-        if (response?.success === true) {
+            if (response?.success === true) {
+                context.setUserData(prev => ({
+                    ...prev,
+                    content: {
+                        ...prev.content,
+                        first_name: formFields.first_name,
+                        last_name: formFields.last_name,
+                        phone: formFields.phone
+                    }
+                }));
 
-            localStorage.setItem("userEmail", formFields.email)
-            localStorage.setItem("userFirstName", formFields.first_name)
-            localStorage.setItem("userLastName", formFields.last_name)
-
-            context.setUserData(prev => ({
-                ...prev,
-                content: {
-                    ...prev.content,
-                    first_name: formFields.first_name,
-                    last_name: formFields.last_name,
-                    phone: formFields.phone
-                }
-            }));
-
+                context.openAlertBox("success", response?.message || "Profile updated successfully!")
+            } else {
+                context.openAlertBox("error", response?.data?.detail?.message || "Failed to update profile")
+            }
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            context.openAlertBox("error", "An error occurred while updating your profile");
+        } finally {
             setIsLoading(false)
-            context.openAlertBox(
-                "success", response?.message
-            )
-
-            setFormFields({
-                first_name: "",
-                last_name: "",
-                phone: ""
-            })
-        } else {
-            setIsLoading(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
         }
     }
 
@@ -95,198 +95,344 @@ const MyAccount = () => {
         if (isSubmitDisabled) return;
 
         setIsLoadingChangePassword(true)
+        setError("");
 
-        const response = await putDataApi("/customer/user/change-password", {
-            old_password: oldPassword,
-            new_password: newPassword,
-            confirm_new_password: confirmPassword
-        });
+        try {
+            const response = await putDataApi("/customer/auth/change-password", {
+                old_password: oldPassword,
+                new_password: newPassword,
+                confirm_new_password: confirmPassword
+            });
 
-        if (response?.success === true) {
-            context.openAlertBox(
-                "success", response?.message
-            )
+            if (response?.success === true) {
+                context.openAlertBox("success", response?.message || "Password changed successfully!")
 
-            setOldPassword("");
-            setNewPassword("");
-            setConfirmPassword("");
-        } else {
+                setOldPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+                setIsShowChangePassword(false);
+            } else {
+                context.openAlertBox("error", response?.data?.detail?.message || "Failed to change password")
+            }
+        } catch (error) {
+            console.error("Error changing password:", error);
+            context.openAlertBox("error", "An error occurred while changing your password");
+        } finally {
             setIsLoadingChangePassword(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
         }
-        setIsLoadingChangePassword(false)
     }
 
     useEffect(() => {
         const token = localStorage.getItem("accesstoken")
-
         if (token === null) {
             navigate('/login')
         }
-    }, [context?.isLogin])
+    }, [navigate])
 
     useEffect(() => {
         const isValid =
             oldPassword.trim() !== "" &&
             newPassword.trim() !== "" &&
             confirmPassword.trim() !== "" &&
-            confirmPassword === newPassword;
+            confirmPassword === newPassword &&
+            newPassword.length >= 6;
 
         setIsSubmitDisabled(!isValid);
 
         if (confirmPassword && confirmPassword !== newPassword) {
             setError("Mật khẩu xác nhận không khớp");
+        } else if (newPassword && newPassword.length < 6) {
+            setError("Mật khẩu mới phải có ít nhất 6 ký tự");
         } else {
             setError("");
         }
     }, [oldPassword, newPassword, confirmPassword]);
 
-    return (
-        <section className="py-10 w-full">
-            <div className="container flex gap-5">
-                <div className="col1 w-[20%]">
-                    <AccountSideBar />
+    const PasswordToggleButton = ({ isShow, onToggle }) => (
+        <Button
+            className="!absolute top-[12px] right-[2px] z-50 !w-[35px] !h-[35px] !min-w-[35px] !rounded-full !text-black hover:!bg-gray-100 transition-colors"
+            onClick={onToggle}
+            type="button"
+        >
+            {isShow ? (
+                <IoMdEye className="text-[20px] opacity-75" />
+            ) : (
+                <IoMdEyeOff className="text-[20px] opacity-75" />
+            )}
+        </Button>
+    );
+
+    if (context?.isLoading) {
+        return (
+            <section className="py-10 w-full">
+                <div className="container flex gap-5">
+                    <div className="col1 w-[20%]">
+                        <AccountSideBar />
+                    </div>
+                    <div className="col2 w-[80%] flex items-center justify-center">
+                        <CircularProgress size={50} />
+                    </div>
                 </div>
+            </section>
+        );
+    }
 
-                <div className="col2 w-[50%]">
-                    <div className="card bg-white p-5 shadow-md rounded-md mb-5">
-                        <div className="flex items-center pb-3 border-b border-[rgba(0,0,0,0.1)]">
-                            <h2 className="pb-0">My Profile</h2>
-                            <Button className="!ml-auto" onClick={() => setIsShowChangePassword(prev => !prev)}>
-                                {isShowChangePassword ? <h3 className="pb-0 text-[rgba(0,0,0,0.7)]">Hide Change Password</h3> : <h3 className="pb-0 text-[rgba(0,0,0,0.7)]">Change Password</h3>}
-                            </Button>
-                        </div>
-
-
-                        <form className="mt-5" onSubmit={handleSubmit}>
-                            <div className="flex items-center gap-5">
-                                <div className="w-[50%]">
-                                    <TextField type="text" id="first_name" name="first_name" value={formFields.first_name} label="First Name" variant="outlined" size="small" className="w-full" onChange={onChangeInput}
-                                        disabled={isLoading === true ? true : false} />
-                                </div>
-
-                                <div className="w-[50%]">
-                                    <TextField type="text" id="last_name" name="last_name" value={formFields.last_name} label="Last Name" variant="outlined" size="small" className="w-full" onChange={onChangeInput}
-                                        disabled={isLoading === true ? true : false} />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center mt-4 gap-5">
-                                <div className="w-[50%]">
-                                    <TextField type="text" id="phone" name="phone" value={formFields.phone} label="Phone" variant="outlined" size="small" className="w-full" onChange={onChangeInput}
-                                        disabled={isLoading === true ? true : false}
-                                        error={formFields.phone !== "" && !isValidVietnamesePhone(formFields.phone)}
-                                        helperText={
-                                            formFields.phone !== "" && !isValidVietnamesePhone(formFields.phone)
-                                                ? "Số điện thoại không hợp lệ"
-                                                : ""
-                                        } />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4 mt-5">
-                                <button type="submit" disabled={!validateValue || isLoading}
-                                    className={`btn-org btn-lg w-[200px] ${(!validateValue || isLoading) ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                    {
-                                        isLoading === true ? <CircularProgress color="inherit" />
-                                            :
-                                            'Update Profile'
-                                    }
-                                </button>
-                            </div>
-                        </form>
+    return (
+        <section className="py-10 w-full bg-gray-50 min-h-screen">
+            <div className="container max-w-7xl mx-auto px-4">
+                <div className="flex flex-col lg:flex-row gap-6">
+                    <div className="lg:w-[280px] flex-shrink-0">
+                        <AccountSideBar />
                     </div>
 
-                    {isShowChangePassword && (
-                        <div className="card bg-white p-5 shadow-md rounded-md">
-                            <div className="flex items-center pb-3 border-b border-[rgba(0,0,0,0.1)]">
-                                <h2 className="pb-0">Change Password</h2>
+                    <div className="flex-1">
+
+                        <div className="card bg-white p-6 shadow-lg rounded-xl mb-6 border border-gray-100">
+                            <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                                <h2 className="text-2xl font-bold text-gray-800 mb-0">My Profile</h2>
+                                <Button
+                                    className="!bg-blue-600 !text-white hover:!bg-blue-700 !px-6 !py-2 !rounded-lg !font-medium transition-all duration-200"
+                                    onClick={() => setIsShowChangePassword(prev => !prev)}
+                                >
+                                    {isShowChangePassword ? "Hide Change Password" : "Change Password"}
+                                </Button>
                             </div>
 
-                            <form className="mt-5" onSubmit={handleChangePassword}>
-                                <div className="flex items-center gap-5">
-                                    <div className="form-group w-[70%] relative">
+                            <form className="mt-6" onSubmit={handleSubmit}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
                                         <TextField
-                                            type={isShowPasswordOld === false ? "password" : "text"}
-                                            id="old_password" name="old_password" label="Old Password" variant="outlined" size="small" className="w-full"
-                                            value={oldPassword} disabled={isLoadingChangePassword === true ? true : false}
-                                            onChange={(e) => setOldPassword(e.target.value)} />
+                                            type="text"
+                                            id="first_name"
+                                            name="first_name"
+                                            value={formFields.first_name}
+                                            label="First Name"
+                                            variant="outlined"
+                                            size="medium"
+                                            className="w-full"
+                                            onChange={onChangeInput}
+                                            disabled={isLoading}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    '&:hover fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                    '&.Mui-focused fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                },
+                                            }}
+                                        />
+                                    </div>
 
-                                        <Button className="!absolute top-[4px] right-[2px] z-50 !w-[35px] !h-[35px] !min-w-[35px]
-                            !rounded-full !text-black" onClick={() => setIsShowPasswordOld(!isShowPasswordOld)}>
-                                            {
-                                                isShowPasswordOld === true ?
-                                                    <IoMdEye className="text-[20px] opacity-75" />
-                                                    :
-                                                    <IoMdEyeOff className="text-[20px] opacity-75" />
-                                            }
-                                        </Button>
+                                    <div>
+                                        <TextField
+                                            type="text"
+                                            id="last_name"
+                                            name="last_name"
+                                            value={formFields.last_name}
+                                            label="Last Name"
+                                            variant="outlined"
+                                            size="medium"
+                                            className="w-full"
+                                            onChange={onChangeInput}
+                                            disabled={isLoading}
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    '&:hover fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                    '&.Mui-focused fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                },
+                                            }}
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="flex items-center mt-4 gap-5">
-                                    <div className="form-group w-[70%] relative">
+                                <div className="mt-6">
+                                    <div className="md:w-1/2">
                                         <TextField
-                                            type={isShowPasswordNew === false ? "password" : "text"}
-                                            id="new_password" name="new_password" label="New Password" variant="outlined" size="small" className="w-full"
-                                            value={newPassword} disabled={isLoadingChangePassword === true ? true : false}
-                                            onChange={(e) => setNewPassword(e.target.value)} />
-
-                                        <Button className="!absolute top-[4px] right-[2px] z-50 !w-[35px] !h-[35px] !min-w-[35px]
-                            !rounded-full !text-black" onClick={() => setIsShowPasswordNew(!isShowPasswordNew)}>
-                                            {
-                                                isShowPasswordNew === true ?
-                                                    <IoMdEye className="text-[20px] opacity-75" />
-                                                    :
-                                                    <IoMdEyeOff className="text-[20px] opacity-75" />
+                                            type="text"
+                                            id="phone"
+                                            name="phone"
+                                            value={formFields.phone}
+                                            label="Phone Number"
+                                            variant="outlined"
+                                            size="medium"
+                                            className="w-full"
+                                            onChange={onChangeInput}
+                                            disabled={isLoading}
+                                            error={formFields.phone !== "" && !isValidVietnamesePhone(formFields.phone)}
+                                            helperText={
+                                                formFields.phone !== "" && !isValidVietnamesePhone(formFields.phone)
+                                                    ? "Số điện thoại không hợp lệ"
+                                                    : ""
                                             }
-                                        </Button>
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    '&:hover fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                    '&.Mui-focused fieldset': {
+                                                        borderColor: '#3b82f6',
+                                                    },
+                                                },
+                                            }}
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="flex items-center mt-4 gap-5">
-                                    <div className="form-group w-[70%] mb-5 relative" ref={confirmPasswordRef}>
-                                        <TextField
-                                            type={isShowPasswordConfirm === false ? "password" : "text"}
-                                            id="confirm_new_password" name="confirm_new_password" label="Confirm Password" variant="outlined" size="small" className="w-full"
-                                            disabled={isLoadingChangePassword === true ? true : false}
-                                            value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                                            error={!!error} helperText={error} />
-
-                                        <Button className="!absolute top-[4px] right-[2px] z-50 !w-[35px] !h-[35px] !min-w-[35px]
-                            !rounded-full !text-black" onClick={() => setIsShowPasswordConfirm(!isShowPasswordConfirm)}>
-                                            {
-                                                isShowPasswordConfirm === true ?
-                                                    <IoMdEye className="text-[20px] opacity-75" />
-                                                    :
-                                                    <IoMdEyeOff className="text-[20px] opacity-75" />
-                                            }
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center w-full mb-3">
+                                <div className="flex items-center mt-8">
                                     <button
                                         type="submit"
-                                        disabled={
-                                            isSubmitDisabled ||
-                                            !oldPassword ||
-                                            !newPassword ||
-                                            !confirmPassword ||
-                                            confirmPassword !== newPassword
-                                        }
-                                        className={`btn-org btn-lg w-[250px] flex items-center justify-center transition ${isSubmitDisabled || isLoadingChangePassword ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                        disabled={!validateValue || isLoading}
+                                        className={`px-8 py-3 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${(!validateValue || isLoading)
+                                                ? "bg-gray-400 cursor-not-allowed"
+                                                : "bg-blue-600 hover:bg-blue-700 cursor-pointer shadow-lg hover:shadow-xl"
+                                            }`}
                                     >
-                                        {
-                                            isLoadingChangePassword === true ? <CircularProgress color="inherit" />
-                                                :
-                                                'Change Password'
-                                        }
+                                        {isLoading ? (
+                                            <>
+                                                <CircularProgress color="inherit" size={20} />
+                                                <span>Updating...</span>
+                                            </>
+                                        ) : (
+                                            'Update Profile'
+                                        )}
                                     </button>
                                 </div>
                             </form>
                         </div>
-                    )}
+
+                        {isShowChangePassword && (
+                            <div className="card bg-white p-6 shadow-lg rounded-xl border border-gray-100">
+                                <div className="flex items-center pb-4 border-b border-gray-200">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-0">Change Password</h2>
+                                </div>
+
+                                <form className="mt-6" onSubmit={handleChangePassword}>
+                                    <div className="space-y-6">
+                                        <div className="md:w-2/3">
+                                            <div className="form-group relative">
+                                                <TextField
+                                                    type={isShowPasswordOld ? "text" : "password"}
+                                                    id="old_password"
+                                                    name="old_password"
+                                                    label="Current Password"
+                                                    variant="outlined"
+                                                    size="medium"
+                                                    className="w-full"
+                                                    value={oldPassword}
+                                                    disabled={isLoadingChangePassword}
+                                                    onChange={(e) => setOldPassword(e.target.value)}
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            '&:hover fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                            '&.Mui-focused fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                        },
+                                                    }}
+                                                />
+                                                <PasswordToggleButton
+                                                    isShow={isShowPasswordOld}
+                                                    onToggle={() => setIsShowPasswordOld(!isShowPasswordOld)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="md:w-2/3">
+                                            <div className="form-group relative">
+                                                <TextField
+                                                    type={isShowPasswordNew ? "text" : "password"}
+                                                    id="new_password"
+                                                    name="new_password"
+                                                    label="New Password"
+                                                    variant="outlined"
+                                                    size="medium"
+                                                    className="w-full"
+                                                    value={newPassword}
+                                                    disabled={isLoadingChangePassword}
+                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            '&:hover fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                            '&.Mui-focused fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                        },
+                                                    }}
+                                                />
+                                                <PasswordToggleButton
+                                                    isShow={isShowPasswordNew}
+                                                    onToggle={() => setIsShowPasswordNew(!isShowPasswordNew)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="md:w-2/3">
+                                            <div className="form-group relative">
+                                                <TextField
+                                                    type={isShowPasswordConfirm ? "text" : "password"}
+                                                    id="confirm_new_password"
+                                                    name="confirm_new_password"
+                                                    label="Confirm New Password"
+                                                    variant="outlined"
+                                                    size="medium"
+                                                    className="w-full"
+                                                    disabled={isLoadingChangePassword}
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    error={!!error}
+                                                    helperText={error}
+                                                    sx={{
+                                                        '& .MuiOutlinedInput-root': {
+                                                            '&:hover fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                            '&.Mui-focused fieldset': {
+                                                                borderColor: '#3b82f6',
+                                                            },
+                                                        },
+                                                    }}
+                                                />
+                                                <PasswordToggleButton
+                                                    isShow={isShowPasswordConfirm}
+                                                    onToggle={() => setIsShowPasswordConfirm(!isShowPasswordConfirm)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center mt-8">
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmitDisabled || isLoadingChangePassword}
+                                            className={`px-8 py-3 rounded-lg font-semibold text-white transition-all duration-200 flex items-center gap-2 ${(isSubmitDisabled || isLoadingChangePassword)
+                                                    ? "bg-gray-400 cursor-not-allowed"
+                                                    : "bg-green-600 hover:bg-green-700 cursor-pointer shadow-lg hover:shadow-xl"
+                                                }`}
+                                        >
+                                            {isLoadingChangePassword ? (
+                                                <>
+                                                    <CircularProgress color="inherit" size={20} />
+                                                    <span>Changing...</span>
+                                                </>
+                                            ) : (
+                                                'Change Password'
+                                            )}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </section>

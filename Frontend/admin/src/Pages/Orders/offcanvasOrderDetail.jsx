@@ -7,25 +7,22 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
 
     return (
         <div className={`fixed inset-0 z-50 ${open ? 'visible' : 'invisible'}`}>
-            {/* Backdrop với hiệu ứng blur */}
             <div
                 className={`fixed inset-0 bg-black/40 backdrop-blur-sm transition-all duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
                 onClick={onClose}
             ></div>
 
-            {/* Main Panel */}
             <div
                 className={`fixed right-0 top-0 h-full w-[650px] bg-white shadow-2xl transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
             >
-                {/* Header với gradient */}
                 <div className="bg-gradient-to-r from-white-600 to-gray-500 p-6 text-white">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-700">Order Details</h2>
                             <p className="text-sm mt-1 text-black">Complete order information</p>
                         </div>
-                        <Button 
-                            className="!w-10 !h-10 !min-w-10 !p-0 !text-white hover:!bg-white/20 !rounded-full" 
+                        <Button
+                            className="!w-10 !h-10 !min-w-10 !p-0 !text-white hover:!bg-white/20 !rounded-full"
                             onClick={onClose}
                         >
                             <span className="text-xl">&times;</span>
@@ -33,17 +30,15 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                     </div>
                 </div>
 
-                {/* Content */}
                 <div className="p-6 h-full overflow-y-auto pb-24 bg-gray-50">
                     {orderInfo && (
                         <>
-                            {/* Order Summary Card */}
                             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold text-gray-800">Order Summary</h3>
                                     <Badge status={orderInfo.status} />
                                 </div>
-                                
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-3">
                                         <div>
@@ -55,7 +50,7 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                             <p className="text-sm text-gray-800 mt-1">{orderInfo.created_at?.slice(0, 10)}</p>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-3">
                                         <div>
                                             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</span>
@@ -67,14 +62,26 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div className="border-t border-gray-100 pt-4 mt-4">
+
+                                <div className="border-t border-gray-100 pt-4 mt-4 space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-lg font-semibold text-gray-800">Total Amount</span>
-                                        <span className="text-2xl font-bold text-green-600">{orderInfo.total_price}</span>
+                                        <span className="text-sm font-medium text-gray-600">Original Total</span>
+                                        <span className="text-sm font-semibold text-gray-800">{orderInfo.total_price}</span>
+                                    </div>
+
+                                    {orderInfo.total_refunded > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium text-gray-600">Total Refunded</span>
+                                            <span className="text-sm font-semibold text-red-600">-{orderInfo.total_refunded}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center border-t border-gray-100 pt-3">
+                                        <span className="text-lg font-semibold text-gray-800">Final Amount</span>
+                                        <span className="text-2xl font-bold text-green-600">{orderInfo.final_total}</span>
                                     </div>
                                 </div>
-                                
+
                                 {orderInfo.note && (
                                     <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                                         <span className="text-xs font-medium text-yellow-700 uppercase tracking-wider">Note</span>
@@ -83,7 +90,6 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                 )}
                             </div>
 
-                            {/* Customer Info Card */}
                             {customer && (
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
                                     <div className="flex items-center mb-4">
@@ -92,7 +98,7 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                         </div>
                                         <h3 className="text-lg font-semibold text-gray-800">Customer Information</h3>
                                     </div>
-                                    
+
                                     <div className="grid grid-cols-1 gap-3">
                                         <div className="flex items-center">
                                             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Name</span>
@@ -110,7 +116,6 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                 </div>
                             )}
 
-                            {/* Address Info Card */}
                             {address && (
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
                                     <div className="flex items-center mb-4">
@@ -119,7 +124,7 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                         </div>
                                         <h3 className="text-lg font-semibold text-gray-800">Shipping Address</h3>
                                     </div>
-                                    
+
                                     <div className="bg-gray-50 rounded-lg p-4">
                                         <p className="text-sm text-gray-700 leading-relaxed">
                                             {[address.line, address.street, address.ward, address.district, address.city, address.country]
@@ -143,24 +148,36 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                         <span className="text-xs font-medium text-gray-600">{order_detail?.length || 0} items</span>
                                     </div>
                                 </div>
-                                
+
                                 {order_detail && order_detail.length > 0 ? (
                                     <div className="max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                                         <div className="space-y-4">
                                             {order_detail.map((item, index) => (
-                                                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                                                <div key={item.id || index} className={`border rounded-lg p-4 hover:shadow-md transition-shadow duration-200 ${item.is_returned ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
                                                     <div className="flex gap-4">
                                                         <div className="relative">
                                                             <img
-                                                                src={item.images?.[0] || "/placeholder-image.jpg"}
+                                                                src={item.variant_image || "/placeholder-image.jpg"}
                                                                 className="w-20 h-20 object-cover rounded-lg shadow-sm"
                                                                 alt="Product"
                                                             />
+                                                            {item.is_returned && (
+                                                                <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                                                                    ↩
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        
+
                                                         <div className="flex-1">
-                                                            <h5 className="font-semibold text-gray-800 mb-2">{item.name}</h5>
-                                                            
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <h5 className="font-semibold text-gray-800">{item.name}</h5>
+                                                                {item.is_returned && (
+                                                                    <span className="inline-flex items-center px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
+                                                                        Returned
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
                                                             <div className="flex gap-4 mb-3">
                                                                 <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                                                                     Size: {item.size || 'None'}
@@ -169,7 +186,7 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                                                     Color: {item.color || 'None'}
                                                                 </span>
                                                             </div>
-                                                            
+
                                                             <div className="flex justify-between items-center">
                                                                 <div>
                                                                     <span className="text-xs text-gray-500">Price</span>
@@ -177,9 +194,25 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
                                                                 </div>
                                                                 <div className="text-right">
                                                                     <span className="text-xs text-gray-500">Quantity</span>
-                                                                    <p className="text-sm font-semibold text-gray-800">x{item.quantity}</p>
+                                                                    <p className="text-sm font-semibold text-gray-800">
+                                                                        x{item.quantity}
+                                                                        {item.is_returned && item.returned_quantity > 0 && (
+                                                                            <span className="text-orange-600 ml-1">
+                                                                                (returned: {item.returned_quantity})
+                                                                            </span>
+                                                                        )}
+                                                                    </p>
                                                                 </div>
                                                             </div>
+
+                                                            {item.is_returned && item.refund_amount > 0 && (
+                                                                <div className="mt-2 pt-2 border-t border-orange-200">
+                                                                    <div className="flex justify-between items-center text-sm">
+                                                                        <span className="text-orange-600 font-medium">Refund Amount:</span>
+                                                                        <span className="text-orange-700 font-semibold">{item.refund_amount}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -203,4 +236,4 @@ const OrderDetailOffcanvas = ({ open, onClose, order }) => {
     );
 };
 
-export default OrderDetailOffcanvas;
+export default OrderDetailOffcanvas

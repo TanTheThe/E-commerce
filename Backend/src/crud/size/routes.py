@@ -9,7 +9,7 @@ from src.dependencies import admin_role_middleware
 
 size_admin_router = APIRouter(prefix="/size")
 size_customer_router = APIRouter(prefix="/size")
-size_common_router = APIRouter(prefix="/size")
+size_staff_router = APIRouter(prefix="/size")
 
 size_service = SizeService()
 access_token_bearer = AccessTokenBearer()

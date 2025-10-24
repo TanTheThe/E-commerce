@@ -11,6 +11,7 @@ import OrderStatusUpdateModal from "./updateStatusOrder";
 import { MyContext } from "../../App";
 import { debounce } from "lodash";
 import { MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow } from "@mui/material";
+import useAuth from "../Verify/auth";
 
 const columns = [
     { id: 'code', label: 'ORDER CODE', minWidth: 120, align: 'center' },
@@ -36,6 +37,9 @@ const Orders = () => {
     const [sortByTotalPrice, setSortByTotalPrice] = useState('');
     const [sortByCreatedAt, setSortByCreatedAt] = useState('newest');
     const [statusFilter, setStatusFilter] = useState('');
+
+    const { userRole, isLoading } = useAuth();
+    const isStaff = userRole === 'staff';
 
     const context = useContext(MyContext)
 
@@ -79,8 +83,11 @@ const Orders = () => {
     }, [buildQueryParams, page, rowsPerPage, searchTerm, context]);
 
     useEffect(() => {
+        if (isLoading) return;
+        if (userRole === 'staff') return;
+
         fetchOrders(page, rowsPerPage, searchTerm);
-    }, [page, rowsPerPage, searchTerm, sortByTotalPrice, sortByCreatedAt, statusFilter, fetchOrders]);
+    }, [page, rowsPerPage, searchTerm, sortByTotalPrice, sortByCreatedAt, statusFilter, fetchOrders, userRole, isLoading]);
 
     const debouncedSearch = useCallback(
         debounce((value) => {
@@ -211,11 +218,11 @@ const Orders = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Trạng thái đơn hàng</label>
                         <Select value={statusFilter} onChange={handleStatusFilterChange} className="w-full h-11">
                             <MenuItem value="">-- Tất cả trạng thái --</MenuItem>
-                            <MenuItem value="Pending">Chờ xử lý</MenuItem>
-                            <MenuItem value="Confirmed">Đã xác nhận</MenuItem>
-                            <MenuItem value="Shipping">Đang giao</MenuItem>
-                            <MenuItem value="Delivered">Đã giao</MenuItem>
-                            <MenuItem value="Cancelled">Đã hủy</MenuItem>
+                            <MenuItem value="pending">Chờ xử lý</MenuItem>
+                            <MenuItem value="confirmed">Đã xác nhận</MenuItem>
+                            <MenuItem value="shipping">Đang giao</MenuItem>
+                            <MenuItem value="delivered">Đã giao</MenuItem>
+                            <MenuItem value="cancelled">Đã hủy</MenuItem>
                         </Select>
                     </div>
 
@@ -261,10 +268,10 @@ const Orders = () => {
                             {statusFilter && (
                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     Trạng thái: {
-                                        statusFilter === 'Pending' ? 'Chờ xử lý' :
-                                            statusFilter === 'Confirmed' ? 'Đã xác nhận' :
-                                                statusFilter === 'Shipping' ? 'Đang giao' :
-                                                    statusFilter === 'Delivered' ? 'Đã giao' : 'Đã hủy'
+                                        statusFilter === 'pending' ? 'Chờ xử lý' :
+                                            statusFilter === 'confirmed' ? 'Đã xác nhận' :
+                                                statusFilter === 'shipping' ? 'Đang giao' :
+                                                    statusFilter === 'delivered' ? 'Đã giao' : 'Đã hủy'
                                     }
                                 </span>
                             )}

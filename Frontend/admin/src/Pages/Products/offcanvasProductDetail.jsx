@@ -25,7 +25,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
 
             <div className={`fixed right-0 top-0 h-full w-[650px] bg-white shadow-xl transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="flex items-center justify-between p-4 border-b border-[rgba(0,0,0,0.2)]">
-                    <h2 className="text-xl font-semibold">Product Details</h2>
+                    <h2 className="text-xl font-semibold">Chi tiết sản phẩm</h2>
                     <Button
                         className="!w-8 !h-8 !min-w-8 !p-0 hover:bg-gray-100"
                         onClick={onClose}
@@ -34,7 +34,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                     </Button>
                 </div>
 
-                <div className="p-4 h-full overflow-y-auto pb-24">
+                <div className="p-4 h-full overflow-y-auto pb-30">
                     {product && (
                         <>
                             <div className="mb-6">
@@ -57,34 +57,129 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                 </div>
                             </div>
 
+                            {product.brand && (
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Thương hiệu</h4>
+                                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                        <div className="flex items-center gap-3">
+                                            {product.brand.logo && (
+                                                <img
+                                                    src={product.brand.logo}
+                                                    alt={product.brand.name}
+                                                    className="w-8 h-8 object-cover rounded"
+                                                />
+                                            )}
+                                            <span className="bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1 rounded">
+                                                {product.brand.name}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {product.materials && product.materials.length > 0 && (
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Chất liệu</h4>
+                                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                        <div className="space-y-2">
+                                            {product.materials.map((material, index) => (
+                                                <div key={material.id || index} className="flex items-center justify-between">
+                                                    <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded">
+                                                        {material.name}
+                                                    </span>
+                                                    <span className="text-sm text-gray-600 font-medium">
+                                                        {material.percentage}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-gray-300 pt-2 mt-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm font-medium text-gray-700">Tổng cộng:</span>
+                                                    <span className="text-sm font-bold text-gray-800">
+                                                        {product.materials.reduce((sum, material) => sum + (material.percentage || 0), 0)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {product.tags && product.tags.length > 0 && (
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Tags</h4>
+                                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                        <div className="flex flex-wrap gap-2">
+                                            {product.tags.map((tag, index) => (
+                                                <span key={tag.id || index} className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded">
+                                                    {tag.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {product.offer && (
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Ưu đãi đặc biệt</h4>
+                                    <div className="p-3 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-md">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-red-800 font-medium">{product.offer.name}</span>
+                                            <span className="bg-red-100 text-red-800 text-sm font-bold px-2 py-1 rounded">
+                                                -{product.offer.discount}%
+                                            </span>
+                                        </div>
+                                        {product.offer.start_time && product.offer.end_time && (
+                                            <div className="mt-2 text-xs text-gray-600">
+                                                <div>Bắt đầu: {new Date(product.offer.start_time).toLocaleDateString('vi-VN')}</div>
+                                                <div>Kết thúc: {new Date(product.offer.end_time).toLocaleDateString('vi-VN')}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="mb-6">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Short Description</h4>
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Trạng thái</h4>
+                                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                    <span className={`inline-block px-3 py-1 rounded text-sm font-medium ${product.status === 'active'
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-gray-100 text-gray-800'
+                                        }`}>
+                                        {product.status === 'active' ? 'Đang hoạt động' : 'Không hoạt động'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Mô tả ngắn</h4>
                                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                     <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                                        {product.short_description || 'No short description available'}
+                                        {product.short_description || 'Không có mô tả ngắn'}
                                     </p>
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Mô tả chi tiết</h4>
                                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                                     <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                                        {product.description || 'No description available'}
+                                        {product.description || 'Không có mô tả chi tiết'}
                                     </p>
                                 </div>
                             </div>
 
                             <div className="mb-6">
                                 <h4 className="text-lg font-semibold mb-4">
-                                    Product Variants ({product.product_variant?.length || 0})
+                                    Biến thể sản phẩm ({product.product_variant?.length || 0})
                                 </h4>
                                 {product.product_variant && product.product_variant.length > 0 ? (
                                     <div className="space-y-4">
                                         {product.product_variant.map((variant, index) => (
                                             <div key={variant.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                                 <div className="flex items-center justify-between mb-3">
-                                                    <h5 className="font-medium text-gray-800">Variant {index + 1}</h5>
+                                                    <h5 className="font-medium text-gray-800">Biến thể {index + 1}</h5>
                                                     <span className="text-sm text-gray-500 bg-white px-2 py-1 rounded">
                                                         ID: {variant.id}
                                                     </span>
@@ -93,18 +188,18 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            Size
+                                                            Kích cỡ
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
                                                             <span className={`${variant.size ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                                                                {variant.size || 'None'}
+                                                                {variant.size || 'Không có'}
                                                             </span>
                                                         </div>
                                                     </div>
 
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            Color
+                                                            Màu sắc
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md flex items-center gap-2">
                                                             {variant.color_code && (
@@ -114,14 +209,14 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                                 ></div>
                                                             )}
                                                             <span className={`${variant.color_name ? 'text-gray-800' : 'text-gray-400 italic'}`}>
-                                                                {variant.color_name || 'None'}
+                                                                {variant.color_name || 'Không có'}
                                                             </span>
                                                         </div>
                                                     </div>
 
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            Original Price
+                                                            Giá gốc
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
                                                             <span className={`${hasDiscount(variant) ? 'text-gray-400 line-through text-sm' : 'text-gray-800 font-semibold'}`}>
@@ -132,7 +227,7 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
 
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            {hasDiscount(variant) ? 'Discounted Price' : 'Price'}
+                                                            {hasDiscount(variant) ? 'Giá khuyến mãi' : 'Giá bán'}
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md flex items-center gap-2">
                                                             {hasDiscount(variant) ? (
@@ -154,12 +249,12 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
 
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-600 mb-1">
-                                                            Quantity
+                                                            Số lượng
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
                                                             <span className={`${variant.quantity > 0 ? 'text-gray-800' : 'text-red-500'}`}>
                                                                 {variant.quantity}
-                                                                {variant.quantity === 0 && ' (Out of stock)'}
+                                                                {variant.quantity === 0 && ' (Hết hàng)'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -170,17 +265,32 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                                                         </label>
                                                         <div className="p-2 bg-white border border-gray-200 rounded-md">
                                                             <span className="text-gray-800 font-mono text-sm">
-                                                                {variant.sku}
+                                                                {variant.sku || 'Không có'}
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                {variant.image && (
+                                                    <div className="mt-3">
+                                                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                                                            Ảnh biến thể
+                                                        </label>
+                                                        <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden">
+                                                            <img
+                                                                src={variant.image}
+                                                                alt={`${product.name} - ${variant.size}`}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
                                     <div className="text-gray-500 text-center py-8">
-                                        No variants available for this product
+                                        Không có biến thể nào cho sản phẩm này
                                     </div>
                                 )}
                             </div>
@@ -188,13 +298,13 @@ const ProductDetailOffcanvas = ({ open, onClose, product }) => {
                     )}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)] p-4">
+                <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[rgba(0,0,0,0.2)] p-3">
                     <div className="flex justify-end">
                         <Button
                             className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
                             onClick={onClose}
                         >
-                            Close
+                            Đóng
                         </Button>
                     </div>
                 </div>

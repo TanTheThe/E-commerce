@@ -11,20 +11,23 @@ import RangeSlider from 'react-range-slider-input';
 import 'react-range-slider-input/dist/style.css';
 import Rating from "@mui/material/Rating";
 import { getDataApi } from "../../utils/api";
+import { Radio } from "@mui/material";
 
-const Sidebar = ({ categoryId,
+const Sidebar = ({
+    categoryId,
     onFilterChange,
     selectedCategoryIds = [],
     selectedSizes = [],
     selectedColors = [],
     selectedRatings = [],
+    selectedBrandId = null,
+    selectedMaterialIds = [],
     minPrice,
     maxPrice }) => {
     const [isOpenCategoryFilter, setIsOpenCategoryFilter] = useState(true);
     const [isOpenSizeFilter, setIsOpenSizeFilter] = useState(true);
     const [isOpenColorFilter, setIsOpenColorFilter] = useState(true);
 
-    const [filterData, setFilterData] = useState({ categories: [], sizes: [], colors: [] });
     const [showAllSizes, setShowAllSizes] = useState(false);
     const [showAllColors, setShowAllColors] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -32,6 +35,19 @@ const Sidebar = ({ categoryId,
 
     const [tempMinPrice, setTempMinPrice] = useState('');
     const [tempMaxPrice, setTempMaxPrice] = useState('');
+
+    const [isOpenBrandFilter, setIsOpenBrandFilter] = useState(true);
+    const [isOpenMaterialFilter, setIsOpenMaterialFilter] = useState(true);
+    const [showAllBrands, setShowAllBrands] = useState(false);
+    const [showAllMaterials, setShowAllMaterials] = useState(false);
+
+    const [filterData, setFilterData] = useState({
+        categories: [],
+        sizes: [],
+        colors: [],
+        brands: [],
+        materials: []
+    });
 
     useEffect(() => {
         const fetchFilters = async () => {
@@ -103,6 +119,21 @@ const Sidebar = ({ categoryId,
         onFilterChange('rating', newSelected);
     };
 
+    const handleBrandChange = (brandId) => {
+        const newSelected = selectedBrandId === brandId ? null : brandId;
+        onFilterChange('brand', newSelected);
+    };
+
+    const handleMaterialChange = (materialId, checked) => {
+        let newSelected;
+        if (checked) {
+            newSelected = [...selectedMaterialIds, materialId];
+        } else {
+            newSelected = selectedMaterialIds.filter(id => id !== materialId);
+        }
+        onFilterChange('materials', newSelected);
+    };
+
     const handlePriceFilter = () => {
         const min = tempMinPrice ? parseFloat(tempMinPrice) : null;
         const max = tempMaxPrice ? parseFloat(tempMaxPrice) : null;
@@ -139,23 +170,34 @@ const Sidebar = ({ categoryId,
                     <FormControlLabel
                         key={item.id || item.name}
                         control={
-                            <Checkbox
-                                size="small"
-                                checked={
-                                    type === 'categories' ? selectedCategoryIds.includes(item.id) :
-                                        type === 'sizes' ? selectedSizes.includes(item.name) :
-                                            type === 'colors' ? selectedColors.includes(item.id) : false
-                                }
-                                onChange={(e) => {
-                                    if (type === 'categories') {
-                                        handleCategoryChange(item.id, e.target.checked);
-                                    } else if (type === 'sizes') {
-                                        handleSizeChange(item.name, e.target.checked);
-                                    } else if (type === 'colors') {
-                                        handleColorChange(item.id, e.target.checked);
+                            type === 'brands' ? (
+                                <Radio
+                                    size="small"
+                                    checked={selectedBrandId === item.id}
+                                    onChange={() => handleBrandChange(item.id)}
+                                />
+                            ) : (
+                                <Checkbox
+                                    size="small"
+                                    checked={
+                                        type === 'categories' ? selectedCategoryIds.includes(item.id) :
+                                            type === 'sizes' ? selectedSizes.includes(item.name) :
+                                                type === 'colors' ? selectedColors.includes(item.id) :
+                                                    type === 'materials' ? selectedMaterialIds.includes(item.id) : false
                                     }
-                                }}
-                            />
+                                    onChange={(e) => {
+                                        if (type === 'categories') {
+                                            handleCategoryChange(item.id, e.target.checked);
+                                        } else if (type === 'sizes') {
+                                            handleSizeChange(item.name, e.target.checked);
+                                        } else if (type === 'colors') {
+                                            handleColorChange(item.id, e.target.checked);
+                                        } else if (type === 'materials') {
+                                            handleMaterialChange(item.id, e.target.checked);
+                                        }
+                                    }}
+                                />
+                            )
                         }
                         label={item.name}
                         className="w-full"
@@ -215,7 +257,7 @@ const Sidebar = ({ categoryId,
                                     control={
                                         <Checkbox
                                             size="small"
-                                            checked={selectedCategoryIds.includes(cat.id)}
+                                            checked={selectedCategoryIds.includes(cat.id) || selectedCategoryIds.includes(cat.slug)}
                                             onChange={(e) => handleCategoryChange(cat.id, e.target.checked)}
                                         />
                                     }
@@ -267,6 +309,56 @@ const Sidebar = ({ categoryId,
                             renderLimitedList(filterData.colors, showAllColors, setShowAllColors, 'colors')
                         ) : (
                             <span className="text-gray-500 text-sm">Không có màu sắc</span>
+                        )}
+                    </div>
+                </Collapse>
+            </div>
+
+            <div className="box mt-5">
+                <h3 className="w-full text-[16px] font-[600] flex items-center pr-5">
+                    Brand
+                    <Button
+                        className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+                        onClick={() => setIsOpenBrandFilter(!isOpenBrandFilter)}
+                    >
+                        {isOpenBrandFilter ? <FaAngleDown /> : <FaAngleUp />}
+                    </Button>
+                </h3>
+                <Collapse isOpened={isOpenBrandFilter}>
+                    <div className="px-3 relative -left-[13px]">
+                        {selectedBrandId && (
+                            <Button
+                                onClick={() => handleBrandChange(null)}
+                                className="!text-[#ff5252] !text-xs !mb-2 !normal-case"
+                            >
+                                Clear Brand Filter
+                            </Button>
+                        )}
+                        {filterData.brands && filterData.brands.length > 0 ? (
+                            renderLimitedList(filterData.brands, showAllBrands, setShowAllBrands, 'brands')
+                        ) : (
+                            <span className="text-gray-500 text-sm">Không có thương hiệu</span>
+                        )}
+                    </div>
+                </Collapse>
+            </div>
+
+            <div className="box mt-5">
+                <h3 className="w-full text-[16px] font-[600] flex items-center pr-5">
+                    Material
+                    <Button
+                        className="!w-[30px] !h-[30px] !min-w-[30px] !rounded-full !ml-auto !text-[#000]"
+                        onClick={() => setIsOpenMaterialFilter(!isOpenMaterialFilter)}
+                    >
+                        {isOpenMaterialFilter ? <FaAngleDown /> : <FaAngleUp />}
+                    </Button>
+                </h3>
+                <Collapse isOpened={isOpenMaterialFilter}>
+                    <div className="px-3 relative -left-[13px]">
+                        {filterData.materials && filterData.materials.length > 0 ? (
+                            renderLimitedList(filterData.materials, showAllMaterials, setShowAllMaterials, 'materials')
+                        ) : (
+                            <span className="text-gray-500 text-sm">Không có chất liệu</span>
                         )}
                     </div>
                 </Collapse>

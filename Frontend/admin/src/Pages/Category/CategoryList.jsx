@@ -204,8 +204,6 @@ const CategoryList = () => {
 
             const response = await getDataApi(`/admin/categories/all?${queryParams.toString()}`);
 
-            console.log(response);
-
             if (response.success) {
                 setCategories(response.data.data || []);
                 setTotalCategories(response.data.total || 0);
@@ -323,7 +321,7 @@ const CategoryList = () => {
                 fetchCategories();
                 closeDeleteDialog();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi trong quá trình xóa danh mục");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi trong quá trình xóa danh mục");
             }
         } catch (error) {
             console.error('Error deleting category:', error);

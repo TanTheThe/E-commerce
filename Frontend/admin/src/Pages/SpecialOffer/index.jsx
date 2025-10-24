@@ -219,7 +219,7 @@ const SpecialOffer = () => {
                 fetchOffers(page, rowsPerPage, searchTerm);
                 closeDeleteDialog();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi trong quá trình xóa mã khuyến mãi");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi trong quá trình xóa mã khuyến mãi");
             }
         } catch (error) {
             console.error('Error deleting offer:', error);

@@ -176,7 +176,7 @@ const Reviews = () => {
                 fetchReviews();
                 closeDeleteDialog();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi trong quá trình xóa đánh giá");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi trong quá trình xóa đánh giá");
             }
         } catch (error) {
             console.error('Error deleting review:', error);
@@ -214,7 +214,7 @@ const Reviews = () => {
                 context.openAlertBox("success", response.message || "Phản hồi đánh giá thành công");
                 closeReplyDialog();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi trong quá trình phản hồi đánh giá");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi trong quá trình phản hồi đánh giá");
             }
         } catch (error) {
             console.error('Error replying review:', error);

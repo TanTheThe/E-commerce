@@ -136,7 +136,7 @@ const ReviewDetailModal = ({ reviewId, isOpen, onClose }) => {
                                 <div>
                                     <h4 className="text-md font-medium text-gray-800 mb-2">Đánh giá:</h4>
                                     <div className="bg-gray-50 p-4 rounded-lg text-gray-700 text-sm leading-relaxed">
-                                        {reviewDetail.comment}
+                                        {typeof reviewDetail.comment === 'object' ? JSON.stringify(reviewDetail.comment) : reviewDetail.comment}
                                     </div>
                                 </div>
                             )}
@@ -165,28 +165,28 @@ const ReviewDetailModal = ({ reviewId, isOpen, onClose }) => {
                                 </div>
                             )}
 
-                            {reviewDetail.additional_comment && (
+                            {reviewDetail.additional_evaluation && reviewDetail.additional_evaluation.has_additional && reviewDetail.additional_evaluation.comment && (
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="text-md font-medium text-gray-800">Đánh giá bổ sung:</h4>
-                                        {reviewDetail.additional_created_at && (
+                                        {reviewDetail.additional_evaluation.created_at && (
                                             <span className="text-xs text-gray-500">
-                                                {formatDate(reviewDetail.additional_created_at)}
+                                                {formatDate(reviewDetail.additional_evaluation.created_at)}
                                             </span>
                                         )}
                                     </div>
                                     <div className="bg-blue-50 p-4 rounded-lg text-gray-700 text-sm leading-relaxed border-l-4 border-blue-400">
-                                        {reviewDetail.additional_comment}
+                                        {reviewDetail.additional_evaluation.comment}
                                     </div>
                                 </div>
                             )}
 
-                            {reviewDetail.additional_image && (
+                            {reviewDetail.additional_evaluation && reviewDetail.additional_evaluation.has_additional && reviewDetail.additional_evaluation.image && (
                                 <div>
                                     <h4 className="text-md font-medium text-gray-800 mb-2">Hình ảnh bổ sung:</h4>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                        {Array.isArray(reviewDetail.additional_image) ? (
-                                            reviewDetail.additional_image.map((img, index) => (
+                                        {Array.isArray(reviewDetail.additional_evaluation.image) ? (
+                                            reviewDetail.additional_evaluation.image.map((img, index) => (
                                                 <img
                                                     key={index}
                                                     src={img}
@@ -196,7 +196,7 @@ const ReviewDetailModal = ({ reviewId, isOpen, onClose }) => {
                                             ))
                                         ) : (
                                             <img
-                                                src={reviewDetail.additional_image}
+                                                src={reviewDetail.additional_evaluation.image}
                                                 alt="Bổ sung"
                                                 className="w-full h-32 object-cover rounded-lg border border-gray-200"
                                             />
@@ -205,18 +205,18 @@ const ReviewDetailModal = ({ reviewId, isOpen, onClose }) => {
                                 </div>
                             )}
 
-                            {reviewDetail.seller_reply && (
+                            {reviewDetail.seller_reply && reviewDetail.seller_reply.content && (
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="text-md font-medium text-gray-800">Phản hồi từ người bán:</h4>
-                                        {reviewDetail.seller_reply_at && (
+                                        {reviewDetail.seller_reply.replied_at && (
                                             <span className="text-xs text-gray-500">
-                                                {formatDate(reviewDetail.seller_reply_at)}
+                                                {formatDate(reviewDetail.seller_reply.replied_at)}
                                             </span>
                                         )}
                                     </div>
                                     <div className="bg-green-50 p-4 rounded-lg text-gray-700 text-sm leading-relaxed border-l-4 border-green-400">
-                                        {reviewDetail.seller_reply}
+                                        {reviewDetail.seller_reply.content}
                                     </div>
                                 </div>
                             )}

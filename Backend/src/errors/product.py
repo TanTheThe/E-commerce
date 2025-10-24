@@ -151,3 +151,23 @@ class ProductException:
                 "error_code": "product_015",
             },
         )
+    
+    @staticmethod
+    def invalid_product_ids():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Một trong số các sản phẩm yêu cầu cập nhật không hợp lệ",
+                "error_code": "product_016",
+            },
+        )
+        
+    @staticmethod
+    def not_found_product_from_variant():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không tìm thấy sản phẩm dựa vào biến thể đã định",
+                "error_code": "product_017",
+            },
+        )

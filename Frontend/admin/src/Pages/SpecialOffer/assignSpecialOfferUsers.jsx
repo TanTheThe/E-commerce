@@ -18,6 +18,7 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
+    const [adminNote, setAdminNote] = useState('');
 
     const context = useContext(MyContext);
 
@@ -25,6 +26,7 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
         if (open) {
             setSelectedUsers([]);
             setSearchTerm('');
+            setAdminNote('');
             setPage(0);
             fetchUsers();
         }
@@ -114,7 +116,8 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
 
             const requestData = {
                 special_offer_id: offer.id,
-                user_ids: selectedUsers
+                user_ids: selectedUsers,
+                ...(adminNote.trim() && { admin_note: adminNote.trim() })
             };
 
             const response = await postDataApi('/admin/special-offer/assign', requestData);
@@ -124,7 +127,7 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
                 onSuccess?.();
                 onClose();
             } else {
-                context.openAlertBox("error", response.message || "Có lỗi khi gắn offer cho người dùng");
+                context.openAlertBox("error", response.data.detail.message || "Có lỗi khi gắn offer cho người dùng");
             }
         } catch (error) {
             console.error('Error assigning offer to users:', error);
@@ -176,6 +179,30 @@ const AssignOfferToUsers = ({ open, onClose, offer, onSuccess }) => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         sx={{ mb: 2 }}
                     />
+
+                    <Box sx={{ mb: 2 }}>
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            variant="outlined"
+                            label="Ghi chú (Tùy chọn)"
+                            placeholder="Nhập ghi chú để gửi cùng với thông báo khuyến mãi..."
+                            value={adminNote}
+                            onChange={(e) => setAdminNote(e.target.value)}
+                            helperText={`${adminNote.length}/500 ký tự. Ghi chú này sẽ được gửi kèm trong thông báo.`}
+                            inputProps={{
+                                maxLength: 500
+                            }}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    '&:hover fieldset': {
+                                        borderColor: 'primary.main',
+                                    },
+                                },
+                            }}
+                        />
+                    </Box>
 
                     <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                         <Typography variant="body2">

@@ -5,7 +5,7 @@ from src.config import Config
 import uuid
 import logging
 from itsdangerous import URLSafeTimedSerializer
-from jwt import ExpiredSignatureError, InvalidTokenError
+from jwt import InvalidTokenError
 
 passwd_context = CryptContext(
     schemes=['bcrypt']
@@ -14,6 +14,7 @@ passwd_context = CryptContext(
 ROLE_SECRET_MAP = {
     "admin": Config.JWT_SECRET_ADMIN,
     "customer": Config.JWT_SECRET_CUSTOMER,
+    "staff": Config.JWT_SECRET_STAFF
 }
 
 TOKEN_CONFIG = {
@@ -25,18 +26,37 @@ TOKEN_CONFIG = {
         "secret": "JWT_RESET_PASSWORD_SECRET_ADMIN",
         "salt": "admin-reset-password",
     },
+    ("staff", "reset_password"): {
+        "secret": "JWT_RESET_PASSWORD_SECRET_STAFF",
+        "salt": "staff-reset-password",
+    },
+    
     ("admin", "first_class_login"): {
         "secret": "JWT_FIRST_CLASS_LOGIN_SECRET_ADMIN",
         "salt": "admin-first-class-login",
     },
+    ("staff", "first_class_login"): {
+        "secret": "JWT_FIRST_CLASS_LOGIN_SECRET_STAFF",
+        "salt": "staff-first-class-login",
+    },
+    
     ("admin", "verify_otp"): {
-        "secret": "JWT_VERIFY_OTP_LOGIN_SECRET_ADMINN",
+        "secret": "JWT_VERIFY_OTP_LOGIN_SECRET_ADMIN",
         "salt": "admin-verify-otp",
     },
+    ("staff", "verify_otp"): {
+        "secret": "JWT_VERIFY_OTP_LOGIN_SECRET_STAFF",
+        "salt": "staff-verify-otp",
+    },
+    
     ("customer", "create_account"): {
         "secret": "JWT_CREATE_ACCOUNT_SECRET_CUSTOMER",
         "salt": "customer-create-account",
-    }
+    },
+    ("staff", "create_account"): {
+        "secret": "JWT_CREATE_ACCOUNT_SECRET_STAFF",
+        "salt": "staff-create-account",
+    },
 }
 
 ACCESS_TOKEN_EXPIRY = 60

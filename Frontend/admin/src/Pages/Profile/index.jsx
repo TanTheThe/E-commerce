@@ -96,7 +96,7 @@ const Profile = () => {
 
         setIsLoadingChangePassword(true)
 
-        const response = await putDataApi("/admin/user/change-password", {
+        const response = await putDataApi("/admin/auth/change-password", {
             old_password: oldPassword,
             new_password: newPassword,
             confirm_new_password: confirmPassword

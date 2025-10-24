@@ -1,4 +1,4 @@
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Tuple
 from sqlalchemy import ColumnElement
 from src.database.models import Product, Product_Variant, Categories, Evaluate, Order_Detail, Order, Categories_Product, \
     Special_Offer
@@ -17,7 +17,7 @@ from src.schemas.product import DeleteMultipleProductModel
 
 class ProductRepository:
     async def create_product(self, product_data, session: AsyncSession):
-        product_data_dict = product_data.model_dump(exclude={"categories_id", "product_variant"})
+        product_data_dict = product_data.model_dump(exclude={"categories_id", "product_variant", "materials", "tags_id"})
 
         new_product = Product(
             **product_data_dict
@@ -44,20 +44,49 @@ class ProductRepository:
 
         return new_product
 
-    async def get_all_product(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                              joins: list = None, skip: int = 0, limit: int = 10, order_by_clause=None):
-        count_stmt = select(func.count(Product.id)).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
+    async def get_all_product(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Product)
+        else:
+            query = select(*select_columns).select_from(Product)
 
-        statement = select(Product).options(
-            *joins if joins else []
-        ).where(*conditions).offset(skip).limit(limit)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        if order_by_clause is not None:
-            statement = statement.order_by(order_by_clause)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
 
-        result = await session.exec(statement)
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         products = result.unique().all()
 
         return products, total
@@ -90,7 +119,6 @@ class ProductRepository:
             .values(**values)
         )
         await session.exec(stmt)
-        await session.commit()
 
 
     async def delete_product(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
@@ -157,14 +185,15 @@ class ProductRepository:
                 ).label("categories"),
                 Special_Offer.discount.label("discount"),
                 Special_Offer.type.label("type_offer"),
-                Product.avg_rating.label("avg_rating")
+                Product.avg_rating.label("avg_rating"),
+                Product.total_sold.label("total_sold")
             )
             .join(Categories_Product, Categories_Product.product_id == Product.id)
             .join(Categories, Categories_Product.categories_id == Categories.id)
             .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
             .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
             .where(conditions)
-            .group_by(Product.id, Product.name, Product.images, Product.popularity_score, Special_Offer.discount, Special_Offer.type, Product.avg_rating)
+            .group_by(Product.id, Product.name, Product.images, Product.popularity_score, Special_Offer.discount, Special_Offer.type, Product.avg_rating, Product.total_sold)
             .order_by(desc(Product.popularity_score))
             .limit(limit_per_category)
         )
@@ -189,14 +218,15 @@ class ProductRepository:
                     )
                 ).label("categories"),
                 Special_Offer.discount.label("discount"),
-                Product.avg_rating.label("avg_rating")
+                Product.avg_rating.label("avg_rating"),
+                Product.total_sold.label("total_sold")
             )
             .join(Categories_Product, Categories_Product.product_id == Product.id)
             .join(Categories, Categories_Product.categories_id == Categories.id)
             .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
             .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
             .where(Special_Offer.discount.isnot(None), Special_Offer.type == "percent")
-            .group_by(Product.id, Product.name, Product.images, Special_Offer.discount, Product.avg_rating)
+            .group_by(Product.id, Product.name, Product.images, Special_Offer.discount, Product.avg_rating, Product.total_sold)
             .order_by(desc(Special_Offer.discount))
             .limit(limit)
         )

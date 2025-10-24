@@ -9,7 +9,7 @@ from src.dependencies import customer_role_middleware
 
 address_admin_router = APIRouter(prefix="/address")
 address_customer_router = APIRouter(prefix="/address")
-address_common_router = APIRouter(prefix="/address")
+address_staff_router = APIRouter(prefix="/address")
 
 address_service = AddressService()
 access_token_bearer = AccessTokenBearer()
