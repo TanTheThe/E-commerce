@@ -134,7 +134,7 @@ const AddSupplierModal = ({ open, onClose, onSupplierAdded, context }) => {
                         <TextField
                             autoFocus
                             margin="dense"
-                            label="Tên Nhà Cung Cấp (*)"
+                            label="Tên Nhà Cung Cấp"
                             type="text"
                             fullWidth
                             variant="outlined"

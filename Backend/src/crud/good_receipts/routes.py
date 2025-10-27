@@ -7,6 +7,7 @@ from src.crud.good_receipts.services.delete_goods_receipt import DeleteGoodsRece
 from src.crud.good_receipts.services.get_all_goods_receipt import GetAllGoodsReceiptService
 from src.crud.good_receipts.services.get_approval_review import ApprovalPreviewService
 from src.crud.good_receipts.services.get_detail_goods_receipt import GetDetailGoodsReceiptService
+from src.crud.good_receipts.services.get_gr_for_create import GetGRForCreateService
 from src.crud.good_receipts.services.update_goods_receipt import UpdateGoodsReceiptService
 from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,6 +28,7 @@ get_all_goods_receipts_service = GetAllGoodsReceiptService()
 get_detail_goods_receipt_service = GetDetailGoodsReceiptService()
 update_goods_receipt_service = UpdateGoodsReceiptService()
 delete_goods_receipt_service = DeleteGoodsReceiptService()
+get_gr_for_create_service = GetGRForCreateService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -130,6 +132,29 @@ async def get_goods_receipt_detail(goods_receipt_id: str,
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin chi tiết phiếu nhập hàng",
+            "content": goods_receipt
+        }
+    )
+    
+    
+@goods_receipt_admin_router.get("/create-info/{parent_goods_receipt_id}")
+async def get_goods_receipt_for_create(parent_goods_receipt_id: str,
+                                       token_details: dict = Depends(access_token_bearer),
+                                       session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    goods_receipt = await get_gr_for_create_service.get_goods_receipt_for_create(
+        session=session,
+        parent_gr_id=parent_goods_receipt_id
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin để tạo phiếu nhập hàng con",
             "content": goods_receipt
         }
     )

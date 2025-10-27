@@ -69,7 +69,7 @@ const Sidebar = () => {
                     </Link>
                 </div>
 
-                <ul className="mt-4">
+                <ul className="mt-4 ">
                     <li>
                         <Link to="/">
                             <Button className="w-full !capitalize !justify-start flex gap-3 text-[14px] !text-[rgba(0,0,0,0.8)] !font-[500] items-center !py-2 hover:!bg-[#f1f1f1]">

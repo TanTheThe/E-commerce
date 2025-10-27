@@ -148,30 +148,24 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
 
     const fetchParentReceiptDetails = async (parentId) => {
         try {
-            const response = await getDataApi(`/admin/goods-receipt/${parentId}`);
+            const response = await getDataApi(`/admin/goods-receipt/create-info/${parentId}`);
             if (response.success) {
                 setParentReceiptDetails(response.data);
 
+                const newItems = response.data.items.map(item => ({
+                    po_detail_id: '', 
+                    product_variant_id: item.product_variant_id,
+                    ordered_quantity: item.ordered_quantity,
+                    received_quantity: 0,
+                    accepted_quantity: 0,
+                    rejected_quantity: 0,
+                    rejection_reason: '',
+                    notes: ''
+                }));
+
                 setFormData(prev => ({
                     ...prev,
-                    items: prev.items.map(item => {
-                        const parentItem = response.data.items.find(
-                            pi => pi.po_detail_id === item.po_detail_id
-                        );
-
-                        if (parentItem) {
-                            return {
-                                ...item,
-                                ordered_quantity: parentItem.rejected_quantity,
-                                received_quantity: 0,
-                                accepted_quantity: 0,
-                                rejected_quantity: 0,
-                                rejection_reason: '',
-                                notes: ''
-                            };
-                        }
-                        return item;
-                    })
+                    items: newItems
                 }));
             } else {
                 openAlertBox?.("error", response.data.detail.message);
@@ -217,12 +211,11 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                     if (field === 'po_detail_id' && value) {
                         if (parentReceiptDetails) {
                             const parentItem = parentReceiptDetails.items.find(
-                                pi => pi.po_detail_id === value
+                                pi => pi.product_variant_id === updated.product_variant_id
                             );
 
                             if (parentItem) {
-                                updated.product_variant_id = parentItem.product_variant_id;
-                                updated.ordered_quantity = parentItem.rejected_quantity;
+                                updated.ordered_quantity = parentItem.ordered_quantity;
                             } else {
                                 openAlertBox?.("warning", "Sản phẩm này không có trong GR cha");
                                 return item;
@@ -277,15 +270,15 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
 
                 if (parentReceiptDetails) {
                     const parentItem = parentReceiptDetails.items.find(
-                        pi => pi.po_detail_id === item.po_detail_id
+                        pi => pi.product_variant_id === item.product_variant_id
                     );
 
                     if (parentItem) {
-                        const maxAcceptable = parentItem.rejected_quantity;
+                        const maxAcceptable = parentItem.ordered_quantity;
 
                         if (item.accepted_quantity > maxAcceptable) {
                             newErrors[`item_${index}_accepted`] =
-                                `Số lượng chấp nhận không được vượt quá ${maxAcceptable} (số lượng từ chối của GR cha)`;
+                                `Số lượng chấp nhận không được vượt quá ${maxAcceptable} (số lượng còn lại từ GR cha)`;
                         }
 
                         if (item.ordered_quantity !== maxAcceptable) {
@@ -550,9 +543,9 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                         .filter(detail => {
                                                             if (parentReceiptDetails) {
                                                                 const parentItem = parentReceiptDetails.items.find(
-                                                                    pi => pi.po_detail_id === detail.po_detail_id
+                                                                    pi => pi.product_variant_id === detail.product_variant_id
                                                                 );
-                                                                return parentItem && parentItem.rejected_quantity > 0;
+                                                                return parentItem && parentItem.ordered_quantity > 0;
                                                             }
                                                             return true;
                                                         })
@@ -560,10 +553,10 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                             let displayQty = detail.ordered_quantity;
                                                             if (parentReceiptDetails) {
                                                                 const parentItem = parentReceiptDetails.items.find(
-                                                                    pi => pi.po_detail_id === detail.po_detail_id
+                                                                    pi => pi.product_variant_id === detail.product_variant_id
                                                                 );
                                                                 if (parentItem) {
-                                                                    displayQty = parentItem.rejected_quantity;
+                                                                    displayQty = parentItem.ordered_quantity;
                                                                 }
                                                             }
 
@@ -571,7 +564,7 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                                 <option key={detail.po_detail_id} value={detail.po_detail_id}>
                                                                     {detail.product_name} - {detail.variant_name}
                                                                     {parentReceiptDetails
-                                                                        ? ` (Từ chối từ GR cha: ${displayQty})`
+                                                                        ? ` (Còn lại từ GR cha: ${displayQty})`
                                                                         : ` (Đặt: ${displayQty})`
                                                                     }
                                                                 </option>
