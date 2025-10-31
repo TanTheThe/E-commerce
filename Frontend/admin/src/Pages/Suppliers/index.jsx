@@ -28,6 +28,7 @@ const columns = [
     { id: 'contact_person', label: 'NGƯỜI LIÊN HỆ', minWidth: 140 },
     { id: 'phone', label: 'SĐT', minWidth: 120 },
     { id: 'email', label: 'EMAIL', minWidth: 180 },
+    { id: 'product_count', label: 'SL SẢN PHẨM', minWidth: 100 },
     { id: 'is_active', label: 'TRẠNG THÁI', minWidth: 120 },
     { id: 'created_at', label: 'NGÀY TẠO', minWidth: 150 },
     { id: 'actions', label: 'THAO TÁC', minWidth: 150 },
@@ -244,6 +245,11 @@ const Suppliers = () => {
                                                 <TableCell>
                                                     <span className="font-[Montserrat] text-gray-500 text-sm">
                                                         {supplier.email}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="font-[Montserrat] text-gray-500 text-sm">
+                                                        {supplier.product_count || 0}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>

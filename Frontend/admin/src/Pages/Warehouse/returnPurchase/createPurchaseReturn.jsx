@@ -78,19 +78,26 @@ const CreatePurchaseReturnModal = ({ isOpen, onClose, onSuccess, warehouseId, go
         try {
             const response = await getDataApi(`/admin/goods-receipt/${grId}`);
             if (response.success) {
-                const details = response.data.items.map(item => ({
-                    gr_detail_id: item.id,
-                    product_variant_id: item.product_variant_id,
-                    product_name: item.product_name,
-                    variant_name: `${item.variant_color_name || ''} - ${item.variant_size || ''}`.trim(),
-                    accepted_quantity: item.accepted_quantity,
-                    received_quantity: item.received_quantity,
-                    rejected_quantity: item.rejected_quantity || 0,
-                    returned_quantity: item.returned_quantity || 0,
-                    unit_cost: item.unit_cost,
-                    variant_sku: item.variant_sku,
-                    variant_image: item.variant_image
-                }));
+                const details = response.data.items
+                    .filter(item => {
+                        const hasRejected = (item.rejected_quantity || 0) > 0;
+                        const hasShortage = item.ordered_quantity > item.accepted_quantity;
+                        return hasRejected || hasShortage;
+                    })
+                    .map(item => ({
+                        gr_detail_id: item.id,
+                        product_variant_id: item.product_variant_id,
+                        product_name: item.product_name,
+                        variant_name: `${item.variant_color_name || ''} - ${item.variant_size || ''}`.trim(),
+                        accepted_quantity: item.accepted_quantity,
+                        received_quantity: item.received_quantity,
+                        rejected_quantity: item.rejected_quantity || 0,
+                        returned_quantity: item.returned_quantity || 0,
+                        unit_cost: item.unit_cost,
+                        variant_sku: item.variant_sku,
+                        variant_image: item.variant_image,
+                        ordered_quantity: item.ordered_quantity
+                    }));
                 setGrDetails(details);
             } else {
                 openAlertBox?.("error", response.data.detail.message);
@@ -151,7 +158,6 @@ const CreatePurchaseReturnModal = ({ isOpen, onClose, onSuccess, warehouseId, go
                             updated.received_quantity = detail.received_quantity;
                             updated.returned_quantity = detail.returned_quantity;
 
-                            // Kiểm tra xem đã trả đủ chưa
                             const alreadyReturned = detail.returned_quantity || 0;
                             const needToReturn = detail.rejected_quantity || 0;
 
@@ -440,7 +446,7 @@ const CreatePurchaseReturnModal = ({ isOpen, onClose, onSuccess, warehouseId, go
                                                     <option value="">Chọn sản phẩm từ GR</option>
                                                     {grDetails.map(detail => (
                                                         <option key={detail.gr_detail_id} value={detail.gr_detail_id}>
-                                                            {detail.product_name} - {detail.variant_name} (Đã nhận: {detail.accepted_quantity})
+                                                            {detail.product_name} - {detail.variant_name} (Cần trả: {detail.rejected_quantity}, Đã nhận: {detail.accepted_quantity}/{detail.ordered_quantity})
                                                         </option>
                                                     ))}
                                                 </select>

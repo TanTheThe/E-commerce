@@ -35,6 +35,7 @@ const StatusBadge = ({ status }) => {
         draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-700' },
         sent: { label: 'Đã gửi', color: 'bg-blue-100 text-blue-700' },
         approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-700' },
+        confirmed: { label: 'Đã xác nhận', color: 'bg-indigo-100 text-indigo-700' },
         completed: { label: 'Hoàn thành', color: 'bg-purple-100 text-purple-700' },
         rejected: { label: 'Đã từ chối', color: 'bg-red-100 text-red-700' }
     };

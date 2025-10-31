@@ -1,40 +1,30 @@
 import React, { useState, useEffect } from "react";
-import {
-    Drawer,
-    Box,
-    Typography,
-    IconButton,
-    CircularProgress,
-    Grid,
-    Paper,
-    Avatar,
-    Divider,
-    Chip,
-} from "@mui/material";
-import {
-    IoMdClose,
-} from "react-icons/io";
+import { Drawer, CircularProgress, Button } from "@mui/material";
 import {
     FaUserCircle,
     FaMapMarkerAlt,
-    FaMoneyBill,
-    FaCalendarAlt,
+    FaCheckCircle,
+    FaTimesCircle,
+    FaWallet,
+    FaExclamationTriangle,
+    FaUniversity,
+    FaEnvelope,
+    FaPhone,
+    FaStickyNote,
+    FaClock,
+    FaCreditCard,
+    FaBox,
 } from "react-icons/fa";
-import {
-    AiOutlinePhone,
-    AiOutlineMail,
-    AiOutlineBank,
-} from "react-icons/ai";
-import { motion } from "framer-motion";
 import { getDataApi } from '../../utils/api';
 
 const SupplierDetailOffcanvas = ({ open, onClose, supplier, context }) => {
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
 
     const formatCurrency = (amount) =>
         amount == null
-            ? "N/A"
+            ? "Chưa có"
             : new Intl.NumberFormat("vi-VN", {
                 style: "currency",
                 currency: "VND",
@@ -77,11 +67,11 @@ const SupplierDetailOffcanvas = ({ open, onClose, supplier, context }) => {
     useEffect(() => {
         if (open && supplier?.id) {
             fetchDetail(supplier.id);
+            setActiveTab(0);
         } else if (!open) {
             setDetail(null);
         }
     }, [open, supplier?.id]);
-
 
     return (
         <Drawer
@@ -90,189 +80,248 @@ const SupplierDetailOffcanvas = ({ open, onClose, supplier, context }) => {
             onClose={onClose}
             PaperProps={{
                 sx: {
-                    width: { xs: '100%', sm: 500, md: 600 },
-                    borderRadius: { xs: 0, sm: '16px 0 0 16px' },
-                    bgcolor: 'background.paper',
-                    overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    width: { xs: '100%', sm: 520, md: 680 },
+                    bgcolor: '#f8fafc',
+                    fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 },
             }}
         >
-            <motion.div
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-            >
-                {/* Header */}
-                <Box
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        px: 3,
-                        py: 2.5,
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
-                        borderBottom: 'none',
-                    }}
-                >
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        Chi tiết Nhà Cung Cấp
-                    </Typography>
-                    <IconButton
+            <div className="h-full flex flex-col" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+                    <h2 className="text-xl font-semibold text-gray-800">Thông tin nhà cung cấp</h2>
+                    <Button
+                        className="!w-8 !h-8 !min-w-8 !p-0 hover:bg-gray-100 !rounded-full"
                         onClick={onClose}
-                        sx={{
-                            color: 'inherit',
-                            '&:hover': { transform: 'rotate(90deg)', bgcolor: 'rgba(255,255,255,0.1)' },
-                            transition: 'transform 0.2s, background 0.2s',
-                        }}
                     >
-                        <IoMdClose size={24} />
-                    </IconButton>
-                </Box>
+                        <span className="text-2xl text-gray-600">&times;</span>
+                    </Button>
+                </div>
 
-                {/* Content */}
                 {loading ? (
-                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <CircularProgress color="primary" />
-                    </Box>
+                    <div className="flex-1 flex items-center justify-center">
+                        <CircularProgress />
+                    </div>
                 ) : !detail ? (
-                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', px: 3 }}>
-                        <Typography color="text.secondary">Không có dữ liệu chi tiết nhà cung cấp.</Typography>
-                    </Box>
+                    <div className="flex-1 flex items-center justify-center px-4">
+                        <p className="text-gray-500">Không có dữ liệu.</p>
+                    </div>
                 ) : (
-                    <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, bgcolor: 'grey.50' }}>
-                        {/* Profile Card */}
-                        <Paper
-                            sx={{
-                                p: 3,
-                                borderRadius: 4,
-                                mb: 3,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 3,
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                                bgcolor: 'white',
-                            }}
-                        >
-                            <Avatar
-                                sx={{
-                                    width: 80,
-                                    height: 80,
-                                    fontSize: 32,
-                                    bgcolor: 'primary.main',
-                                    color: 'white',
-                                    fontWeight: 700,
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                }}
-                            >
-                                {detail.name?.[0] || 'N'}
-                            </Avatar>
-                            <Box sx={{ flexGrow: 1 }}>
-                                <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                                    {detail.name}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                                    Mã NCC: {detail.code}
-                                </Typography>
-                                <Chip
-                                    label={detail.is_active ? 'Đang hoạt động' : 'Không hoạt động'}
-                                    sx={{
-                                        mt: 1,
-                                        fontWeight: 600,
-                                        color: 'white',
-                                        bgcolor: detail.is_active ? 'success.main' : 'error.main',
-                                        '&:hover': { opacity: 0.9 },
-                                    }}
-                                />
-                            </Box>
-                        </Paper>
+                    <>
+                        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-full bg-white/25 border-2 border-white/50 flex items-center justify-center text-white text-2xl font-bold">
+                                    {detail.name?.[0] || 'N'}
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-xl font-semibold text-white mb-1">{detail.name}</h3>
+                                    <p className="text-white/90 text-sm">Mã: {detail.code}</p>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 ${detail.is_active
+                                        ? 'bg-green-500/90 text-white'
+                                        : 'bg-red-500/90 text-white'
+                                    }`}>
+                                    {detail.is_active ? <FaCheckCircle size={12} /> : <FaTimesCircle size={12} />}
+                                    {detail.is_active ? 'Hoạt động' : 'Ngưng'}
+                                </span>
+                            </div>
+                        </div>
 
-                        {/* Contact Info */}
-                        <InfoSection title="Liên hệ" icon={<FaUserCircle size={20} />}>
-                            <InfoRow label="Người liên hệ" value={detail.contact_person} />
-                            <InfoRow label="Số điện thoại" value={detail.phone} />
-                            <InfoRow label="Email" value={detail.email} />
-                            <InfoRow label="Địa chỉ" value={detail.address} />
-                        </InfoSection>
+                        {/* Tabs */}
+                        <div className="bg-white border-b border-gray-200">
+                            <div className="flex px-4">
+                                <button
+                                    className={`px-6 py-3 font-medium text-sm transition-colors relative ${activeTab === 0
+                                            ? 'text-purple-600'
+                                            : 'text-gray-600 hover:text-purple-600'
+                                        }`}
+                                    onClick={() => setActiveTab(0)}
+                                >
+                                    Thông tin
+                                    {activeTab === 0 && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600"></div>
+                                    )}
+                                </button>
+                                <button
+                                    className={`px-6 py-3 font-medium text-sm transition-colors relative flex items-center gap-2 ${activeTab === 1
+                                            ? 'text-purple-600'
+                                            : 'text-gray-600 hover:text-purple-600'
+                                        }`}
+                                    onClick={() => setActiveTab(1)}
+                                >
+                                    Sản phẩm
+                                    {detail.total_products > 0 && (
+                                        <span className="bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                            {detail.total_products}
+                                        </span>
+                                    )}
+                                    {activeTab === 1 && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600"></div>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
 
-                        {/* Accounting Info */}
-                        <InfoSection title="Kế toán" icon={<AiOutlineBank size={20} />}>
-                            <InfoRow label="Số TK Ngân hàng" value={detail.bank_account} />
-                            <InfoRow label="Tên Ngân hàng" value={detail.bank_name} />
-                            <InfoRow label="Hạn mức công nợ" value={formatCurrency(detail.credit_limit)} />
-                            <InfoRow label="Công nợ hiện tại" value={formatCurrency(detail.current_debt)} />
-                        </InfoSection>
+                        <div className="flex-1 overflow-y-auto p-4 pb-24">
+                            {activeTab === 0 && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-gradient-to-br from-purple-600 to-indigo-600 p-4 rounded-lg text-white">
+                                            <div className="flex items-center gap-2 mb-2 opacity-90">
+                                                <FaWallet size={16} />
+                                                <span className="text-sm">Hạn mức</span>
+                                            </div>
+                                            <p className="text-xl font-bold">{formatCurrency(detail.credit_limit)}</p>
+                                        </div>
+                                        <div className={`bg-gradient-to-br ${detail.current_debt > 0
+                                                ? 'from-red-500 to-pink-500'
+                                                : 'from-blue-500 to-cyan-500'
+                                            } p-4 rounded-lg text-white`}>
+                                            <div className="flex items-center gap-2 mb-2 opacity-90">
+                                                <FaExclamationTriangle size={16} />
+                                                <span className="text-sm">Công nợ</span>
+                                            </div>
+                                            <p className="text-xl font-bold">{formatCurrency(detail.current_debt)}</p>
+                                        </div>
+                                    </div>
 
-                        {/* Notes */}
-                        <InfoSection title="Ghi chú" icon={<FaMoneyBill size={20} />}>
-                            <Paper
-                                variant="outlined"
-                                sx={{
-                                    p: 2,
-                                    bgcolor: 'white',
-                                    borderColor: 'grey.300',
-                                    borderRadius: 2,
-                                    minHeight: 80,
-                                    maxHeight: 200,
-                                    overflowY: 'auto',
-                                    color: 'text.secondary',
-                                    whiteSpace: 'pre-wrap',
-                                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
-                                }}
-                            >
-                                {detail.notes || 'Không có ghi chú.'}
-                            </Paper>
-                        </InfoSection>
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
+                                            <FaUserCircle className="text-purple-600" size={20} />
+                                            <h4 className="font-semibold text-gray-800">Thông tin liên hệ</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <InfoRow icon={<FaUserCircle />} label="Người liên hệ" value={detail.contact_person} />
+                                            <InfoRow icon={<FaPhone />} label="Số điện thoại" value={detail.phone} />
+                                            <InfoRow icon={<FaEnvelope />} label="Email" value={detail.email} />
+                                            <InfoRow icon={<FaMapMarkerAlt />} label="Địa chỉ" value={detail.address} />
+                                        </div>
+                                    </div>
 
-                        <Divider sx={{ my: 3, borderColor: 'grey.300' }} />
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, justifyContent: 'center' }}>
-                            <FaCalendarAlt size={16} color="grey.600" />
-                            <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-                                Ngày tạo: {formatDate(detail.created_at)}
-                            </Typography>
-                        </Box>
-                    </Box>
+                                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
+                                            <FaUniversity className="text-purple-600" size={20} />
+                                            <h4 className="font-semibold text-gray-800">Thông tin ngân hàng</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <InfoRow icon={<FaCreditCard />} label="Số tài khoản" value={detail.bank_account} />
+                                            <InfoRow icon={<FaUniversity />} label="Ngân hàng" value={detail.bank_name} />
+                                        </div>
+                                    </div>
+
+                                    {detail.notes && (
+                                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-200">
+                                                <FaStickyNote className="text-purple-600" size={20} />
+                                                <h4 className="font-semibold text-gray-800">Ghi chú</h4>
+                                            </div>
+                                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                                <p className="text-gray-700 whitespace-pre-wrap text-sm">{detail.notes}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                                        <div className="flex flex-col sm:flex-row gap-3 text-sm text-gray-600 justify-center">
+                                            <div className="flex items-center gap-2">
+                                                <FaClock size={14} className="text-gray-400" />
+                                                <span>Tạo: {formatDate(detail.created_at)}</span>
+                                            </div>
+                                            {detail.updated_at && (
+                                                <div className="flex items-center gap-2">
+                                                    <FaClock size={14} className="text-gray-400" />
+                                                    <span>Cập nhật: {formatDate(detail.updated_at)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 1 && (
+                                <div>
+                                    {detail.products && detail.products.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {detail.products.map((product) => (
+                                                <div
+                                                    key={product.id}
+                                                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                                                >
+                                                    <div className="flex gap-3 p-3">
+                                                        <img
+                                                            src={product.image || 'https://via.placeholder.com/100x100?text=No+Image'}
+                                                            alt={product.name}
+                                                            className="w-24 h-24 object-cover rounded-md flex-shrink-0"
+                                                        />
+                                                        <div className="flex-1 min-w-0">
+                                                            <h5 className="font-semibold text-gray-800 mb-2 line-clamp-2">
+                                                                {product.name}
+                                                            </h5>
+                                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                                <span className={`text-xs px-2 py-1 rounded font-medium ${product.status === 'active'
+                                                                        ? 'bg-green-100 text-green-800'
+                                                                        : 'bg-gray-100 text-gray-800'
+                                                                    }`}>
+                                                                    {product.status}
+                                                                </span>
+                                                                <span className={`text-xs px-2 py-1 rounded font-medium flex items-center gap-1 ${product.is_active
+                                                                        ? 'bg-blue-100 text-blue-800'
+                                                                        : 'bg-red-100 text-red-800'
+                                                                    }`}>
+                                                                    {product.is_active ? (
+                                                                        <FaCheckCircle size={10} />
+                                                                    ) : (
+                                                                        <FaTimesCircle size={10} />
+                                                                    )}
+                                                                    {product.is_active ? 'Cung cấp' : 'Ngừng'}
+                                                                </span>
+                                                            </div>
+                                                            {product.notes && (
+                                                                <p className="text-xs text-gray-600 truncate">
+                                                                    💬 {product.notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                                            <FaBox size={48} className="text-gray-300 mx-auto mb-3" />
+                                            <p className="text-gray-500">Chưa có sản phẩm nào</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3">
+                            <div className="flex justify-end">
+                                <Button
+                                    className="!px-6 !py-2 !bg-gray-600 !text-white !rounded-md hover:!bg-gray-700 !normal-case"
+                                    onClick={onClose}
+                                >
+                                    Đóng
+                                </Button>
+                            </div>
+                        </div>
+                    </>
                 )}
-            </motion.div>
+            </div>
         </Drawer>
     );
 };
 
-const InfoSection = ({ title, icon, children }) => (
-    <Paper
-        sx={{
-            p: 3,
-            mb: 3,
-            borderRadius: 4,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-            bgcolor: 'white',
-        }}
-    >
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Box sx={{ color: 'primary.main', mr: 1.5 }}>{icon}</Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {title}
-            </Typography>
-        </Box>
-        <Grid container spacing={2}>
-            {children}
-        </Grid>
-    </Paper>
-);
-
-const InfoRow = ({ label, value }) => (
-    <Grid item xs={12} sm={6}>
-        <Box>
-            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500, mb: 0.5 }}>
-                {label}
-            </Typography>
-            <Typography variant="body1" sx={{ color: 'text.primary', fontWeight: 600, wordBreak: 'break-word' }}>
-                {value || 'N/A'}
-            </Typography>
-        </Box>
-    </Grid>
+const InfoRow = ({ icon, label, value }) => (
+    <div className="flex items-start gap-3">
+        <div className="text-gray-400 mt-0.5 flex-shrink-0">
+            {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-600 font-medium mb-1">{label}</p>
+            <p className="text-sm text-gray-800 break-words">{value || 'N/A'}</p>
+        </div>
+    </div>
 );
 
 export default SupplierDetailOffcanvas;

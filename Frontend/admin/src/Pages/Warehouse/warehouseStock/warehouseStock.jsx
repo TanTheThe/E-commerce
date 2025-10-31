@@ -139,7 +139,7 @@ const WarehouseStock = ({ warehouse, onClose }) => {
         setLoadingVariants(prev => new Set([...prev, productId]));
         try {
             const response = await getDataApi(
-                `/admin/warehouse/stock/${warehouse.id}/products/${productId}/variants`
+                `/admin/stock/warehouse/${warehouse.id}/products/${productId}/variants`
             );
 
             if (response.success) {

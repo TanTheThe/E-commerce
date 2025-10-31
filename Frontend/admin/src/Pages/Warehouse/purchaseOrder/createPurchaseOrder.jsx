@@ -16,6 +16,7 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
     const [categories, setCategories] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
+    const [invalidProducts, setInvalidProducts] = useState(new Set());
 
     useEffect(() => {
         if (isOpen) {
@@ -30,6 +31,55 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
             setFormData(prev => ({ ...prev, warehouse_id: warehouseId }));
         }
     }, [warehouseId]);
+
+    const handleSupplierChange = async (supplierId) => {
+        setFormData(prev => ({ ...prev, supplier_id: supplierId }));
+
+        if (supplierId && formData.items.length > 0) {
+            await refreshAllItemsProducts(supplierId);
+        }
+    };
+
+    const refreshAllItemsProducts = async (supplierId) => {
+        const invalidProductIds = new Set();
+
+        const updatedItems = await Promise.all(
+            formData.items.map(async (item, index) => {
+                try {
+                    let url = `/admin/product/all/select-box`;
+                    if (item.category_id) {
+                        url += `?category_id=${item.category_id}`;
+                        if (supplierId) {
+                            url += `&supplier_id=${supplierId}`;
+                        }
+                    } else if (supplierId) {
+                        url += `?supplier_id=${supplierId}`;
+                    }
+
+                    const response = await getDataApi(url);
+                    const newProducts = response.success ? response.data || [] : [];
+
+                    const isProductValid = item.product_id &&
+                        newProducts.some(p => p.id === item.product_id);
+
+                    if (item.product_id && !isProductValid) {
+                        invalidProductIds.add(index);
+                    }
+
+                    return {
+                        ...item,
+                        products: newProducts
+                    };
+                } catch (error) {
+                    console.error('Error refreshing products:', error);
+                    return item;
+                }
+            })
+        );
+
+        setFormData(prev => ({ ...prev, items: updatedItems }));
+        setInvalidProducts(invalidProductIds);
+    };
 
     const fetchSuppliers = async () => {
         try {
@@ -92,6 +142,17 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
             ...prev,
             items: prev.items.filter((_, i) => i !== index)
         }));
+
+        setInvalidProducts(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(index);
+            const adjustedSet = new Set();
+            newSet.forEach(idx => {
+                if (idx > index) adjustedSet.add(idx - 1);
+                else if (idx < index) adjustedSet.add(idx);
+            });
+            return adjustedSet;
+        });
     };
 
     const updateItem = (index, field, value) => {
@@ -116,10 +177,24 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
         }
     };
 
+    const isVariantDuplicate = (index, variantId) => {
+        if (!variantId) return false;
+        return formData.items.some((item, i) =>
+            i !== index && item.product_variant_id == variantId
+        );
+    };
+
     const fetchProductsByCategory = async (index, categoryId) => {
         updateItem(index, 'isLoadingProducts', true);
         try {
-            const response = await getDataApi(`/admin/product/all/select-box?category_id=${categoryId}`);
+            const supplierId = formData.supplier_id;
+            let url = `/admin/product/all/select-box?category_id=${categoryId}`;
+
+            if (supplierId) {
+                url += `&supplier_id=${supplierId}`;
+            }
+
+            const response = await getDataApi(url);
             if (response.success) {
                 updateItem(index, 'products', response.data || []);
             }
@@ -133,7 +208,14 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
     const fetchAllProducts = async (index) => {
         updateItem(index, 'isLoadingProducts', true);
         try {
-            const response = await getDataApi('/admin/product/all/select-box');
+            const supplierId = formData.supplier_id;
+            let url = `/admin/product/all/select-box`;
+
+            if (supplierId) {
+                url += `?supplier_id=${supplierId}`;
+            }
+
+            const response = await getDataApi(url);
             if (response.success) {
                 updateItem(index, 'products', response.data || []);
             }
@@ -147,6 +229,12 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
     const handleProductChange = async (index, productId) => {
         updateItem(index, 'product_id', productId);
         updateItem(index, 'product_variant_id', '');
+
+        setInvalidProducts(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(index);
+            return newSet;
+        });
 
         if (productId) {
             await fetchVariantsByProduct(index, productId);
@@ -172,6 +260,11 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
     };
 
     const handleVariantChange = (index, variantId) => {
+        if (isVariantDuplicate(index, variantId)) {
+            openAlertBox?.("warning", "Biến thể này đã được chọn ở sản phẩm khác. Vui lòng quay lại chỉnh sửa hoặc chọn biến thể khác.");
+            return;
+        }
+
         updateItem(index, 'product_variant_id', variantId);
 
         const item = formData.items[index];
@@ -198,6 +291,10 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
         if (formData.items.length === 0) {
             newErrors.items = 'Vui lòng thêm ít nhất 1 sản phẩm';
         } else {
+            if (invalidProducts.size > 0) {
+                newErrors.invalid_products = 'Có sản phẩm không thuộc nhà cung cấp đã chọn. Vui lòng chọn lại.';
+            }
+
             formData.items.forEach((item, index) => {
                 if (!item.product_variant_id) {
                     newErrors[`item_${index}_variant`] = 'Vui lòng chọn biến thể sản phẩm';
@@ -296,9 +393,8 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
                                 </label>
                                 <select
                                     value={formData.supplier_id}
-                                    onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.supplier_id ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                                    onChange={(e) => handleSupplierChange(e.target.value)}
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.supplier_id ? 'border-red-500' : 'border-gray-300'}`}
                                 >
                                     <option value="">Chọn nhà cung cấp</option>
                                     {suppliers.map(supplier => (
@@ -360,9 +456,25 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
                                 <p className="mb-3 text-sm text-red-500">{errors.items}</p>
                             )}
 
+                            {errors.invalid_products && (
+                                <div className="mb-3 p-3 bg-red-50 border border-red-300 rounded-md flex items-start gap-2">
+                                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-sm text-red-800">{errors.invalid_products}</p>
+                                </div>
+                            )}
+
                             <div className="space-y-4">
                                 {formData.items.map((item, index) => (
                                     <div key={index} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                        {invalidProducts.has(index) && (
+                                            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-md flex items-start gap-2">
+                                                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                                <div className="text-sm text-yellow-800">
+                                                    <p className="font-medium">Sản phẩm không thuộc nhà cung cấp đã chọn</p>
+                                                    <p className="text-xs mt-1">Vui lòng chọn lại sản phẩm phù hợp với nhà cung cấp hiện tại</p>
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="flex items-start justify-between mb-3">
                                             <span className="text-sm font-medium text-gray-700">
                                                 Sản phẩm #{index + 1}
@@ -430,11 +542,19 @@ const CreatePurchaseOrderModal = ({ isOpen, onClose, onSuccess, warehouseId, ope
                                                     <option value="">
                                                         {item.isLoadingVariants ? 'Đang tải...' : 'Chọn biến thể'}
                                                     </option>
-                                                    {item.variants?.map(variant => (
-                                                        <option key={variant.id} value={variant.id}>
-                                                            {variant.name}
-                                                        </option>
-                                                    ))}
+                                                    {item.variants?.map(variant => {
+                                                        const isDuplicate = isVariantDuplicate(index, variant.id);
+                                                        return (
+                                                            <option
+                                                                key={variant.id}
+                                                                value={variant.id}
+                                                                disabled={isDuplicate}
+                                                                style={isDuplicate ? { color: '#999', fontStyle: 'italic' } : {}}
+                                                            >
+                                                                {variant.name} {isDuplicate ? '(Đã chọn)' : ''}
+                                                            </option>
+                                                        );
+                                                    })}
                                                 </select>
                                                 {errors[`item_${index}_variant`] && (
                                                     <p className="mt-1 text-sm text-red-500">{errors[`item_${index}_variant`]}</p>

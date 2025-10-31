@@ -153,7 +153,7 @@ const GoodsReceiptDetailModal = ({ grId, onClose }) => {
                         {grDetail.parent_receipt_id && (
                             <div className="space-y-2">
                                 <label className="text-sm text-gray-600">GR cha</label>
-                                <p className="font-medium text-gray-700">{grDetail.parent_receipt_id}</p>
+                                <p className="font-medium text-gray-700">{grDetail.receipt_number_parent}</p>
                             </div>
                         )}
                     </div>
@@ -211,7 +211,18 @@ const GoodsReceiptDetailModal = ({ grId, onClose }) => {
                                         grDetail.items.map((item) => (
                                             <React.Fragment key={item.id}>
                                                 <tr className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3 text-sm font-medium">{item.product_name}</td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            {item.variant_image && (
+                                                                <img
+                                                                    src={item.variant_image}
+                                                                    alt={item.product_name}
+                                                                    className="w-12 h-12 object-cover rounded"
+                                                                />
+                                                            )}
+                                                            <span className="text-sm font-medium">{item.product_name}</span>
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3 text-sm">{item.variant_sku}</td>
                                                     <td className="px-4 py-3 text-sm">{item.variant_color_name || '-'}</td>
                                                     <td className="px-4 py-3 text-sm">{item.variant_size || '-'}</td>

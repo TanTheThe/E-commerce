@@ -83,6 +83,13 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
         }
     };
 
+    const isPoDetailDuplicate = (index, poDetailId) => {
+        if (!poDetailId) return false;
+        return formData.items.some((item, i) =>
+            i !== index && item.po_detail_id == poDetailId
+        );
+    };
+
     const fetchWarehouses = async () => {
         try {
             const response = await getDataApi('/admin/warehouse/all?limit=1000');
@@ -152,21 +159,21 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
             if (response.success) {
                 setParentReceiptDetails(response.data);
 
-                const newItems = response.data.items.map(item => ({
-                    po_detail_id: '', 
-                    product_variant_id: item.product_variant_id,
-                    ordered_quantity: item.ordered_quantity,
-                    received_quantity: 0,
-                    accepted_quantity: 0,
-                    rejected_quantity: 0,
-                    rejection_reason: '',
-                    notes: ''
-                }));
+                // const newItems = response.data.items.map(item => ({
+                //     po_detail_id: '',
+                //     product_variant_id: item.product_variant_id,
+                //     ordered_quantity: item.ordered_quantity,
+                //     received_quantity: 0,
+                //     accepted_quantity: 0,
+                //     rejected_quantity: 0,
+                //     rejection_reason: '',
+                //     notes: ''
+                // }));
 
-                setFormData(prev => ({
-                    ...prev,
-                    items: newItems
-                }));
+                // setFormData(prev => ({
+                //     ...prev,
+                //     items: newItems
+                // }));
             } else {
                 openAlertBox?.("error", response.data.detail.message);
             }
@@ -206,19 +213,30 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
             ...prev,
             items: prev.items.map((item, i) => {
                 if (i === index) {
+                    if (field === 'po_detail_id' && value) {
+                        if (isPoDetailDuplicate(index, value)) {
+                            openAlertBox?.("warning", "Chi tiết PO này đã được chọn ở sản phẩm khác. Vui lòng quay lại chỉnh sửa hoặc chọn chi tiết khác.");
+                            return item;
+                        }
+                    }
+
                     const updated = { ...item, [field]: value };
 
                     if (field === 'po_detail_id' && value) {
                         if (parentReceiptDetails) {
-                            const parentItem = parentReceiptDetails.items.find(
-                                pi => pi.product_variant_id === updated.product_variant_id
-                            );
+                            const detail = poDetails.find(d => d.po_detail_id === value);
+                            if (detail) {
+                                const parentItem = parentReceiptDetails.items.find(
+                                    pi => pi.product_variant_id === detail.product_variant_id
+                                );
 
-                            if (parentItem) {
-                                updated.ordered_quantity = parentItem.ordered_quantity;
-                            } else {
-                                openAlertBox?.("warning", "Sản phẩm này không có trong GR cha");
-                                return item;
+                                if (parentItem) {
+                                    updated.product_variant_id = detail.product_variant_id;
+                                    updated.ordered_quantity = parentItem.ordered_quantity;
+                                } else {
+                                    openAlertBox?.("warning", "Sản phẩm này không có trong GR cha");
+                                    return item;
+                                }
                             }
                         } else {
                             const detail = poDetails.find(d => d.po_detail_id === value);
@@ -550,6 +568,7 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                             return true;
                                                         })
                                                         .map(detail => {
+                                                            const isDuplicate = isPoDetailDuplicate(index, detail.po_detail_id);
                                                             let displayQty = detail.ordered_quantity;
                                                             if (parentReceiptDetails) {
                                                                 const parentItem = parentReceiptDetails.items.find(
@@ -561,12 +580,18 @@ const CreateGoodsReceiptModal = ({ isOpen, onClose, onSuccess, warehouseId, purc
                                                             }
 
                                                             return (
-                                                                <option key={detail.po_detail_id} value={detail.po_detail_id}>
+                                                                <option
+                                                                    key={detail.po_detail_id}
+                                                                    value={detail.po_detail_id}
+                                                                    disabled={isDuplicate}
+                                                                    style={isDuplicate ? { color: '#999', fontStyle: 'italic' } : {}}
+                                                                >
                                                                     {detail.product_name} - {detail.variant_name}
                                                                     {parentReceiptDetails
                                                                         ? ` (Còn lại từ GR cha: ${displayQty})`
                                                                         : ` (Đặt: ${displayQty})`
                                                                     }
+                                                                    {isDuplicate ? ' (Đã chọn)' : ''}
                                                                 </option>
                                                             );
                                                         })

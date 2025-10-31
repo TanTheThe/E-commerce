@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Plus, Package } from 'lucide-react';
+import { Plus, Package, FileText } from 'lucide-react';
 import { MyContext } from '../../../App';
 import useAuth from '../../Verify/auth';
 import { deleteDataApi, getDataApi, postDataApi } from '../../../utils/api';
@@ -7,35 +7,33 @@ import ReturnPurchaseCard from './returnPurchaseCard';
 import UpdateReturnPurchaseModal from './updateReturnPurchase';
 import PurchaseReturnDetailModal from './returnPurchaseDetail';
 import CreatePurchaseReturnModal from './createPurchaseReturn';
+import ReturnPurchaseListModal from './purchaseOrderReturn';
+
+const formatDate = (dateString) => {
+    if (!dateString || isNaN(Date.parse(dateString))) {
+        return null;
+    }
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+};
 
 const ReturnPurchaseManagement = ({ warehouse }) => {
-    const [activeTab, setActiveTab] = useState('all');
-    const [returnPurchases, setReturnPurchases] = useState([]);
+    const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [total, setTotal] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedReturnId, setSelectedReturnId] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [returnToUpdateId, setReturnToUpdateId] = useState(null);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [confirmAction, setConfirmAction] = useState(null);
+    const [selectedPOId, setSelectedPOId] = useState(null);
 
     const { userRole } = useAuth();
     const context = useContext(MyContext);
 
     const limit = 12;
 
-    const tabs = [
-        { key: 'all', label: 'Tất cả', status: null },
-        { key: 'draft', label: 'Nháp', status: 'draft' },
-        { key: 'approved', label: 'Đã duyệt', status: 'approved' },
-        { key: 'sent', label: 'Đã gửi', status: 'sent' },
-        { key: 'confirmed', label: 'Đã xác nhận', status: 'confirmed' },
-        { key: 'completed', label: 'Hoàn thành', status: 'completed' }
-    ];
-
-    const fetchReturnPurchases = async () => {
+    const fetchPurchaseOrdersWithReturns = async () => {
         setIsLoading(true);
         try {
             const skip = (currentPage - 1) * limit;
@@ -44,213 +42,67 @@ const ReturnPurchaseManagement = ({ warehouse }) => {
                 limit: limit.toString()
             });
 
-            const currentTab = tabs.find(t => t.key === activeTab);
-            if (currentTab?.status) {
-                queryParams.append('status_pr', currentTab.status);
-            }
-
             if (warehouse?.id) {
                 queryParams.append('warehouse_id', warehouse.id);
             }
 
-            if (searchQuery.trim()) {
-                queryParams.append('search', searchQuery.trim());
-            }
-
-            const response = await getDataApi(`/admin/return-purchase?${queryParams.toString()}`);
+            const response = await getDataApi(`/admin/purchase-orders/purchase-orders-with-returns?${queryParams.toString()}`);
 
             if (response.success) {
-                setReturnPurchases(response.data.data || []);
+                setPurchaseOrders(response.data.data || []);
                 setTotal(response.data.total || 0);
             }
         } catch (error) {
-            console.error('Error fetching return purchases:', error);
+            console.error('Error fetching purchase orders with returns:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchReturnPurchases();
-    }, [activeTab, currentPage, warehouse?.id, searchQuery]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [activeTab, searchQuery]);
+        fetchPurchaseOrdersWithReturns();
+    }, [currentPage, warehouse?.id]);
 
     const totalPages = Math.ceil(total / limit);
 
-    const handleViewDetail = (returnId) => {
-        setSelectedReturnId(returnId);
-    };
-
-    const handleUpdate = (returnId) => {
-        setReturnToUpdateId(returnId);
-    };
-
-    const handleSendEmail = async (returnId, requestData) => {
-        try {
-            const response = await postDataApi(
-                `/admin/return-purchase/${returnId}/send-email`,
-                requestData
-            );
-
-            if (response.success) {
-                fetchReturnPurchases();
-                context.openAlertBox("success", response.message || "Đã gửi email thông báo hoàn trả đến nhà cung cấp");
-            } else {
-                context.openAlertBox("error", response?.data?.detail?.message || "Gửi email thất bại");
-            }
-        } catch (error) {
-            console.error('Error sending return email:', error);
-            context.openAlertBox("error", "Đã xảy ra lỗi khi gửi email");
-        }
-    };
-
-    const handleApprove = (returnId) => {
-        setConfirmAction({
-            action: 'approveReturn',
-            returnId,
-            message: 'Bạn có chắc muốn duyệt phiếu trả hàng này không?'
-        });
-        setShowConfirmModal(true);
-    };
-
-    const handleDelete = (returnId) => {
-        setConfirmAction({
-            action: 'deleteReturn',
-            returnId,
-            message: 'Bạn có chắc muốn xóa phiếu trả hàng này không?'
-        });
-        setShowConfirmModal(true);
-    };
-
-    const handleConfirm = (returnId) => {
-        setConfirmAction({
-            action: 'confirmReturn',
-            returnId,
-            message: 'Bạn có chắc muốn xác nhận đã nhận hàng trả từ NCC không?'
-        });
-        setShowConfirmModal(true);
-    };
-
-    const handleComplete = (returnId) => {
-        setConfirmAction({
-            action: 'completeReturn',
-            returnId,
-            message: 'Bạn có chắc muốn hoàn thành phiếu trả hàng này không?'
-        });
-        setShowConfirmModal(true);
-    };
-
-    const executeConfirmAction = async () => {
-        if (!confirmAction) return;
-
-        setShowConfirmModal(false);
-
-        if (confirmAction.action === 'deleteReturn') {
-            const returnId = confirmAction.returnId;
-            try {
-                const response = await deleteDataApi(`/admin/return-purchase/${returnId}`);
-
-                if (response.success) {
-                    context.openAlertBox("success", response.message || "Xóa phiếu trả hàng thành công");
-                    fetchReturnPurchases();
-                } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Xóa phiếu trả hàng thất bại");
-                }
-            } catch (error) {
-                console.error('Error deleting return purchase:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi xóa phiếu trả hàng");
-            }
-        } else if (confirmAction.action === 'approveReturn') {
-            const returnId = confirmAction.returnId;
-            try {
-                const response = await postDataApi(`/admin/return-purchase/${returnId}/approve`, {});
-
-                if (response.success) {
-                    context.openAlertBox("success", response.message || "Duyệt phiếu trả hàng thành công");
-                    fetchReturnPurchases();
-                } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Duyệt phiếu trả hàng thất bại");
-                }
-            } catch (error) {
-                console.error('Error approving return purchase:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi duyệt phiếu trả hàng");
-            }
-        } else if (confirmAction.action === 'confirmReturn') {
-            const returnId = confirmAction.returnId;
-            try {
-                const response = await postDataApi(`/admin/return-purchase/${returnId}/confirmed`, {});
-
-                if (response.success) {
-                    context.openAlertBox("success", response.message || "Xác nhận nhận hàng thành công");
-                    fetchReturnPurchases();
-                } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Xác nhận nhận hàng thất bại");
-                }
-            } catch (error) {
-                console.error('Error confirming return purchase:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi xác nhận nhận hàng");
-            }
-        } else if (confirmAction.action === 'completeReturn') {
-            const returnId = confirmAction.returnId;
-            try {
-                const response = await postDataApi(`/admin/return-purchase/${returnId}/complete`, {});
-
-                if (response.success) {
-                    context.openAlertBox("success", response.message || "Hoàn thành phiếu trả hàng thành công");
-                    fetchReturnPurchases();
-                } else {
-                    context.openAlertBox("error", response?.data?.detail?.message || "Hoàn thành phiếu trả hàng thất bại");
-                }
-            } catch (error) {
-                console.error('Error completing return purchase:', error);
-                context.openAlertBox("error", "Đã xảy ra lỗi khi hoàn thành phiếu trả hàng");
-            }
-        }
-
-        setConfirmAction(null);
-    };
-
     const handleCreateNew = () => {
         setIsCreateModalOpen(true);
+    };
+
+    const handleViewReturns = (poId) => {
+        setSelectedPOId(poId);
+    };
+
+    const getStatusBadge = (status) => {
+        const statusConfig = {
+            draft: { label: 'Nháp', color: 'bg-gray-100 text-gray-700' },
+            approved: { label: 'Đã duyệt', color: 'bg-green-100 text-green-700' },
+            ordered: { label: 'Đã đặt hàng', color: 'bg-blue-100 text-blue-700' },
+            partial: { label: 'Nhập 1 phần', color: 'bg-yellow-100 text-yellow-700' },
+            completed: { label: 'Hoàn thành', color: 'bg-purple-100 text-purple-700' }
+        };
+
+        const config = statusConfig[status] || statusConfig.draft;
+
+        return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+                {config.label}
+            </span>
+        );
     };
 
     return (
         <div className="h-full flex flex-col bg-gray-50">
             <div className="bg-white border-b border-gray-200">
                 <div className="flex items-center justify-between px-6 py-4">
-                    <div className="flex items-center gap-2">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.key}
-                                className={`px-4 py-2 font-medium text-sm rounded-md transition-colors ${activeTab === tab.key
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
-                                onClick={() => setActiveTab(tab.key)}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="text"
-                            placeholder="Tìm theo số phiếu trả hàng..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                            onClick={handleCreateNew}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>Tạo phiếu trả hàng</span>
-                        </button>
-                    </div>
+                    <h2 className="text-xl font-semibold text-gray-800">Quản lý phiếu trả hàng nhập</h2>
+                    <button
+                        onClick={handleCreateNew}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Tạo phiếu trả hàng</span>
+                    </button>
                 </div>
             </div>
 
@@ -266,35 +118,53 @@ const ReturnPurchaseManagement = ({ warehouse }) => {
                             </div>
                         ))}
                     </div>
-                ) : returnPurchases.length === 0 ? (
+                ) : purchaseOrders.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-sm p-12 text-center">
                         <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500 text-lg">Không có phiếu trả hàng nào</p>
+                        <p className="text-gray-500 text-lg">Không có đơn nhập hàng nào có phiếu trả</p>
                     </div>
                 ) : (
                     <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                            {returnPurchases.map((returnPurchase) => (
-                                <ReturnPurchaseCard
-                                    key={returnPurchase.id}
-                                    returnPurchase={returnPurchase}
-                                    onViewDetail={handleViewDetail}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    onSendEmail={handleSendEmail}
-                                    onApprove={handleApprove}
-                                    onConfirm={handleConfirm}
-                                    onComplete={handleComplete}
-                                    userRole={userRole}
-                                    openAlertBox={context.openAlertBox}
-                                />
+                            {purchaseOrders.map((po) => (
+                                <div key={po.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex-1">
+                                            <h3 className="font-semibold text-lg text-gray-900">{po.po_number}</h3>
+                                        </div>
+                                        {getStatusBadge(po.status)}
+                                    </div>
+
+                                    <div className="space-y-2 mb-3 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Tổng đã đặt:</span>
+                                            <span className="font-medium text-gray-900">{po.total_ordered || 0} món</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Số phiếu hoàn:</span>
+                                            <span className="font-semibold text-blue-600">{po.total_gr_count || 0} phiếu</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Ngày tạo:</span>
+                                            <span className="font-medium text-gray-900">{formatDate(po.created_at)}</span>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleViewReturns(po.id)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        <span>Xem phiếu trả hàng</span>
+                                    </button>
+                                </div>
                             ))}
                         </div>
 
                         {totalPages > 1 && (
                             <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-4">
                                 <div className="text-sm text-gray-600">
-                                    Trang {currentPage} / {totalPages} · Tổng: {total} phiếu
+                                    Trang {currentPage} / {totalPages} · Tổng: {total} đơn
                                 </div>
                                 <div className="flex gap-2">
                                     <button
@@ -318,56 +188,20 @@ const ReturnPurchaseManagement = ({ warehouse }) => {
                 )}
             </div>
 
-            {returnToUpdateId && (
-                <UpdateReturnPurchaseModal
-                    isOpen={!!returnToUpdateId}
-                    prId={returnToUpdateId}
-                    onClose={() => setReturnToUpdateId(null)}
-                    onSuccess={() => {
-                        setReturnToUpdateId(null);
-                        fetchReturnPurchases();
-                    }}
+            {selectedPOId && (
+                <ReturnPurchaseListModal
+                    poId={selectedPOId}
+                    warehouseId={warehouse?.id}
+                    onClose={() => setSelectedPOId(null)}
+                    userRole={userRole}
+                    openAlertBox={context.openAlertBox}
                 />
-            )}
-
-            {selectedReturnId && (
-                <PurchaseReturnDetailModal
-                    prId={selectedReturnId}
-                    onClose={() => setSelectedReturnId(null)}
-                />
-            )}
-
-            {showConfirmModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-                    style={{ backdropFilter: 'blur(2px)', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
-                    <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Xác nhận</h3>
-                        <p className="text-gray-600 mb-6">{confirmAction?.message}</p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors cursor-pointer"
-                                onClick={() => {
-                                    setShowConfirmModal(false);
-                                    setConfirmAction(null);
-                                }}
-                            >
-                                Hủy
-                            </button>
-                            <button
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
-                                onClick={executeConfirmAction}
-                            >
-                                Xác nhận
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
 
             <CreatePurchaseReturnModal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                onSuccess={fetchReturnPurchases}
+                onSuccess={fetchPurchaseOrdersWithReturns}
                 warehouseId={warehouse?.id}
                 openAlertBox={context.openAlertBox}
             />

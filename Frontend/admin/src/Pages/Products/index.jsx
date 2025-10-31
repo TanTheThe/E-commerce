@@ -225,8 +225,6 @@ const Products = () => {
 
             const response = await getDataApi(`/admin/product/all?${queryParams.toString()}`);
 
-            console.log("39127889371892378912");
-
             if (response.success === true) {
                 setProducts(response.data.data || []);
                 setTotalProducts(response.data.total || 0);
