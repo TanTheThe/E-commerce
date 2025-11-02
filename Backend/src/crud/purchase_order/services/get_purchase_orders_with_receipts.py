@@ -1,48 +1,36 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.orm import selectinload
-from sqlmodel import desc
+from sqlmodel import desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.user.repositories import UserRepository
-from src.database.models import PurchaseOrder
-
+from src.database.models import PurchaseOrder, GoodsReceipt
 
 purchase_order_repository = PurchaseOrderRepository()
+goods_receipt_repository = GoodsReceiptRepository()
 user_repository = UserRepository()
 
-class GetPurchaseOrdersService:
-    async def get_purchase_orders(self, session: AsyncSession,
-                                  status_list: Optional[List[str]] = None,
-                                  supplier_id: Optional[str] = None,
-                                  warehouse_id: Optional[str] = None,
-                                  payment_status: Optional[str] = None,
-                                  from_date: Optional[datetime] = None,
-                                  to_date: Optional[datetime] = None,
-                                  skip: int = 0, limit: int = 10):
+class GetPurchaseOrdersWithReceiptsService:
+    async def get_purchase_orders_with_receipts(self, session: AsyncSession, warehouse_id: str,
+                                                status_po: Optional[str] = None, search: Optional[str] = None,
+                                                skip: int = 0, limit: int = 12):
         conditions = []
 
-        if status_list:
-            conditions.append(PurchaseOrder.status.in_(status_list))
+        po_has_gr_subquery = select(GoodsReceipt.purchase_order_id).distinct().where(GoodsReceipt.warehouse_id == warehouse_id)
 
-        if supplier_id:
-            conditions.append(PurchaseOrder.supplier_id == supplier_id)
+        conditions.append(PurchaseOrder.id.in_(po_has_gr_subquery))
 
-        if warehouse_id:
-            conditions.append(PurchaseOrder.warehouse_id == warehouse_id)
+        if status_po:
+            conditions.append(PurchaseOrder.status == status_po)
 
-        if payment_status:
-            conditions.append(PurchaseOrder.payment_status == payment_status)
-
-        if from_date:
-            conditions.append(PurchaseOrder.order_date >= from_date)
-
-        if to_date:
-            conditions.append(PurchaseOrder.order_date <= to_date)
+        if search:
+            conditions.append(PurchaseOrder.po_number.ilike(f"%{search}%"))
 
         options = [
-            selectinload(PurchaseOrder.supplier),
-            selectinload(PurchaseOrder.warehouse)
+            selectinload(PurchaseOrder.po_details)
         ]
 
         order_by = desc(PurchaseOrder.created_at)
@@ -52,25 +40,25 @@ class GetPurchaseOrdersService:
 
         items = []
         for po in pos:
-            items.append(
-                {
-                    "id": str(po.id),
-                    "po_number": po.po_number,
-                    "supplier_name": po.supplier.name if po.supplier else None,
-                    "warehouse_name": po.warehouse.name if po.warehouse else None,
-                    "status": po.status,
-                    "order_date": str(po.order_date),
-                    "expected_delivery_date": str(po.expected_delivery_date),
-                    "total_amount": po.total_amount,
-                    "payment_status": po.payment_status,
-                    "created_at": str(po.created_at),
-                    "supplier_invoice_urls": bool(po.supplier_invoice_urls),
-                }
-            )
+            total_ordered = sum(detail.quantity for detail in po.po_details) if po.po_details else 0
+
+            _, gr_count = await goods_receipt_repository.get_all_goods_receipt(
+                session=session,
+                where_conditions=[GoodsReceipt.purchase_order_id == po.id, GoodsReceipt.warehouse_id == warehouse_id])
+
+            items.append({
+                "id": str(po.id),
+                "po_number": po.po_number,
+                "status": po.status,
+                "total_ordered": total_ordered,
+                "total_gr_count": gr_count,
+                "created_at": po.created_at.isoformat(),
+                "updated_at": po.updated_at.isoformat() if po.updated_at else None
+            })
 
         return {
             "data": items,
-            "total": total,
+            "total": total
         }
 
 

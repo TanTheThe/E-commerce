@@ -77,7 +77,7 @@ class ApproveGoodsReceiptService:
         if not po:
             PurchaseOrderException.po_not_found()
 
-        all_related_grs = await utils_GR_service.get_all_related_receipts(gr, str(po.id), session)
+        all_related_grs = await utils_GR_service.get_all_related_receipts(str(po.id), session)
 
         return gr, po, all_related_grs
 

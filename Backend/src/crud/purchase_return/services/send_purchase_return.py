@@ -1,19 +1,10 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy.orm import selectinload
-from src.config import Config
-from src.crud.authentication.utils import create_url_safe_token
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.purchase_return.services.utils_service import UtilsPRService
-from src.crud.supplier.repositories import SupplierRepository
-from src.crud.warehouse.repositories import WareHouseRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.database.models import Product_Variant, PurchaseOrderDetail, PurchaseOrder, PurchaseReturn
-from src.errors.purchase_order import PurchaseOrderException
+from src.database.models import PurchaseReturn
 from src.errors.purchase_return import PurchaseReturnException
 from src.mail import create_message, mail
-from src.schemas.purchase_order import SendPurchaseOrderRequest
 
 
 utils_pr_service = UtilsPRService()
@@ -60,6 +51,8 @@ class SendPurchaseReturnService:
         items_html = ""
         for idx, detail in enumerate(pr.return_details, 1):
             variant_info = ""
+            product_name = "N/A"
+
             if detail.product_variant:
                 variant_info = f"{detail.product_variant.sku}"
                 if detail.product_variant.size:
@@ -67,7 +60,9 @@ class SendPurchaseReturnService:
                 if detail.product_variant.color_name:
                     variant_info += f" - {detail.product_variant.color_name}"
 
-            product_name = detail.product_variant.name if detail.product_variant else "N/A"
+                if detail.product_variant.product:
+                    product_name = detail.product_variant.product.name
+
             condition_label = {
                 "damaged": "Hư hỏng",
                 "defective": "Lỗi kỹ thuật",
@@ -76,18 +71,22 @@ class SendPurchaseReturnService:
             }.get(detail.condition, detail.condition)
 
             items_html += f"""
-            <tr style="border-bottom: 1px solid #e8e8e8;">
-                <td style="padding: 14px 10px; text-align: center; color: #666;">{idx}</td>
-                <td style="padding: 14px 10px;">
-                    <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;">{product_name}</div>
-                    <div style="color: #7f8c8d; font-size: 13px;">{variant_info}</div>
-                    <div style="color: #e74c3c; font-size: 12px; margin-top: 4px;">🔴 {condition_label}</div>
-                </td>
-                <td style="padding: 14px 10px; text-align: center; color: #e74c3c; font-weight: 600;">{detail.return_quantity}</td>
-                <td style="padding: 14px 10px; text-align: right; color: #34495e;">{format_currency(detail.unit_cost)} đ</td>
-                <td style="padding: 14px 10px; text-align: right; color: #e74c3c; font-weight: 600;">{format_currency(detail.total_cost)} đ</td>
-            </tr>
-            """
+                <tr style="border-bottom: 1px solid #e8e8e8;">
+                    <td style="padding: 14px 10px; text-align: center; color: #666;">{idx}</td>
+                    <td style="padding: 14px 10px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div>
+                                <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;">{product_name}</div>
+                                <div style="color: #7f8c8d; font-size: 13px;">{variant_info}</div>
+                                <div style="color: #e74c3c; font-size: 12px; margin-top: 4px;">🔴 {condition_label}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="padding: 14px 10px; text-align: center; color: #e74c3c; font-weight: 600;">{detail.return_quantity}</td>
+                    <td style="padding: 14px 10px; text-align: right; color: #34495e;">{format_currency(detail.unit_cost)} đ</td>
+                    <td style="padding: 14px 10px; text-align: right; color: #e74c3c; font-weight: 600;">{format_currency(detail.total_cost)} đ</td>
+                </tr>
+                """
 
         gr_number = pr.goods_receipt.receipt_number if pr.goods_receipt else "N/A"
         po_number = pr.purchase_order.po_number if pr.purchase_order else "N/A"

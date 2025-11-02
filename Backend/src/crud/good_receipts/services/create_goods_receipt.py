@@ -42,7 +42,8 @@ class CreateGoodsReceiptService:
                 request.items,
                 purchase_order,
                 parent_details_map,
-                session
+                session,
+                request.parent_receipt_id
             )
 
         created_gr = await self.create_and_save_receipt(
@@ -170,7 +171,7 @@ class CreateGoodsReceiptService:
 
         return variant
 
-    def validate_ordered_quantity(self, item, po_detail, parent_details_map: dict):
+    async def validate_ordered_quantity(self, item, po_detail, parent_details_map: dict, session: AsyncSession, parent_receipt_id: str = None):
         if parent_details_map:
             parent_detail = parent_details_map.get(item.po_detail_id)
 
@@ -179,11 +180,28 @@ class CreateGoodsReceiptService:
 
             expected_qty = parent_detail.rejected_quantity
 
+            if parent_receipt_id:
+                child_condition = [GoodsReceipt.parent_receipt_id == parent_receipt_id]
+                child_options = [selectinload(GoodsReceipt.receipt_details)]
+
+                sibling_grs, _ = await goods_receipt_repository.get_all_goods_receipt(
+                    session=session,
+                    where_conditions=child_condition,
+                    options=child_options
+                )
+
+                for sibling_gr in sibling_grs:
+                    for sibling_detail in sibling_gr.receipt_details:
+                        if str(sibling_detail.po_detail_id) == item.po_detail_id:
+                            expected_qty -= sibling_detail.received_quantity
+
+            expected_qty = max(0, expected_qty)
+
             if item.ordered_quantity != expected_qty:
                 GoodsReceiptException.ordered_quantity_must_equal_expected_qty(expected_qty)
 
-            if item.accepted_quantity > expected_qty:
-                GoodsReceiptException.accept_greater_than_reject_parent()
+            if item.accepted_quantity > item.ordered_quantity:
+                GoodsReceiptException.accept_greater_than_ordered()
 
         else:
             if item.ordered_quantity != po_detail.quantity:
@@ -241,7 +259,7 @@ class CreateGoodsReceiptService:
         )
 
     async def process_receipt_items(self, items: List[GoodsReceiptDetailCreate], purchase_order,
-                                    parent_details_map: dict, session: AsyncSession):
+                                parent_details_map: dict, session: AsyncSession, parent_receipt_id: str = None):
         receipt_details = []
         total_received_amount = 0
         has_discrepancy = False
@@ -256,7 +274,7 @@ class CreateGoodsReceiptService:
 
             variant = await self.get_and_validate_variant(item, po_detail, session)
 
-            self.validate_ordered_quantity(item, po_detail, parent_details_map)
+            await self.validate_ordered_quantity(item, po_detail, parent_details_map, session, parent_receipt_id)
 
             item_discrepancies = self.check_item_discrepancies(item, variant)
             if item_discrepancies:

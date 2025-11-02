@@ -171,3 +171,13 @@ class ProductException:
                 "error_code": "product_017",
             },
         )
+
+    @staticmethod
+    def some_products_not_exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Có một vài sản phẩm không tồn tại",
+                "error_code": "product_018",
+            },
+        )

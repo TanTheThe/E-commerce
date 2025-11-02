@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
-from src.database.models import PurchaseReturn, PurchaseReturnDetail, GoodsReceiptDetail
+from src.database.models import PurchaseReturn, PurchaseReturnDetail, GoodsReceiptDetail, Product_Variant
 from src.errors.goods_receipt import GoodsReceiptException
 from src.errors.purchase_return import PurchaseReturnException
 
@@ -20,7 +20,8 @@ class UtilsPRService:
             selectinload(PurchaseReturn.goods_receipt),
             selectinload(PurchaseReturn.supplier),
             selectinload(PurchaseReturn.warehouse),
-            selectinload(PurchaseReturn.return_details)
+            selectinload(PurchaseReturn.return_details).selectinload(PurchaseReturnDetail.product_variant).selectinload(
+                Product_Variant.product)
         ]
 
         pr = await purchase_return_repository.get_purchase_return(

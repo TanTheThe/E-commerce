@@ -285,9 +285,10 @@ async def get_detail_product_admin(id: str,
 
 @product_admin_router.get('/all/select-box')
 async def get_products_selectbox(category_id: Optional[str] = None,
+                                 supplier_id: Optional[str] = None,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    product_dict = await get_all_products_service.get_products_select_box(session, category_id)
+    product_dict = await get_all_products_service.get_products_select_box(session, category_id, supplier_id)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

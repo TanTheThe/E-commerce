@@ -2,7 +2,7 @@ from typing import Optional
 from sqlmodel import desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.supplier.repositories import SupplierRepository
-from src.database.models import Supplier
+from src.database.models import Supplier, Supplier_Product
 
 supplier_repository = SupplierRepository()
 
@@ -31,6 +31,12 @@ class GetAllSuppliersService:
 
         items = []
         for sup in suppliers:
+            condition_supplier_product = [
+                Supplier_Product.supplier_id == sup.id,
+                Supplier_Product.is_active == True
+            ]
+            _, product_count = await supplier_repository.get_all_suppliers_product(session=session, where_conditions=condition_supplier_product)
+
             items.append(
                 {
                     "id": str(sup.id),
@@ -41,6 +47,7 @@ class GetAllSuppliersService:
                     "email": sup.email,
                     "is_active": sup.is_active,
                     "created_at": str(sup.created_at),
+                    "product_count": product_count,
                 }
             )
 

@@ -3,7 +3,7 @@ from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.user.repositories import UserRepository
-from src.database.models import GoodsReceipt, GoodsReceiptDetail, PurchaseOrder, Product_Variant, User
+from src.database.models import GoodsReceipt, GoodsReceiptDetail, Product_Variant, User
 from src.errors.goods_receipt import GoodsReceiptException
 
 
@@ -30,6 +30,13 @@ class GetDetailGoodsReceiptService:
                                                               options=options)
         if not gr:
             GoodsReceiptException.gr_not_found()
+
+        receipt_number_parent = None
+        if gr.parent_receipt_id:
+            parent_receipt = await goods_receipt_repository.get_goods_receipt(session=session,
+                                                                              where_conditions=[GoodsReceipt.id == gr.parent_receipt_id])
+            if parent_receipt:
+                receipt_number_parent = parent_receipt.receipt_number
 
         received_by_name = None
         if gr.received_by:
@@ -111,6 +118,7 @@ class GetDetailGoodsReceiptService:
             "supplier_name": gr.supplier.name if gr.supplier else None,
             "supplier_code": gr.supplier.code if gr.supplier else None,
             "parent_receipt_id": str(gr.parent_receipt_id) if gr.parent_receipt_id else None,
+            "receipt_number_parent": receipt_number_parent,
             "status": gr.status,
             "receipt_date": str(gr.receipt_date),
             "total_received_amount": gr.total_received_amount,

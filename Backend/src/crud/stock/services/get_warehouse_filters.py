@@ -97,7 +97,7 @@ class GetWarehouseFiltersService:
         ]
 
 
-    async def get_brands_with_count(self, session: AsyncSession, warehouse_id: str) -> List[dict]:
+    async def get_brands_with_count(self, session: AsyncSession, warehouse_id: str):
         select_columns = [
             Brand.id,
             Brand.name,

@@ -25,6 +25,22 @@ class OrderRepository:
         return new_order
 
 
+    async def create_order_status_history(self, order_data, session: AsyncSession):
+        if not isinstance(order_data, dict):
+            order_data_dict = order_data.model_dump(exclude_none=True)
+        else:
+            order_data_dict = order_data
+
+        new_order_history = OrderStatusHistory(
+            **order_data_dict,
+        )
+
+        session.add(new_order_history)
+        await session.flush()
+
+        return new_order_history
+
+
     async def get_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         statement = select(Order).options(
             *joins if joins else []

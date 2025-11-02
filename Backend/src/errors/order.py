@@ -260,4 +260,24 @@ class OrderException:
                 "error_code": "order_026",
             },
         )
+
+    @staticmethod
+    def already_in_this_status():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng đã đang ở trạng thái này rồi",
+                "error_code": "order_027",
+            },
+        )
+
+    @staticmethod
+    def cant_change_status(old_status, new_status):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể chuyển từ trạng thái '{old_status}' sang '{new_status}'",
+                "error_code": "order_027",
+            },
+        )
     

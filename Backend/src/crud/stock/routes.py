@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Query
 from typing import Optional, List
 from src.crud.stock.services.get_all_variants_in_warehouse import GetVariantsInWarehouseService
 from src.crud.stock.services.get_low_stock_items import GetLowStockItemsService
@@ -31,8 +31,8 @@ access_token_bearer = AccessTokenBearer()
 async def get_products_in_warehouse(warehouse_id: str,
                                     skip: int = 0, limit: int = 10,
                                     search: Optional[str] = None,
-                                    category_ids: Optional[List[str]] = None,
-                                    brand_ids: Optional[List[str]] = None,
+                                    category_ids: Optional[List[str]] = Query(None),
+                                    brand_ids: Optional[List[str]] = Query(None),
                                     stock_status: ProductStockStatus = ProductStockStatus.ALL,
                                     sort_by: SortBy = SortBy.NAME,
                                     sort_order: SortOrder = SortOrder.ASC,

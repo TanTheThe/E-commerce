@@ -74,8 +74,17 @@ class GetAllGoodsReceiptService:
             options=options
         )
 
+        parent_ids = [gr.parent_receipt_id for gr in grs if gr.parent_receipt_id]
+
+        parent_map = {}
+        if parent_ids:
+            parent_receipt, _ = await goods_receipt_repository.get_all_goods_receipt(
+                session=session, where_conditions=[GoodsReceipt.id.in_(parent_ids)])
+            parent_map = {str(r.id): r.receipt_number for r in parent_receipt}
+
         items = []
         for gr in grs:
+            parent_id = str(gr.parent_receipt_id) if gr.parent_receipt_id else None
             items.append({
                 "id": str(gr.id),
                 "receipt_number": gr.receipt_number,
@@ -98,7 +107,8 @@ class GetAllGoodsReceiptService:
                 "total_received_amount": gr.total_received_amount,
                 "total_items": len(gr.receipt_details) if gr.receipt_details else 0,
                 "has_discrepancy": gr.has_discrepancy,
-                "parent_receipt_id": str(gr.parent_receipt_id) if gr.parent_receipt_id else None,
+                "parent_receipt_id": parent_id,
+                "receipt_number_parent": parent_map.get(parent_id),
                 "approved_by": str(gr.approved_by) if gr.approved_by else None,
                 "approved_at": gr.approved_at.isoformat() if gr.approved_at else None,
                 "completed_at": gr.completed_at.isoformat() if gr.completed_at else None,

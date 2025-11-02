@@ -42,6 +42,7 @@ class ProductService:
     async def delete_product(self, product_id: str, session: AsyncSession):
         condition = and_(Product.id == product_id)
         product_delete = await product_repository.delete_product(condition, session)
+        await session.commit()
         return product_delete
 
     async def delete_multiple_product(self, data: DeleteMultipleProductModel, session: AsyncSession):

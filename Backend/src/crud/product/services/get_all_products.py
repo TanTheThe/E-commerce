@@ -9,7 +9,7 @@ from src.crud.color.services import ColorService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand, Material, Product_Material, \
-    Tag, Categories_Product, Color
+    Tag, Categories_Product, Color, Supplier_Product
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc, asc, or_, func, select, case
 from src.crud.product.repositories import ProductRepository
@@ -293,8 +293,8 @@ class GetAllProductsService:
         ]
 
         filters, order_by_clause = await self.filter_product(filter_data, session)
-        products, total = await product_repository.get_all_product(filters, session, joins, skip, limit,
-                                                                   order_by_clause)
+        products, total = await product_repository.get_all_product(session=session, where_conditions=filters, skip=skip,
+                                                                   limit=limit, order_by=order_by_clause, options=joins)
 
         product_list = []
         for product in products:
@@ -605,7 +605,8 @@ class GetAllProductsService:
             return desc(Product.created_at)
 
 
-    async def get_products_select_box(self, session: AsyncSession, category_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_products_select_box(self, session: AsyncSession, category_id: Optional[str] = None,
+                                      supplier_id: Optional[str] = None) -> List[Dict[str, Any]]:
         where_conditions = [Product.deleted_at.is_(None)]
 
         joins = []
@@ -622,7 +623,20 @@ class GetAllProductsService:
                 Categories_Product.deleted_at.is_(None)
             ])
 
-        products, _ = await product_repository.get_all_product(session=session, joins=joins if category_id else None,
+        if supplier_id:
+            joins.append((
+                Supplier_Product,
+                {
+                    'on': Supplier_Product.product_id == Product.id,
+                    'type': 'inner'
+                }
+            ))
+            where_conditions.extend([
+                Supplier_Product.supplier_id == supplier_id,
+                Supplier_Product.is_active == True
+            ])
+
+        products, _ = await product_repository.get_all_product(session=session, joins=joins,
                                                                where_conditions=where_conditions, skip=0, limit=1000)
 
         return [

@@ -1,4 +1,6 @@
 from typing import Optional
+
+from sqlalchemy.orm import selectinload
 from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.categories_product.repositories import CategoriesProductRepository
@@ -6,7 +8,7 @@ from src.crud.product.repositories import ProductRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.stock.repositories import StockRepository
 from src.crud.warehouse.repositories import WareHouseRepository
-from src.database.models import Warehouse, Product_Variant, Stock, Product
+from src.database.models import Warehouse, Product_Variant, Stock, Product, Color
 from src.errors.product import ProductException
 from src.errors.warehouse import WareHouseException
 
@@ -24,7 +26,8 @@ class GetVariantsInWarehouseService:
             WareHouseException.warehouse_not_found()
 
         product_condition = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
-        product = await product_repository.get_product(product_condition, session)
+        product_tuple = await product_repository.get_product(product_condition, session)
+        product = product_tuple[0]
         if not product:
             ProductException.not_found()
 
@@ -45,11 +48,14 @@ class GetVariantsInWarehouseService:
             Stock.cost_price,
             Stock.last_cost_price,
             Stock.last_inbound_date,
-            Stock.last_outbound_date
+            Stock.last_outbound_date,
+            Color.name.label('color_table_name'),
+            Color.code.label('color_table_code')
         ]
 
         joins_list = [
-            (Stock, {'on': Stock.product_variant_id == Product_Variant.id, 'type': 'inner'})
+            (Stock, {'on': Stock.product_variant_id == Product_Variant.id, 'type': 'inner'}),
+            (Color, {'on': Color.id == Product_Variant.color_id, 'type': 'outer'})
         ]
 
         where_conds = [
@@ -79,8 +85,8 @@ class GetVariantsInWarehouseService:
                 'id': str(row.variant_id),
                 'sku': row.sku,
                 'size': row.size,
-                'color_name': row.color_name,
-                'color_code': row.color_code,
+                'color_name': row.color_name if row.color_name else row.color_table_name,
+                'color_code': row.color_code if row.color_code else row.color_table_code,
                 'image': row.image,
                 'price': float(row.price) if row.price else None,
                 'stock': {

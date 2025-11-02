@@ -1,7 +1,8 @@
+from sqlalchemy import delete
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.supplier.repositories import SupplierRepository
-from src.database.models import Supplier, PurchaseOrder
+from src.database.models import Supplier, PurchaseOrder, Supplier_Product
 from src.errors.supplier import SupplierException
 
 supplier_repository = SupplierRepository()
@@ -23,6 +24,11 @@ class DeleteSupplierService:
 
         if existing.current_debt != 0:
             SupplierException.cant_delete_supplier_outstanding_debt()
+
+        delete_supplier_products_stmt = delete(Supplier_Product).where(
+            Supplier_Product.supplier_id == supplier_id
+        )
+        await session.execute(delete_supplier_products_stmt)
 
         success = await supplier_repository.delete_supplier(supplier_id, session)
         if not success:

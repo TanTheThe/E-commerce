@@ -8,6 +8,7 @@ from src.crud.good_receipts.services.get_all_goods_receipt import GetAllGoodsRec
 from src.crud.good_receipts.services.get_approval_review import ApprovalPreviewService
 from src.crud.good_receipts.services.get_detail_goods_receipt import GetDetailGoodsReceiptService
 from src.crud.good_receipts.services.get_gr_for_create import GetGRForCreateService
+from src.crud.good_receipts.services.get_gr_tree_by_po import GetGRTreeByPOService
 from src.crud.good_receipts.services.update_goods_receipt import UpdateGoodsReceiptService
 from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -29,6 +30,7 @@ get_detail_goods_receipt_service = GetDetailGoodsReceiptService()
 update_goods_receipt_service = UpdateGoodsReceiptService()
 delete_goods_receipt_service = DeleteGoodsReceiptService()
 get_gr_for_create_service = GetGRForCreateService()
+get_gr_tree_by_po_service = GetGRTreeByPOService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -155,6 +157,30 @@ async def get_goods_receipt_for_create(parent_goods_receipt_id: str,
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin để tạo phiếu nhập hàng con",
+            "content": goods_receipt
+        }
+    )
+
+
+@goods_receipt_admin_router.get("/{purchase_order_id}/receipts-tree")
+async def get_gr_tree_by_po(purchase_order_id: str, warehouse_id: str,
+                            token_details: dict = Depends(access_token_bearer),
+                            session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    goods_receipt = await get_gr_tree_by_po_service.get_gr_tree_by_po(
+        session=session,
+        purchase_order_id=purchase_order_id,
+        warehouse_id=warehouse_id
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin phiếu nhập kho theo dạng cây",
             "content": goods_receipt
         }
     )

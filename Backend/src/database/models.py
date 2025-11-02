@@ -352,6 +352,42 @@ class Tag(SQLModel, table=True):
     )
 
 
+class Supplier_Product(SQLModel, table=True):
+    __tablename__ = 'supplier_product'
+
+    supplier_id: uuid.UUID = Field(
+        foreign_key="supplier.id",
+        primary_key=True,
+        nullable=False
+    )
+
+    product_id: uuid.UUID = Field(
+        foreign_key="product.id",
+        primary_key=True,
+        nullable=False
+    )
+
+    is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="true"), default=True)
+
+    notes: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+
+    created_at: datetime = Field(
+        sa_column=Column(
+            pg.TIMESTAMP,
+            nullable=False,
+            server_default=text("CURRENT_TIMESTAMP")
+        ),
+        default=datetime.now
+    )
+
+    updated_at: Optional[datetime] = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=True)
+    )
+
+    products: Optional["Product"] = Relationship(back_populates="supplier_products", sa_relationship_kwargs={'lazy': 'noload'})
+    suppliers: Optional["Supplier"] = Relationship(back_populates="supplier_products", sa_relationship_kwargs={'lazy': 'noload'})
+
+
 class Product(SQLModel, table=True):
     __tablename__ = 'product'
 
@@ -392,6 +428,8 @@ class Product(SQLModel, table=True):
     materials: List["Material"] = Relationship(back_populates="products", link_model=Product_Material, sa_relationship_kwargs={'lazy': 'noload'})
     product_tags: List["Product_Tag"] = Relationship(back_populates="product", sa_relationship_kwargs={'lazy': 'noload'})
     tags: List["Tag"] = Relationship(back_populates="products", link_model=Product_Tag,sa_relationship_kwargs={'lazy': 'noload'})
+    supplier_products: List["Supplier_Product"] = Relationship(back_populates="products", sa_relationship_kwargs={'lazy': 'noload'})
+    suppliers: List["Supplier"] = Relationship(back_populates="products", link_model=Supplier_Product, sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Product_Variant(SQLModel, table=True):
@@ -1666,6 +1704,10 @@ class Supplier(SQLModel, table=True):
     goods_receipts: List["GoodsReceipt"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
     supplier_payments: List["SupplierPayment"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
     purchase_returns: List["PurchaseReturn"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
+    products: List["Product"] = Relationship(back_populates="suppliers", link_model=Supplier_Product, sa_relationship_kwargs={'lazy': 'noload'})
+    supplier_products: List["Supplier_Product"] = Relationship(back_populates="suppliers", sa_relationship_kwargs={'lazy': 'noload'})
+
+
 
 
 

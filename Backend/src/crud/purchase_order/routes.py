@@ -7,6 +7,8 @@ from src.crud.purchase_order.services.create_purchase_order import CreatePurchas
 from src.crud.purchase_order.services.delete_purchase_order import DeletePurchaseOrderService
 from src.crud.purchase_order.services.get_purchase_order_by_id import GetPurchaseOrderByIDService
 from src.crud.purchase_order.services.get_purchase_orders import GetPurchaseOrdersService
+from src.crud.purchase_order.services.get_purchase_orders_with_receipts import GetPurchaseOrdersWithReceiptsService
+from src.crud.purchase_order.services.get_purchase_orders_with_returns import GetPurchaseOrdersWithReturnsService
 from src.crud.purchase_order.services.send_purchase_order import SendPurchaseOrderService
 from src.crud.purchase_order.services.update_po_after_negotiation import UpdatePOAfterNegotiationService
 from src.crud.purchase_order.services.update_purchase_order import UpdatePurchaseOrderService
@@ -31,6 +33,8 @@ approve_purchase_order_service = ApprovePurchaseOrderService()
 send_purchase_order_service = SendPurchaseOrderService()
 update_po_after_negotiation_service = UpdatePOAfterNegotiationService()
 confirm_purchase_order_service = ConfirmPurchaseOrderService()
+get_purchase_orders_with_receipts_service = GetPurchaseOrdersWithReceiptsService()
+get_purchase_orders_with_returns_service = GetPurchaseOrdersWithReturnsService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -81,6 +85,55 @@ async def get_purchase_orders(po_status: Optional[str] = Query(None, description
         content={
             "message": "Thông tin các đơn nhập hàng",
             "content": purchase_orders
+        }
+    )
+
+
+@purchase_orders_admin_router.get("/purchase-orders-with-receipts")
+async def get_purchase_orders_with_receipts(warehouse_id: str,
+                                            status_po: Optional[str] = None,
+                                            search: Optional[str] = None,
+                                            skip: int = 0, limit: int = 12,
+                                            token_details: dict = Depends(access_token_bearer),
+                                            session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    purchase_order = await get_purchase_orders_with_receipts_service.get_purchase_orders_with_receipts(
+        session, warehouse_id, status_po, search, skip, limit)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin đơn nhập hàng có phiếu nhập kho",
+            "content": purchase_order
+        }
+    )
+
+
+@purchase_orders_admin_router.get("/purchase-orders-with-returns")
+async def get_purchase_orders_with_returns(warehouse_id: str,
+                                           status_po: Optional[str] = None,
+                                            search: Optional[str] = None,
+                                            skip: int = 0, limit: int = 12,
+                                            token_details: dict = Depends(access_token_bearer),
+                                            session: AsyncSession = Depends(get_session)):
+    role = token_details.get('role')
+
+    if role not in ['admin', 'staff']:
+        UserException.role_invalid()
+
+    purchase_order = await get_purchase_orders_with_returns_service.get_purchase_orders_with_returns(
+        session, warehouse_id, status_po, search, skip, limit
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Thông tin đơn nhập hàng có phiếu nhập kho",
+            "content": purchase_order
         }
     )
 

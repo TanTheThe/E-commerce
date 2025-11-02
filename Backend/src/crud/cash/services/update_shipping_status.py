@@ -7,7 +7,7 @@ from src.crud.order.repositories import OrderRepository
 from src.crud.user.repositories import UserRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.crud.webhook.repositories import CashRepository
+from src.crud.cash.repositories import CashRepository
 from src.database.models import Order, User
 from src.errors.order import OrderException
 from src.schemas.webhook import ShippingWebhookRequest

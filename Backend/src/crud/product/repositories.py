@@ -133,7 +133,6 @@ class ProductRepository:
                 },
             )
         product_to_delete.deleted_at = datetime.now()
-        await session.commit()
 
         return {"deleted_id": str(product_to_delete.id)}
 

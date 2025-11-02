@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Optional, List
 from sqlalchemy import func, Integer
 from sqlmodel import and_, select, or_
@@ -16,21 +17,8 @@ stock_repository = StockRepository()
 category_product_repository = CategoriesProductRepository()
 
 class GetProductsInWarehouseService:
-    async def get_products_summary(self, session: AsyncSession,
-                                   warehouse_id: str,
-                                   skip: int = 0, limit: int = 10,
-                                   search: Optional[str] = None,
-                                   category_ids: Optional[List[str]] = None,
-                                   brand_ids: Optional[List[str]] = None,
-                                   stock_status: ProductStockStatus = ProductStockStatus.ALL,
-                                   sort_by: SortBy = SortBy.NAME,
-                                   sort_order: SortOrder = SortOrder.ASC):
-        condition = and_(Warehouse.id == warehouse_id)
-        warehouse = await warehouse_repository.get_warehouse(condition, session)
-        if not warehouse:
-            WareHouseException.warehouse_not_found()
-
-        select_columns_stock_summary = [
+    def build_stock_summary_subquery(self, warehouse_id: str):
+        select_columns = [
             Product_Variant.product_id,
             func.sum(Stock.quantity).label('total_quantity'),
             func.sum(Stock.available_quantity).label('total_available'),
@@ -50,8 +38,8 @@ class GetProductsInWarehouseService:
             func.max(Stock.last_inbound_date).label('last_inbound_date')
         ]
 
-        stock_summary = (
-            select(*select_columns_stock_summary)
+        return (
+            select(*select_columns)
             .select_from(Product_Variant)
             .join(Stock, Stock.product_variant_id == Product_Variant.id)
             .where(and_(
@@ -60,6 +48,91 @@ class GetProductsInWarehouseService:
             ))
             .group_by(Product_Variant.product_id)
         ).subquery()
+
+    def build_where_conditions(self, search: Optional[str], category_ids: Optional[List[str]], brand_ids: Optional[List[str]],
+                               stock_status: ProductStockStatus, stock_summary_subquery) -> List:
+        where_conds = [Product.deleted_at.is_(None)]
+
+        if search:
+            where_conds.append(or_(
+                Product.name.ilike(f"%{search}%"),
+                Product.slug.ilike(f"%{search}%")
+            ))
+
+        if category_ids:
+            category_subquery = select(Categories_Product.product_id).where(
+                and_(
+                    Categories_Product.categories_id.in_(category_ids),
+                    Categories_Product.deleted_at.is_(None)
+                )
+            )
+            where_conds.append(Product.id.in_(category_subquery))
+
+        if brand_ids:
+            where_conds.append(Product.brand_id.in_(brand_ids))
+
+        if stock_status == ProductStockStatus.AVAILABLE:
+            where_conds.append(stock_summary_subquery.c.total_available > 0)
+        elif stock_status == ProductStockStatus.LOW:
+            where_conds.append(stock_summary_subquery.c.variants_low_stock > 0)
+        elif stock_status == ProductStockStatus.OUT:
+            where_conds.append(stock_summary_subquery.c.variants_out_of_stock > 0)
+
+        return where_conds
+
+    async def get_categories_for_products(self, session: AsyncSession, product_ids: List[str]):
+        if not product_ids:
+            return {}
+
+        select_columns = [Categories.id, Categories.name, Categories_Product.product_id,]
+        select_from = Categories_Product
+        joins = [
+            (
+                Categories,
+                {'on': Categories_Product.categories_id == Categories.id}
+            )
+        ]
+        where_conditions = [
+            Categories_Product.product_id.in_(product_ids),
+            Categories_Product.deleted_at.is_(None),
+            Categories.deleted_at.is_(None)
+        ]
+
+        cate_products, _ = await category_product_repository.get_all_cate_product(
+            session=session,
+            select_columns=select_columns,
+            select_from=select_from,
+            joins=joins,
+            where_conditions=where_conditions,
+            skip=0,
+            limit=1000
+        )
+
+        categories_map = defaultdict(list)
+        for row in cate_products:
+            categories_map[str(row.product_id)].append({
+                'id': str(row.id),
+                'name': row.name
+            })
+
+        return dict(categories_map)
+
+
+    async def get_products_summary(self, session: AsyncSession,
+                                   warehouse_id: str,
+                                   skip: int = 0, limit: int = 10,
+                                   search: Optional[str] = None,
+                                   category_ids: Optional[List[str]] = None,
+                                   brand_ids: Optional[List[str]] = None,
+                                   stock_status: ProductStockStatus = ProductStockStatus.ALL,
+                                   sort_by: SortBy = SortBy.NAME,
+                                   sort_order: SortOrder = SortOrder.ASC):
+        condition = and_(Warehouse.id == warehouse_id)
+        warehouse = await warehouse_repository.get_warehouse(condition, session)
+        if not warehouse:
+            WareHouseException.warehouse_not_found()
+
+        stock_summary = self.build_stock_summary_subquery(warehouse_id)
 
         select_cols = [
             Product.id.label('product_id'),
@@ -90,32 +163,7 @@ class GetProductsInWarehouseService:
             (Brand, {'on': Product.brand_id == Brand.id, 'type': 'outer'})
         ]
 
-        where_conds = [Product.deleted_at.is_(None)]
-
-        if search:
-            where_conds.append(or_(
-                Product.name.ilike(f"%{search}%"),
-                Product.slug.ilike(f"%{search}%")
-            ))
-
-        if category_ids:
-            category_subquery = select(Categories_Product.product_id).where(
-                and_(
-                    Categories_Product.categories_id.in_(category_ids),
-                    Categories_Product.deleted_at.is_(None)
-                )
-            )
-            where_conds.append(Product.id.in_(category_subquery))
-
-        if brand_ids:
-            where_conds.append(Product.brand_id.in_(brand_ids))
-
-        if stock_status == ProductStockStatus.AVAILABLE:
-            where_conds.append(stock_summary.c.total_available > 0)
-        elif stock_status == ProductStockStatus.LOW:
-            where_conds.append(stock_summary.c.variants_low_stock > 0)
-        elif stock_status == ProductStockStatus.OUT:
-            where_conds.append(stock_summary.c.variants_out_of_stock > 0)
+        where_conds = self.build_where_conditions(search, category_ids, brand_ids, stock_status, stock_summary)
 
         if sort_by == SortBy.NAME:
             order_col = Product.name
@@ -138,9 +186,14 @@ class GetProductsInWarehouseService:
             limit=limit
         )
 
+        product_ids = [str(row.product_id) for row in results]
+        categories_map = await self.get_categories_for_products(session, product_ids)
+
         products_data = []
         for row in results:
-            categories = await self.get_product_categories(session, str(row.product_id))
+            product_id = str(row.product_id)
+            categories = categories_map.get(product_id, [])
+
             status = self.determine_stock_status(
                 row.total_available or 0,
                 row.variants_low_stock or 0,
@@ -206,7 +259,7 @@ class GetProductsInWarehouseService:
             limit=1000
         )
 
-        categories = [{'id': row.id, 'name': row.name} for row in cate_products]
+        categories = [{'id': str(row.id), 'name': row.name} for row in cate_products]
         return categories
 
 

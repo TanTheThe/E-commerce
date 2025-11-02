@@ -203,21 +203,21 @@ class GoodsReceiptException:
         )
 
     @staticmethod
-    def ordered_quantity_must_equal_expected_qty(expected_qty):
+    def ordered_quantity_greater_than_available(expected_qty):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": f"ordered_quantity phải bằng {expected_qty}",
+                "message": f"ordered_quantity lớn hơn số lượng {expected_qty}",
                 "error_code": "gr_001",
             },
         )
 
     @staticmethod
-    def accept_greater_than_reject_parent():
+    def accept_greater_than_ordered():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": f"accepted_quantity không được vượt quá rejected_quantity của parent",
+                "message": f"accepted_quantity không được vượt quá ordered_quantity",
                 "error_code": "gr_001",
             },
         )

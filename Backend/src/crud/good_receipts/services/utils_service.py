@@ -9,61 +9,41 @@ goods_receipt_repository = GoodsReceiptRepository()
 
 
 class UtilsGRService:
-    async def get_all_related_receipts(self, current_gr: GoodsReceipt, po_id: str, session: AsyncSession):
-        root_id = await self.find_root_receipt(current_gr, session)
+    async def get_all_related_receipts(self, po_id: str, session: AsyncSession):
+        root_grs = await self.find_all_root_receipts(po_id, session)
 
+        if not root_grs:
+            return []
+
+        all_grs = []
+        for root_gr in root_grs:
+            tree_grs = await self.get_all_descendants_recursively(
+                [root_gr], po_id, session
+            )
+            all_grs.extend(tree_grs)
+
+        return all_grs
+
+
+    async def find_all_root_receipts(self, po_id: str, session: AsyncSession):
         condition = [
             GoodsReceipt.purchase_order_id == po_id,
-            GoodsReceipt.id == root_id
+            GoodsReceipt.parent_receipt_id.is_(None)
         ]
-
         options = [selectinload(GoodsReceipt.receipt_details)]
 
-        grs, _ = await goods_receipt_repository.get_all_goods_receipt(
+        root_grs, _ = await goods_receipt_repository.get_all_goods_receipt(
             session=session,
             where_conditions=condition,
             options=options
         )
-        
-        all_grs = await self.get_all_descendants_recursively(grs, po_id, session)
-        
-        return all_grs
 
-    async def find_root_receipt(self, current_gr: GoodsReceipt, session: AsyncSession):
-        visited = set()
-        current = current_gr
-
-        while current and current.parent_receipt_id is not None:
-            parent_id_str = str(current.parent_receipt_id)
-
-            if parent_id_str in visited:
-                GoodsReceiptException.circular_gr_error()
-
-            visited.add(parent_id_str)
-
-            parent = await goods_receipt_repository.get_goods_receipt(
-                session=session,
-                where_conditions=[GoodsReceipt.id == current.parent_receipt_id],
-            )
-
-            if not parent:
-                return str(current.id)
-
-            current = parent
-
-            if parent.parent_receipt_id is None:
-                return str(parent.id)
-
-            await session.refresh(current)
-
-        return str(current.id)
+        return root_grs
 
 
     async def get_all_descendants_recursively(self, current_grs, po_id: str, session: AsyncSession):
         all_grs = list(current_grs)
-
         visited_ids = set(str(gr.id) for gr in current_grs)
-
         current_batch = list(current_grs)
 
         while current_batch:
@@ -73,7 +53,6 @@ class UtilsGRService:
                 GoodsReceipt.purchase_order_id == po_id,
                 GoodsReceipt.parent_receipt_id.in_(current_ids)
             ]
-
             options = [selectinload(GoodsReceipt.receipt_details)]
 
             children, _ = await goods_receipt_repository.get_all_goods_receipt(

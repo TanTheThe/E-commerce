@@ -82,3 +82,13 @@ class SupplierException:
             },
         )
 
+    @staticmethod
+    def cant_find_link():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy liên kết giữa supplier và các products",
+                "error_code": "supp_002",
+            },
+        )
+
