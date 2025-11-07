@@ -15,18 +15,18 @@ async def lifespan(app: FastAPI):
     app.state.engine = engine
     app.state.session = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
-    # app.state.redis = Redis(
-    #     host=Config.REDIS_HOST,
-    #     port=Config.REDIS_PORT,
-    #     db=0,
-    #     decode_responses=True
-    # )
+    app.state.redis = Redis(
+        host=Config.REDIS_HOST,
+        port=Config.REDIS_PORT,
+        db=0,
+        decode_responses=True
+    )
 
     yield
 
     await app.state.engine.dispose()
-    # await app.state.redis.close()
-    # await app.state.redis.connection_pool.disconnect()
+    await app.state.redis.close()
+    await app.state.redis.connection_pool.disconnect()
 
 app = FastAPI(title="E-commerce", version="v1", lifespan=lifespan)
 

@@ -1,13 +1,10 @@
 from datetime import datetime
-import uuid
-from sqlmodel import and_
-from starlette.responses import JSONResponse
 from src.crud.authentication.utils import verify_password, generate_password_hash
 from src.database.models import User
 from src.errors.authentication import AuthException
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.user.repositories import UserRepository
-from fastapi import status, HTTPException
+from fastapi import HTTPException
 from src.schemas.user import ChangePasswordModel, UserRole
 
 user_repository = UserRepository()
@@ -16,7 +13,7 @@ user_repository = UserRepository()
 class ChangePasswordService:
     async def change_password(self, user_id: str, password_data: ChangePasswordModel, role: UserRole, session: AsyncSession):
         try:
-            self.validate_input(user_id, password_data)
+            self.validate_input(password_data)
 
             user = await self.find_and_validate_user(user_id, role, session)
 
@@ -26,19 +23,15 @@ class ChangePasswordService:
 
             await self.update_user_password(user, password_data.new_password, session)
 
+            await session.commit()
+
             role_display = self.get_role_display(role)
 
-            return JSONResponse(
-                content={
-                    "message": f"Đổi mật khẩu {role_display} thành công",
-                    "content": {
+            return role_display, {
                         "user_id": str(user.id),
                         "email": user.email,
                         "updated_at": datetime.now().isoformat()
                     }
-                },
-                status_code=status.HTTP_200_OK
-            )
 
         except HTTPException:
             raise
@@ -47,25 +40,20 @@ class ChangePasswordService:
             AuthException.password_change_failed()
 
 
-    def validate_input(self, user_id: str, password_data: ChangePasswordModel):
-        try:
-            uuid.UUID(user_id)
-        except ValueError:
-            AuthException.invalid_user_id()
-
-        if not password_data.old_password or not password_data.old_password.strip():
+    def validate_input(self, password_data: ChangePasswordModel):
+        if not password_data.old_password or len(password_data.old_password.strip()) == 0:
             AuthException.old_password_required()
 
-        if not password_data.new_password or not password_data.new_password.strip():
+        if not password_data.new_password or len(password_data.new_password.strip()) == 0:
             AuthException.new_password_required()
 
-        if not password_data.confirm_new_password or not password_data.confirm_new_password.strip():
+        if not password_data.confirm_new_password or len(password_data.confirm_new_password.strip()) == 0:
             AuthException.confirm_password_required()
 
 
     async def find_and_validate_user(self, user_id: str, role: UserRole, session: AsyncSession):
-        condition = and_(User.id == user_id)
-        user = await user_repository.get_user(condition, session)
+        condition = [User.id == user_id, User.deleted_at.is_(None)]
+        user = await user_repository.get_user(session=session, where_conditions=condition)
 
         if not user:
             AuthException.user_not_found()
@@ -112,7 +100,6 @@ class ChangePasswordService:
         if verify_password(new_password, user.password):
             AuthException.same_password_error()
 
-
     def validate_password_strength(self, password: str):
         if len(password) < 8:
             AuthException.password_too_short()
@@ -120,11 +107,36 @@ class ChangePasswordService:
         if len(password) > 100:
             AuthException.password_too_long()
 
-        if not any(c.isalpha() for c in password):
-            AuthException.password_needs_letters()
+        if not any(c.isupper() for c in password):
+            AuthException.password_missing_uppercase()
+
+        if not any(c.islower() for c in password):
+            AuthException.password_missing_lowercase()
 
         if not any(c.isdigit() for c in password):
-            AuthException.password_needs_numbers()
+            AuthException.password_missing_digit()
+
+        special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        if not any(c in special_chars for c in password):
+            AuthException.password_missing_special_char()
+
+        common_patterns = [
+            r'12345', r'password', r'qwerty', r'abc123',
+            r'111111', r'123123', r'admin', r'letmein'
+        ]
+        password_lower = password.lower()
+        for pattern in common_patterns:
+            if pattern in password_lower:
+                AuthException.password_contains_common_pattern()
+
+        if self.has_excessive_repeated_chars(password):
+            AuthException.password_too_repetitive()
+
+    def has_excessive_repeated_chars(self, password: str, max_repeat: int = 5) -> bool:
+        for i in range(len(password) - max_repeat + 1):
+            if len(set(password[i:i + max_repeat])) == 1:
+                return True
+        return False
 
 
     async def update_user_password(self, user, new_password: str, session: AsyncSession):
@@ -136,8 +148,8 @@ class ChangePasswordService:
                 'updated_at': datetime.now()
             }
 
-            condition = and_(User.id == user.id, User.deleted_at.is_(None))
-            await user_repository.update_user_some_field(condition, update_data, session)
+            condition = [User.id == user.id, User.deleted_at.is_(None)]
+            await user_repository.update_user(condition, update_data, session)
 
         except Exception as e:
             raise

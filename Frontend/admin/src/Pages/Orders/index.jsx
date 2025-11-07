@@ -222,6 +222,8 @@ const Orders = () => {
                             <MenuItem value="confirmed">Đã xác nhận</MenuItem>
                             <MenuItem value="shipping">Đang giao</MenuItem>
                             <MenuItem value="delivered">Đã giao</MenuItem>
+                            <MenuItem value="received">Đã nhận hàng</MenuItem>
+                            <MenuItem value="returned">Đã trả hàng</MenuItem>
                             <MenuItem value="cancelled">Đã hủy</MenuItem>
                         </Select>
                     </div>
@@ -271,7 +273,9 @@ const Orders = () => {
                                         statusFilter === 'pending' ? 'Chờ xử lý' :
                                             statusFilter === 'confirmed' ? 'Đã xác nhận' :
                                                 statusFilter === 'shipping' ? 'Đang giao' :
-                                                    statusFilter === 'delivered' ? 'Đã giao' : 'Đã hủy'
+                                                    statusFilter === 'delivered' ? 'Đã giao' :
+                                                        statusFilter === 'received' ? 'Đã nhận hàng' :
+                                                            statusFilter === 'returned' ? 'Đã trả hàng' : 'Đã hủy'
                                     }
                                 </span>
                             )}

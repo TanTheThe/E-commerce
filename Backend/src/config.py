@@ -24,11 +24,13 @@ class Settings(BaseSettings):
     JWT_VERIFY_OTP_LOGIN_SECRET_STAFF: str
 
     JWT_ALGORITHM: str
-    # REDIS_HOST: str = "localhost"
-    # REDIS_PORT: int = 6379
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
     DOMAIN: str
     CUSTOMER_DOMAIN_CLIENT: str
     ADMIN_DOMAIN_CLIENT: str
+
+    ENVIRONMENT: str
 
     MAIL_USERNAME: str
     MAIL_PASSWORD: str

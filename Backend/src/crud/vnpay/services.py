@@ -3,6 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
+from src.crud.cash.repositories import CashRepository
 from src.crud.order.services.create_order import CreateOrderService
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from src.crud.vnpay.utils import hmacsha512
@@ -14,13 +15,13 @@ from src.errors.order import OrderException
 from src.database.models import Order, Payment, Special_Offer
 from src.schemas.order import PaymentStatusOrderType
 import urllib.parse
-import httpx
 import uuid
 
 order_repository = OrderRepository()
 vnpay_repository = VNPayRepository()
 special_offer_repository = SpecialOfferRepository()
 create_order_service = CreateOrderService()
+cash_repository = CashRepository()
 
 class VNPayService:
     def __init__(self):
@@ -133,7 +134,7 @@ class VNPayService:
             vnp_pay_date = datetime.strptime(vnp_pay_date_raw, "%Y%m%d%H%M%S")
 
         condition_order = and_(Order.code == order_code, Order.deleted_at.is_(None))
-        joins = [selectinload(Order.order_detail)]
+        joins = [selectinload(Order.order_detail), selectinload(Order.user)]
         order = await order_repository.get_order(condition_order, session, joins)
 
         if not order:
@@ -168,11 +169,11 @@ class VNPayService:
 
             order_offer = None
             if order.special_offer_id:
-                conditions_offer = and_(
+                conditions_offer = [
                     Special_Offer.id == order.special_offer_id,
                     Special_Offer.deleted_at.is_(None)
-                )
-                order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
+                ]
+                order_offer = await special_offer_repository.get_special_offer(session=session, where_conditions=conditions_offer)
 
             _, _, _, product_offers_to_update = await create_order_service.calculate_order_totals(
                 order.order_detail, variant_map, session
@@ -205,9 +206,15 @@ class VNPayService:
 
         payment = await vnpay_repository.create_payment(payment_dict, session)
 
+        cash_transaction = None
+        if is_success:
+            cash_transaction = await self.create_vnpay_revenue_transaction(
+                order, payment, vnp_pay_date, session
+            )
+
         await session.commit()
 
-        return {
+        response = {
             "order_id": str(payment.order_id),
             "order_code": order_code,
             "amount": payment.amount,
@@ -217,6 +224,41 @@ class VNPayService:
             "status": payment.status,
             "already_processed": False
         }
+
+        if cash_transaction:
+            response["cash_transaction"] = {
+                "id": str(cash_transaction.id),
+                "transaction_code": cash_transaction.transaction_code,
+                "amount": cash_transaction.amount
+            }
+
+        return response
+
+
+    async def create_vnpay_revenue_transaction(self, order, payment, transaction_date: datetime, session: AsyncSession):
+        user = order.user
+        reference_name = f"{user.first_name} {user.last_name}" if user else None
+
+        transaction_code = f"CT{int(datetime.now().timestamp() * 1000)}"
+
+        transaction_data = {
+            'transaction_code': transaction_code,
+            'transaction_type': 'inflow',
+            'category': 'revenue',
+            'amount': order.total_price,
+            'transaction_date': transaction_date or datetime.now(),
+            'reference_type': 'customer',
+            'reference_id': order.user_id,
+            'reference_name': reference_name,
+            'payment_method': 'e_wallet',
+            'notes': f"Doanh thu VNPay từ đơn hàng {order.code} - Giao dịch {payment.transaction_no}",
+            'performed_by': None
+        }
+
+        cash_transaction = await cash_repository.create_cash_transaction(transaction_data, session)
+
+        return cash_transaction
+
 
 
     async def handle_ipn(self, input_data: dict, session: AsyncSession):
@@ -297,36 +339,4 @@ class VNPayService:
         ]
         for key in expired_keys:
             del self.payment_results_cache[key]
-
-
-    async def query_transaction(self, order_id: str, trans_date: str, ipaddr: str):
-        vnp_TmnCode = Config.VNPAY_TMN_CODE
-        vnp_RequestId = "req_" + datetime.now().strftime("%Y%m%d%H%M%S")
-        vnp_Version = "2.1.0"
-        vnp_Command = "querydr"
-        vnp_OrderInfo = "kiem tra gd"
-        vnp_CreateDate = datetime.now().strftime("%Y%m%d%H%M%S")
-
-        hash_data = "|".join([
-            vnp_RequestId, vnp_Version, vnp_Command, vnp_TmnCode,
-            order_id, trans_date, vnp_CreateDate, ipaddr, vnp_OrderInfo
-        ])
-        secure_hash = hmacsha512(Config.VNPAY_HASH_SECRET_KEY, hash_data)
-
-        data = {
-            "vnp_RequestId": vnp_RequestId,
-            "vnp_TmnCode": vnp_TmnCode,
-            "vnp_Command": vnp_Command,
-            "vnp_TxnRef": order_id,
-            "vnp_OrderInfo": vnp_OrderInfo,
-            "vnp_TransactionDate": trans_date,
-            "vnp_CreateDate": vnp_CreateDate,
-            "vnp_IpAddr": ipaddr,
-            "vnp_Version": vnp_Version,
-            "vnp_SecureHash": secure_hash,
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(Config.VNPAY_API_URL, json=data)
-        return response.json() if response.status_code == 200 else {"error": f"Request failed {response.status_code}"}
 

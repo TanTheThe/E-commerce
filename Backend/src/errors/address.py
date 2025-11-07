@@ -30,3 +30,13 @@ class AddressException:
                 "error_code": "address_002"
             }
         )
+
+    @staticmethod
+    def invalid_address():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Địa chỉ đã nhập không hợp lệ",
+                "error_code": "address_002"
+            }
+        )

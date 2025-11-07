@@ -57,7 +57,7 @@ class AuthException:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": "OTP không chính xác",
+                "message": "OTP không chính xác, ",
                 "error_code": "auth_006",
             },
         )
@@ -381,6 +381,66 @@ class AuthException:
                 "error_code": "auth_038",
             },
         )
+
+    @staticmethod
+    def password_missing_uppercase():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu thiếu chữ cái in hoa",
+                "error_code": "auth_038",
+            },
+        )
+
+    @staticmethod
+    def password_missing_lowercase():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu thiếu chữ cái viết thường",
+                "error_code": "auth_038",
+            },
+        )
+
+    @staticmethod
+    def password_missing_digit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu thiếu số",
+                "error_code": "auth_038",
+            },
+        )
+
+    @staticmethod
+    def password_missing_special_char():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu thiếu ký tự đặc biệt",
+                "error_code": "auth_038",
+            },
+        )
+
+    @staticmethod
+    def password_contains_common_pattern():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu nằm trong danh sách các mật khẩu quá đơn giản",
+                "error_code": "auth_038",
+            },
+        )
+
+    @staticmethod
+    def password_too_repetitive():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mật khẩu có quá nhiều ký tự lặp lại liên tục",
+                "error_code": "auth_038",
+            },
+        )
         
     @staticmethod
     def account_deleted():
@@ -471,4 +531,73 @@ class AuthException:
                 "error_code": "auth_045",
             },
         )
-    
+
+    @staticmethod
+    def invalid_email_format():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Format của email không hợp lệ",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def time_lock_remaining(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def token_already_used():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Token này đã được sử dụng rồi",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def invalid_otp_or_email():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"OTP hoặc email không hợp lệ",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def otp_max_attempts_exceeded():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Số lần nhập OTP đã vượt quá số lượng cho phép",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def invalid_otp_attempts(attempts_left):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"OTP vừa nhập không đúng - số lần thử lại còn: {attempts_left}",
+                "error_code": "auth_045",
+            },
+        )
+
+    @staticmethod
+    def email_already_registered():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Email này đã được tạo trước đó",
+                "error_code": "auth_045",
+            },
+        )

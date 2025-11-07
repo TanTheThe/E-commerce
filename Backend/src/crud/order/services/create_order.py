@@ -51,19 +51,19 @@ class CreateOrderService:
 
         order_offer = None
         if offer_id:
-            conditions_offer = and_(
+            conditions_offer = [
                 Special_Offer.id == offer_id,
                 Special_Offer.deleted_at.is_(None),
                 Special_Offer.scope == "order"
-            )
-            order_offer = await special_offer_repository.get_special_offer(conditions_offer, session)
+            ]
+            order_offer = await special_offer_repository.get_special_offer(session=session, where_conditions=conditions_offer)
             if not order_offer:
                 SpecialOfferException.not_found()
 
         return customer, address, order_offer
 
     async def get_variants_with_product_offers(self, variant_ids, session):
-        condition = Product_Variant.id.in_(variant_ids)
+        condition = [Product_Variant.id.in_(variant_ids)]
         options = [
             selectinload(Product_Variant.product).options(
                 selectinload(Product.special_offer),
@@ -75,7 +75,7 @@ class CreateOrderService:
             ),
         ]
 
-        variants = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition, options=options, for_update=True)
+        variants, _ = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition, options=options, for_update=True)
         return {str(v.id): v for v in variants}
 
     async def calculate_order_totals(self, order_items, variant_map, session: AsyncSession):
@@ -213,7 +213,7 @@ class CreateOrderService:
             if product_offers_to_update:
                 offer_ids = list(product_offers_to_update.keys())
                 condition = [Special_Offer.id.in_(offer_ids), Special_Offer.deleted_at.is_(None)]
-                locked_offers, _ = await special_offer_repository.get_all_special_offer(condition, session)
+                locked_offers, _ = await special_offer_repository.get_all_special_offer(session=session, where_conditions=condition)
 
                 updates = []
                 for offer in locked_offers:
@@ -234,8 +234,8 @@ class CreateOrderService:
 
             if order_offer:
                 locked_order_offer = await special_offer_repository.get_special_offer(
-                    and_(Special_Offer.id == order_offer.id, Special_Offer.deleted_at.is_(None)),
-                    session,
+                    session=session,
+                    where_conditions=[Special_Offer.id == order_offer.id, Special_Offer.deleted_at.is_(None)],
                     for_update=True
                 )
                 if locked_order_offer:
@@ -322,7 +322,7 @@ class CreateOrderService:
             total_discount = product_discount + order_discount
             total_price = sub_total - order_discount
 
-            payment_status = PaymentStatusOrderType.SUCCESS if order_data.payment_method == "direct" else PaymentStatusOrderType.PENDING
+            payment_status = PaymentStatusOrderType.PENDING
 
             address_dict = {
                 "line": address.line,

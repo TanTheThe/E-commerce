@@ -111,3 +111,23 @@ class ReturnOrderException:
                 "error_code": "return_011",
             },
         )
+
+    @staticmethod
+    def must_be_in_completed():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Return order phải ở trạng thái completed mới có thể tạo manual refund transaction",
+                "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def amount_greater_than_total_refund():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Số tiền hoàn lại không được lớn hơn tổng refund amount",
+                "error_code": "return_011",
+            },
+        )

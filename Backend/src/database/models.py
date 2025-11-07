@@ -1173,7 +1173,8 @@ class User(SQLModel, table=True):
     is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    otp: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    otp_hash: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    otp_attempts: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True), default=0)
     expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
@@ -1221,6 +1222,7 @@ class CashTransaction(SQLModel, table=True):
     # - revenue (doanh thu bán hàng)
     # - purchase (chi phí mua hàng)
     # - loan (vay/trả nợ)
+    # - refund (hoàn trả)
     # - other (khác)
     category: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
 
@@ -1706,6 +1708,36 @@ class Supplier(SQLModel, table=True):
     purchase_returns: List["PurchaseReturn"] = Relationship(back_populates="supplier", sa_relationship_kwargs={'lazy': 'noload'})
     products: List["Product"] = Relationship(back_populates="suppliers", link_model=Supplier_Product, sa_relationship_kwargs={'lazy': 'noload'})
     supplier_products: List["Supplier_Product"] = Relationship(back_populates="suppliers", sa_relationship_kwargs={'lazy': 'noload'})
+
+
+class LoginAttempt(SQLModel, table=True):
+    __tablename__ = 'login_attempts'
+
+    __table_args__ = (
+        Index('idx_email_attempted_at', 'email', 'attempted_at'),
+        Index('idx_ip_attempted_at', 'ip_address', 'attempted_at'),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    email: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, index=True))
+    ip_address: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    is_successful: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")),
+        default=False
+    )
+    attempted_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True),
+        default=datetime.now
+    )
+
+
 
 
 

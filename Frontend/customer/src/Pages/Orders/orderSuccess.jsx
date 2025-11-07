@@ -271,6 +271,23 @@ const OrderSuccessPage = () => {
                                         <span className="text-[#ff5252]">{orderData.order.total_price?.toLocaleString('vi-VN')}đ</span>
                                     </div>
                                 </div>
+
+                                {orderData.order.paid_amount !== undefined && (
+                                    <div className="border-t pt-3">
+                                        {orderData.order.paid_amount > 0 ? (
+                                            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                                                <span className="text-sm font-medium text-green-800">Đã thanh toán</span>
+                                                <span className="text-sm font-bold text-green-800">
+                                                    {orderData.order.paid_amount?.toLocaleString('vi-VN')}đ
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                                <span className="text-sm font-medium text-orange-800">⏳ Chờ thanh toán VNPay</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

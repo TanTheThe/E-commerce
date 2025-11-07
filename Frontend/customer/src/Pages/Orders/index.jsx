@@ -5,7 +5,7 @@ import { FaAngleDown, FaAngleUp } from "react-icons/fa";
 import Badge from "../../components/Badge";
 import { Collapse } from "react-collapse";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FiCheck, FiChevronDown, FiChevronUp, FiClock, FiTruck, FiStar, FiX, FiCamera, FiMessageSquare } from "react-icons/fi";
+import { FiCheck, FiChevronDown, FiChevronUp, FiClock, FiTruck, FiStar, FiX, FiCamera, FiMessageSquare, FiPackage } from "react-icons/fi";
 import { getDataApi, postDataApi, putDataApi } from "../../utils/api";
 import EvaluationButtons from "../Evaluate/evaluationButton";
 import EvaluateModal from "../Evaluate/evaluateModal";
@@ -92,6 +92,15 @@ const Orders = () => {
             bgColor: 'bg-green-50',
             borderColor: 'border-green-200',
             status: 'delivered'
+        },
+        {
+            key: 'returned',
+            label: 'Đã hoàn trả',
+            icon: FiPackage,
+            color: 'text-purple-600',
+            bgColor: 'bg-purple-50',
+            borderColor: 'border-purple-200',
+            status: 'returned'
         },
     ];
 
@@ -629,6 +638,20 @@ const Orders = () => {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {orderItem.order.paid_amount !== undefined && (
+                                                    <div className="mt-2">
+                                                        {orderItem.order.paid_amount > 0 ? (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                ✓ Đã thanh toán: {orderItem.order.paid_amount?.toLocaleString('vi-VN')}đ
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                                                ⏳ Chờ thanh toán VNPay
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {orderItem.order.has_pending_cancellation && (
                                                     <div className="mt-2">

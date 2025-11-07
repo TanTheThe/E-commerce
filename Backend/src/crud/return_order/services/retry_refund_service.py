@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy.orm import selectinload
 from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
@@ -6,6 +7,7 @@ from src.crud.order.repositories import OrderRepository
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
 from src.crud.return_order.repositories import ReturnOrderRepository
+from src.crud.return_order.services.complete_return_order import CompleteReturnOrderService
 from src.crud.vnpay.repositories import VNPayRepository
 from src.crud.vnpay.utils import get_client_ip
 from src.database.models import PaymentRefund, Payment, ReturnOrder, Order
@@ -18,6 +20,7 @@ vnpay_repository = VNPayRepository()
 return_order_repository = ReturnOrderRepository()
 payment_refund_service = PaymentRefundService()
 order_repository = OrderRepository()
+complete_return_order_service = CompleteReturnOrderService()
 
 class RetryRefundService:
     async def retry_refund_payment(self, refund_id: str, request: Request, session: AsyncSession):
@@ -38,7 +41,12 @@ class RetryRefundService:
         )
 
         conditions = [ReturnOrder.order_id == payment.order_id]
-        return_order = await return_order_repository.get_return_order(conditions, session)
+        joins = [
+            selectinload(ReturnOrder.return_items),
+            selectinload(ReturnOrder.order),
+            selectinload(ReturnOrder.user)
+        ]
+        return_order = await return_order_repository.get_return_order(conditions, session, joins)
 
         try:
             refund.attempt_count += 1
@@ -53,7 +61,7 @@ class RetryRefundService:
                 transaction_no=payment.transaction_no,
             )
 
-            vnp_amount = int(refund_response.get("vnp_Amount")) * 100
+            vnp_amount = int(refund_response.get("vnp_Amount"))
 
             if (refund_response.get("vnp_ResponseCode") == "00" and
                     refund_response.get("vnp_TxnRef") == payment.txn_ref and
@@ -71,13 +79,26 @@ class RetryRefundService:
                     {"payment_status": PaymentStatusOrderType.REFUNDED},
                     session
                 )
+
+                cash_transaction = await complete_return_order_service.create_refund_cash_transaction(
+                    return_order=return_order,
+                    refund_amount=refund.refund_amount,
+                    session=session
+                )
+
                 await session.commit()
 
                 return {
                     "status": "success",
                     "message": "Hoàn tiền thành công",
                     "refund_id": refund_id,
-                    "attempt_count": refund.attempt_count
+                    "attempt_count": refund.attempt_count,
+                    "cash_transaction": {
+                        "id": str(cash_transaction.id),
+                        "transaction_code": cash_transaction.transaction_code,
+                        "amount": cash_transaction.amount,
+                        "transaction_date": cash_transaction.transaction_date.isoformat()
+                    }
                 }
 
             else:

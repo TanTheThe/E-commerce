@@ -1,5 +1,11 @@
 from fastapi import APIRouter, status, Depends
-from src.crud.special_offer.services import SpecialOfferService
+
+from src.crud.special_offer.services.assign_offer_to_users import AssignOfferToUsersService
+from src.crud.special_offer.services.create_special_offer import CreateSpecialOfferService
+from src.crud.special_offer.services.delete_special_offer import DeleteSpecialOfferService
+from src.crud.special_offer.services.get_all_special_offer import GetAllSpecialOfferService
+from src.crud.special_offer.services.set_offers_to_product import SetOfferToProductService
+from src.crud.special_offer.services.update_special_offer import UpdateSpecialOfferService
 from src.dependencies import AccessTokenBearer
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
     SetOfferToProduct, AssignOfferToUsers
@@ -13,7 +19,12 @@ special_offer_admin_router = APIRouter(prefix="/special-offer")
 special_offer_customer_router = APIRouter(prefix="/special-offer")
 special_offer_staff_router = APIRouter(prefix="/special-offer")
 
-special_offer_service = SpecialOfferService()
+create_special_offer_service = CreateSpecialOfferService()
+get_all_special_offer_service = GetAllSpecialOfferService()
+update_special_offer_service = UpdateSpecialOfferService()
+set_offer_to_product_service = SetOfferToProductService()
+assign_offer_to_users_service = AssignOfferToUsersService()
+delete_special_offer_service = DeleteSpecialOfferService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -22,7 +33,7 @@ access_token_bearer = AccessTokenBearer()
 async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
-    new_special_offer_dict = await special_offer_service.create_special_offer_service(special_offer_data, session)
+    new_special_offer_dict = await create_special_offer_service.create_special_offer(special_offer_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -54,7 +65,7 @@ async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
         time_status=time_status
     )
 
-    special_offers = await special_offer_service.get_all_special_offer_service(session, filter_data, skip=skip, limit=limit)
+    special_offers = await get_all_special_offer_service.get_all_special_offer(session, filter_data, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -70,7 +81,7 @@ async def set_offer_to_product(data: SetOfferToProduct,
                                session: AsyncSession = Depends(get_session),
                                token_details: dict = Depends(access_token_bearer)):
 
-    await special_offer_service.set_offer_to_product_service(data, session)
+    await set_offer_to_product_service.set_offer_to_product(data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -86,7 +97,7 @@ async def get_all_special_offer_customer(session: AsyncSession = Depends(get_ses
                                          search: Optional[str] = None,
                                          skip: int = 0, limit: int = 10):
     user_id = token_details['user']['id']
-    special_offers = await special_offer_service.get_all_special_offer_customer_service(user_id, session, search, skip, limit)
+    special_offers = await get_all_special_offer_service.get_all_special_offer_customer(user_id, session, search, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -102,7 +113,7 @@ async def update_special_offer(id: str,
                                special_offer_update: SpecialOfferUpdateModel,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
-    special_offer_update = await special_offer_service.update_special_offer_service(id, special_offer_update, session)
+    special_offer_update = await update_special_offer_service.update_special_offer(id, special_offer_update, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -116,7 +127,7 @@ async def update_special_offer(id: str,
 async def assign_offer_to_users(special_offer: AssignOfferToUsers,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
-    result = await special_offer_service.assign_offer_to_users_service(special_offer, session)
+    result = await assign_offer_to_users_service.assign_offer_to_users(special_offer, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -130,7 +141,7 @@ async def assign_offer_to_users(special_offer: AssignOfferToUsers,
 @special_offer_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def delete_categories(id: str, token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
-    special_offer_delete = await special_offer_service.delete_categories_service(id, session)
+    special_offer_delete = await delete_special_offer_service.delete_special_offer(id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

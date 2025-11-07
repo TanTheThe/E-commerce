@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker
 from src.config import Config
 from fastapi import Request
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -12,6 +12,14 @@ engine: AsyncEngine = create_async_engine(
     max_overflow=20,
     future=True,
     echo=False
+)
+
+async_session_maker = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False
 )
 
 # def setup_query_logger(engine):

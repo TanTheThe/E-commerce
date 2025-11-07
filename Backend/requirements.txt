@@ -21,3 +21,6 @@ psycopg2-binary
 httpx
 python-multipart
 Unidecode
+celery[redis]
+vietnam-provinces
+slowapi

@@ -4,7 +4,7 @@ import jwt
 from src.config import Config
 import uuid
 import logging
-from itsdangerous import URLSafeTimedSerializer
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from jwt import InvalidTokenError
 
 passwd_context = CryptContext(
@@ -21,41 +21,50 @@ TOKEN_CONFIG = {
     ("customer", "reset_password"): {
         "secret": "JWT_RESET_PASSWORD_SECRET_CUSTOMER",
         "salt": "customer-reset-password",
+        "max_age": 3600
     },
     ("admin", "reset_password"): {
         "secret": "JWT_RESET_PASSWORD_SECRET_ADMIN",
         "salt": "admin-reset-password",
+        "max_age": 3600
     },
     ("staff", "reset_password"): {
         "secret": "JWT_RESET_PASSWORD_SECRET_STAFF",
         "salt": "staff-reset-password",
+        "max_age": 3600
     },
-    
+
     ("admin", "first_class_login"): {
         "secret": "JWT_FIRST_CLASS_LOGIN_SECRET_ADMIN",
         "salt": "admin-first-class-login",
+        "max_age": 300
     },
     ("staff", "first_class_login"): {
         "secret": "JWT_FIRST_CLASS_LOGIN_SECRET_STAFF",
         "salt": "staff-first-class-login",
+        "max_age": 300
     },
-    
+
     ("admin", "verify_otp"): {
         "secret": "JWT_VERIFY_OTP_LOGIN_SECRET_ADMIN",
         "salt": "admin-verify-otp",
+        "max_age": 180
     },
     ("staff", "verify_otp"): {
         "secret": "JWT_VERIFY_OTP_LOGIN_SECRET_STAFF",
         "salt": "staff-verify-otp",
+        "max_age": 180
     },
-    
+
     ("customer", "create_account"): {
         "secret": "JWT_CREATE_ACCOUNT_SECRET_CUSTOMER",
         "salt": "customer-create-account",
+        "max_age": 1800
     },
     ("staff", "create_account"): {
         "secret": "JWT_CREATE_ACCOUNT_SECRET_STAFF",
         "salt": "staff-create-account",
+        "max_age": 1800
     },
 }
 
@@ -135,8 +144,19 @@ def create_url_safe_token(data: dict, role: str, purpose: str) -> str:
 
 def decode_url_safe_token(token: str, role: str, purpose: str) -> dict | None:
     try:
+        config = TOKEN_CONFIG.get((role, purpose))
+        if not config:
+            raise ValueError(f"Invalid combination: role={role}, purpose={purpose}")
+
         serializer = get_serializer(role, purpose)
-        return serializer.loads(token)
+        max_age = config.get("max_age", 3600)
+
+        return serializer.loads(token, max_age=max_age)
+
+
+    except (SignatureExpired, BadSignature) as e:
+        logging.warning(f"Invalid token for role={role}, purpose={purpose}")
+        return None
     except Exception as e:
         logging.error(f"Token decode error for role={role}, purpose={purpose}: {str(e)}")
         return None

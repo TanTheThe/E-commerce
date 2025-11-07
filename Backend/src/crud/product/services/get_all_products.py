@@ -114,8 +114,8 @@ class GetAllProductsService:
         ]
 
         filters, order_by_clause = await self.filter_product(filter_data, session)
-        products, total = await product_repository.get_all_product(filters, session, joins, skip, limit,
-                                                                   order_by_clause)
+        products, total = await product_repository.get_all_product(session=session, where_conditions=filters, options=joins,
+                                                                   skip=skip, limit=limit, order_by=order_by_clause)
 
         product_list = []
         for product in products:

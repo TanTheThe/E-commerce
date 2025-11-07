@@ -7,6 +7,8 @@ const Badge = (props) => {
             case "confirmed": return 'bg-yellow-500 text-white';
             case "shipping": return 'bg-purple-500 text-white';
             case "delivered": return 'bg-green-700 text-white';
+            case "received": return 'bg-blue-600 text-white';
+            case "returned": return 'bg-orange-500 text-white';
             case "cancelled": return 'bg-gray-500 text-white';
             default: return 'bg-gray-400 text-white';
         }

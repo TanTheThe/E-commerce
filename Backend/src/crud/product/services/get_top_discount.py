@@ -65,9 +65,10 @@ class GetTopDiscountService:
         ]
 
         products, _ = await product_repository.get_all_product(
-            condition, session, joins, skip=0,
+            session=session,
+            where_conditions=condition, options=joins, skip=0,
             limit=limit * 10,
-            order_by_clause=order_by
+            order_by=order_by
         )
 
         products_with_discount = []

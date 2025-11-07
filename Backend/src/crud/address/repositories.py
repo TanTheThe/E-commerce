@@ -1,60 +1,130 @@
-from typing import Optional
-from sqlalchemy import ColumnElement
+from typing import Optional, Any, List, Tuple, Dict
+from sqlalchemy import ColumnElement, func, update
 from src.database.models import Address
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_
+from sqlmodel import select, and_
 from datetime import datetime
 from src.errors.address import AddressException
 
 
 class AddressRepository:
-    async def create_address(self, user_id, address_data, session: AsyncSession):
-        address_data_dict = address_data.model_dump()
+    async def create_address(self, address_dict, session: AsyncSession):
+        address = Address(**address_dict)
+        session.add(address)
+        await session.flush()
+        await session.refresh(address)
 
-        new_address = Address(
-            **address_data_dict,
-            user_id=user_id,
-            created_at=datetime.now()
-        )
-        session.add(new_address)
-        await session.commit()
+        return address
 
-        return new_address
+    async def get_all_addresses(self, session: AsyncSession,
+                                select_columns: Optional[List[Any]] = None,
+                                joins: Optional[List[Tuple[Any, dict]]] = None,
+                                where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                group_by_columns: Optional[List[Any]] = None,
+                                having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                order_by: Optional[Any] = None,
+                                options: Optional[List[Any]] = None,
+                                skip: int = 0, limit: int = 10):
 
-
-    async def get_all_address(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        statement = select(Address).order_by(desc(Address.created_at))
-
-        if conditions is None:
-            conditions = and_(Address.deleted_at == None)
+        if select_columns is None:
+            query = select(Address)
         else:
-            conditions = and_(conditions, Address.deleted_at == None)
+            query = select(*select_columns).select_from(Address)
 
-        statement = statement.where(conditions)
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
 
-        return result.all()
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
+
+        addresses = result.all()
+
+        return addresses, total
 
 
-    async def get_address(self, conditions: ColumnElement[bool], session: AsyncSession, joins: list = None):
-        statement = select(Address).where(conditions).options(*joins if joins else [])
+    async def get_address(self, session: AsyncSession,
+                                select_columns: Optional[List[Any]] = None,
+                                joins: Optional[List[Tuple[Any, dict]]] = None,
+                                where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                group_by_columns: Optional[List[Any]] = None,
+                                having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                order_by: Optional[Any] = None,
+                                options: Optional[List[Any]] = None):
 
-        result = await session.exec(statement)
+        if select_columns is None:
+            query = select(Address)
+        else:
+            query = select(*select_columns).select_from(Address)
 
-        return result.first()
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        address = result.one_or_none()
+
+        return address
 
 
-    async def update_address(self, data_need_update, update_data: dict, session: AsyncSession):
-        for k, v in update_data.items():
-            setattr(data_need_update, k, v)
+    async def update_address(self, where_conditions: Optional[List[ColumnElement[bool]]],
+                             update_data: Dict[str, Any], session: AsyncSession):
+        query = (
+            update(Address)
+            .where(and_(*where_conditions))
+            .values(**update_data)
+            .returning(Address)
+        )
 
-        data_need_update.updated_at = datetime.now()
+        result = await session.exec(query)
 
-        return data_need_update
+        return result.one_or_none()
 
 
-    async def delete_address(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        address_to_delete = await self.get_address(condition, session)
+    async def delete_address(self, where_conditions: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        address_to_delete = await self.get_address(session=session, where_conditions=where_conditions)
 
         if address_to_delete is None:
             AddressException.not_found_to_delete()

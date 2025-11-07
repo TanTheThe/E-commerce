@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement
 from src.database.models import Categories, Cart, Cart_Item
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -70,19 +70,55 @@ class CartRepository:
         result = await session.exec(statement)
         return result.one_or_none()
 
-    async def get_cart_with_paginated_items(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                                            joins: list = None, skip: int = 0, limit: int = 10):
-        count_stmt = select(func.count(Cart_Item.id)).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total_count = total_result.one()
 
-        statement = select(Cart_Item).options(
-            *joins if joins else []
-        ).order_by(Cart_Item.product_id, Cart_Item.created_at.desc()).where(*conditions).offset(skip).limit(limit)
+    async def get_all_cart_items(self, session: AsyncSession,
+                                    select_columns: Optional[List[Any]] = None,
+                                    joins: Optional[List[Tuple[Any, dict]]] = None,
+                                    where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    group_by_columns: Optional[List[Any]] = None,
+                                    having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    order_by: Optional[Any] = None,
+                                    skip: int = 0, limit: int = 10,
+                                    options: Optional[list] = None):
 
-        result = await session.exec(statement)
-        cart_items = result.all()
-        return cart_items, total_count
+        if select_columns is None:
+            query = select(Cart_Item)
+        else:
+            query = select(*select_columns).select_from(Cart_Item)
+
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
+        items = result.all()
+
+        return items, total
+
 
     async def update_cart(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
                                         session: AsyncSession):

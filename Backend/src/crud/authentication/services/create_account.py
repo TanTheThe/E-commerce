@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.database.models import User
 from src.errors.authentication import AuthException
 from src.errors.user import UserException
 from src.schemas.user import UserCreateModel, UserRole
-from src.crud.authentication.utils import create_url_safe_token, decode_url_safe_token
+from src.crud.authentication.utils import create_url_safe_token, decode_url_safe_token, generate_password_hash
 from sqlmodel import and_
 from src.mail import create_message, mail
 from fastapi import BackgroundTasks
@@ -19,19 +19,51 @@ class CreateAccountService:
                                   bg_tasks: BackgroundTasks, session: AsyncSession):
         email = user_data.email
 
-        condition = and_(User.email == email)
-        user_exists = await user_repository.get_user(condition, session)
+        condition = [User.email == email, User.deleted_at.is_(None)]
+        user_exists = await user_repository.get_user(session=session, where_conditions=condition)
+
         if user_exists:
-            UserException.email_exists()
+            if user_exists.is_verified:
+                UserException.email_exists()
+            if user_exists.created_at and (datetime.now() - user_exists.created_at) > timedelta(hours=24):
+                condition_delete = [User.id == user_exists.id]
+                await user_repository.delete_user(session=session, where_conditions=condition_delete)
+            else:
+                AuthException.email_already_registered()
 
         try:
-            new_user = await user_repository.create_user(user_data, role, session)
+            password_hash = generate_password_hash(user_data.password)
+            user_create_data = {
+                **user_data.model_dump(),
+                "password": password_hash,
+                'email': email,
+                'is_verified': False,
+                'created_at': datetime.now(),
+            }
+
+            if role == UserRole.CUSTOMER:
+                user_create_data['is_customer'] = True
+                user_create_data['customer_status'] = "active"
+            elif role == UserRole.STAFF:
+                user_create_data['is_staff'] = True
+                user_create_data['staff_status'] = "active"
+
+            new_user = await user_repository.create_user(user_create_data, session)
+            await session.commit()
+
         except Exception as e:
+            await session.rollback()
             raise AuthException.creation_failed()
 
+        token_payload = {
+            "email": email,
+            "user_id": str(new_user.id),
+            "timestamp": datetime.now().isoformat()
+        }
+
         token = create_url_safe_token(
-            {"email": email}, 
-            role=role.value, 
+            token_payload,
+            role.value,
             purpose="create_account"
         )
         
@@ -76,40 +108,3 @@ class CreateAccountService:
         """
         
         return subject, html
-
-    async def verify_user_account(self, token: str, role: UserRole, session: AsyncSession):
-        token_data = decode_url_safe_token(
-            token,
-            role=role.value,
-            purpose="create_account"
-        )
-            
-        if token_data is None:
-            AuthException.authentication_error()
-
-        user_email = token_data.get('email')
-        if not user_email:
-            AuthException.authentication_error()
-            
-        condition = and_(User.email == user_email)
-        user = await user_repository.get_user(condition, session)
-
-        if not user:
-            AuthException.user_not_found()
-            
-        update_data = {'is_verified': True, 'updated_at': datetime.now()}
-        
-        if role == UserRole.CUSTOMER:
-            update_data['is_customer'] = True
-        elif role == UserRole.STAFF:
-            update_data['is_staff'] = True
-            
-        try:
-            condition = and_(User.id == user.id, User.deleted_at.is_(None))
-            await user_repository.update_user_some_field(condition, update_data, session)
-            await session.commit()
-
-        except Exception as e:
-            raise AuthException.verification_failed()
-            
-        return True

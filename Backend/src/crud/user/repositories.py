@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
 from src.database.models import User
@@ -7,24 +7,52 @@ from src.crud.authentication.utils import generate_password_hash
 from sqlmodel import select, update, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
+
+from src.errors.authentication import AuthException
 from src.schemas.user import UserCreateModel, UserDeleteModel, UserRole
 
 
 class UserRepository:
-    async def get_user(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        base_condition = User.deleted_at.is_(None)
+    async def get_user(self, session: AsyncSession,
+                       select_columns: Optional[List[Any]] = None,
+                       joins: Optional[List[Tuple[Any, dict]]] = None,
+                       where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                       group_by_columns: Optional[List[Any]] = None,
+                       having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                       order_by: Optional[Any] = None,
+                       options: Optional[List[Any]] = None):
 
-        if conditions is not None:
-            combined_condition = and_(base_condition, conditions)
+        if select_columns is None:
+            query = select(User)
         else:
-            combined_condition = base_condition
+            query = select(*select_columns).select_from(User)
 
-        statement = select(User).options(
-            *joins if joins else []
-        ).where(combined_condition)
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        return result.first()
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+        user = result.one_or_none()
+
+        return user
 
 
     async def get_all_users(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
@@ -66,62 +94,35 @@ class UserRepository:
         return users, total
 
 
-    async def update_user(self, data_need_update, update_data: dict, session: AsyncSession):
-        for k, v in update_data.items():
-            setattr(data_need_update, k, v)
-
-        data_need_update.updated_at = datetime.now()
-
-        return data_need_update
-    
-    
-    async def update_user_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
-        stmt = (
+    async def update_user(self, where_conditions: Optional[List[ColumnElement[bool]]],
+                             update_data: Dict[str, Any], session: AsyncSession):
+        query = (
             update(User)
-            .where(condition)
-            .values(**values)
+            .where(and_(*where_conditions))
+            .values(**update_data)
+            .returning(User)
         )
-        await session.exec(stmt)
+
+        result = await session.exec(query)
+
+        return result.one_or_none()
 
 
-    async def create_user(self, user_data: UserCreateModel, role: UserRole, session: AsyncSession):
-        user_data_dict = user_data.model_dump()
-        user_data_dict['password'] = generate_password_hash(user_data_dict['password'])
-        
-        if role == UserRole.CUSTOMER:
-            user_data_dict['is_customer'] = True
-            user_data_dict['customer_status'] = "active"
-        elif role == UserRole.STAFF:
-            user_data_dict['is_staff'] = True
-            user_data_dict['staff_status'] = "active"
+    async def create_user(self, user_data: dict, session: AsyncSession):
+        new_user = User(**user_data)
+        session.add(new_user)
+        await session.commit()
+        await session.refresh(new_user)
 
-        current_time = datetime.now()
-        user_data_dict['created_at'] = current_time
-        user_data_dict['updated_at'] = current_time
-        
-        try:
-            new_user = User(**user_data_dict)
-            session.add(new_user)
-            await session.commit()
-            await session.refresh(new_user)  
-            
-            return new_user
-        except Exception as e:
-            await session.rollback()
-            raise e
+        return new_user
 
 
-    async def delete_user(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        user_to_delete = await self.get_user(condition, session)
+    async def delete_user(self, where_conditions: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        user_to_delete = await self.get_user(session=session, where_conditions=where_conditions)
 
         if user_to_delete is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "message": "Không tìm thấy người dùng.",
-                    "error_code": "product_006",
-                },
-            )
+            AuthException.user_not_found()
+
         user_to_delete.deleted_at = datetime.now()
         await session.commit()
 

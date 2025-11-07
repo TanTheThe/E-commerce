@@ -1,6 +1,8 @@
 from sqlalchemy.orm import selectinload
 from datetime import datetime
 from starlette.requests import Request
+
+from src.celery_tasks.auto_complete_return import auto_complete_return_order_task
 from src.crud.notification.services import NotificationService
 from src.crud.order.repositories import OrderRepository
 from src.crud.payment_refund.repositories import PaymentRefundRepository
@@ -14,6 +16,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
 from src.errors.return_order import ReturnOrderException
 from src.schemas.return_order import ReturnOrderActionType, ReturnOrderStatusType
+import logging
 
 order_repository = OrderRepository()
 return_order_repository = ReturnOrderRepository()
@@ -23,6 +26,8 @@ vnpay_repository = VNPayRepository()
 payment_refund_service = PaymentRefundService()
 payment_refund_repository = PaymentRefundRepository()
 product_variant_repository = ProductVariantRepository()
+
+logger = logging.getLogger(__name__)
 
 class ProcessReturnOrderService:
     async def process_return_request(self, return_order_id: str, action: str, admin_data: dict,
@@ -49,6 +54,12 @@ class ProcessReturnOrderService:
         if action == ReturnOrderActionType.APPROVE:
             await self.approve_return_request(return_order, admin_data, session)
             message = f"Đã chấp nhận yêu cầu hoàn trả đơn hàng #{return_order.order.code}"
+
+            auto_complete_return_order_task.apply_async(
+                args=[str(return_order_id)],
+                countdown=259200  # 3 days = 3 * 24 * 60 * 60
+            )
+            logger.info(f"Scheduled auto-complete for return order {return_order_id} in 3 days")
 
         elif action == ReturnOrderActionType.REJECT:
             reject_reason = admin_data.get('reject_reason')

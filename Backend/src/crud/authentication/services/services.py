@@ -44,11 +44,6 @@ class AuthenticationService:
 
 
     async def detect_user_role(self, email: str, allowed_roles: list[UserRole], session: AsyncSession) -> UserRole:
-        if not email or not email.strip():
-            AuthException.email_required()
-
-        email = email.strip().lower()
-
         for role in allowed_roles:
             try:
                 user = await self.find_and_validate_user(email, role, session)
@@ -56,8 +51,6 @@ class AuthenticationService:
                     return role
             except HTTPException:
                 continue
-
-        AuthException.email_not_found()
 
 
     async def detect_role_from_token(self, token: str, allowed_roles: list[UserRole], purpose: str) -> UserRole:
@@ -292,7 +285,7 @@ class AuthenticationService:
             AuthException.forgot_password_failed()
 
 
-    async def verify_otp(self, data: VerifyOTPModel, role: UserRole, session: AsyncSession):
+    async def verify_otp(self, data: VerifyOTPModel, role: UserRole, session: AsyncSession, request: Request):
         try:
             if not data.email or not data.otp:
                 AuthException.otp_and_email_required()
@@ -371,7 +364,7 @@ class AuthenticationService:
         if len(password) > 100:
             AuthException.password_too_long()
         
-        if not any(c.isalpha() for c in password) or not any(c.isdigit() for c in password):
+        if not any(c.isalpha() for c in password):
             AuthException.password_too_weak()
 
 

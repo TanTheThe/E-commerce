@@ -1,6 +1,5 @@
 from venv import logger
-from fastapi import APIRouter, Depends, Request, Form, status
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from src.config import Config
 from src.crud.vnpay.services import VNPayService
@@ -10,7 +9,6 @@ from src.schemas.vnpay import PaymentRequest
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from src.dependencies import customer_role_middleware
-from datetime import datetime
 import random
 import urllib.parse
 import json
@@ -23,19 +21,14 @@ vnpay_staff_router = APIRouter(prefix="/vnpay")
 vnpay_service = VNPayService()
 access_token_bearer = AccessTokenBearer()
 
-templates = Jinja2Templates(directory="src/templates")
-
 n = random.randint(10 ** 11, 10 ** 12 - 1)
 n_str = str(n).zfill(12)
 
 
 @vnpay_customer_router.post("/payment", dependencies=[Depends(customer_role_middleware)])
-async def create_payment(
-        request: Request,
-        payment_data: PaymentRequest,
-        token_details: dict = Depends(access_token_bearer),
-        session: AsyncSession = Depends(get_session)
-):
+async def create_payment(request: Request, payment_data: PaymentRequest,
+                         token_details: dict = Depends(access_token_bearer),
+                         session: AsyncSession = Depends(get_session)):
     if not payment_data.order_code or not payment_data.amount:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -155,30 +148,3 @@ async def get_payment_result(session_id: str, session: AsyncSession = Depends(ge
                 "data": None
             }
         )
-
-
-@vnpay_customer_router.get("/query", response_class=HTMLResponse)
-async def query_form(request: Request):
-    return templates.TemplateResponse("payment/query.html", {
-        "request": request,
-        "title": "Kiểm tra kết quả giao dịch",
-        "current_year": datetime.now().year
-    })
-
-
-@vnpay_customer_router.post("/query", response_class=HTMLResponse)
-async def query(
-        request: Request,
-        order_id: str = Form(...),
-        trans_date: str = Form(...),
-        session: AsyncSession = Depends(get_session)
-):
-    # dependencies=[Depends(customer_role_middleware)]
-    # token_details: dict = Depends(access_token_bearer),
-    response_json = await vnpay_service.query_transaction(order_id, trans_date, get_client_ip(request))
-    return templates.TemplateResponse("payment/query.html", {
-        "request": request,
-        "title": "Kiểm tra kết quả giao dịch",
-        "response_json": response_json,
-        "current_year": datetime.now().year
-    })

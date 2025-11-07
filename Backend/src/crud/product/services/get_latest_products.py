@@ -61,8 +61,12 @@ class GetLatestProductsService:
             ),
         ]
 
-        products, _ = await product_repository.get_all_product(condition, session, joins, skip=0,
-                                                               limit=limit_per_category, order_by_clause=order_by)
+        products, _ = await product_repository.get_all_product(
+            session=session,
+            where_conditions=condition, options=joins, skip=0,
+            limit=limit_per_category,
+            order_by=order_by
+        )
 
         product_list = []
         for product in products:

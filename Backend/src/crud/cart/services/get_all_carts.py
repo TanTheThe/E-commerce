@@ -8,7 +8,7 @@ from src.errors.cart import CartException
 from src.errors.product import ProductException
 from src.schemas.cart import CartCreateModel, CartItemCreateModel, CartItemsDeleteModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, select, func, or_, case
+from sqlmodel import and_, select, func, or_, case, desc
 from sqlalchemy.orm import selectinload, joinedload
 import uuid
 import time
@@ -74,8 +74,11 @@ class GetAllCartsService:
                     Product_Variant.deleted_at
                 ),
             ]
-            cart.items, total_count = await cart_repository.get_cart_with_paginated_items(
-                condition, session, joins, skip, limit
+
+            order_by = desc(Cart_Item.created_at)
+
+            cart.items, total_count = await cart_repository.get_all_cart_items(
+                session=session, where_conditions=condition, options=joins, skip=skip, limit=limit, order_by=order_by
             )
 
             await self.check_and_update_cart_prices(cart.items, session)

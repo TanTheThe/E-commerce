@@ -1,4 +1,4 @@
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from src.crud.notification.services import NotificationService
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
@@ -110,21 +110,29 @@ class GetAllOrdersService:
                         "created_at": str(return_order.created_at)
                     })
 
+            order_info = {
+                "order_id": str(order.id),
+                "code": order.code,
+                "status": order.status,
+                "created_at": str(order.created_at),
+                "discount": order.discount,
+                "total_price": order.total_price,
+                "can_show_cancel_button": can_show_cancel_button,
+                "has_pending_cancellation": has_pending_cancellation,
+                "cancellation_status": order.cancellation_status,
+                "cancellation_reason": order.cancellation_reason if has_pending_cancellation else None,
+                "has_return_orders": has_return_orders,
+                "return_orders": return_orders_info
+            }
+
+            if order.payment_method == "vnpay":
+                if order.payment_status == "success":
+                    order_info["paid_amount"] = order.total_price
+                elif order.payment_status == "pending":
+                    order_info["paid_amount"] = 0
+
             order_response.append({
-                "order": {
-                    "order_id": str(order.id),
-                    "code": order.code,
-                    "status": order.status,
-                    "created_at": str(order.created_at),
-                    "discount": order.discount,
-                    "total_price": order.total_price,
-                    "can_show_cancel_button": can_show_cancel_button,
-                    "has_pending_cancellation": has_pending_cancellation,
-                    "cancellation_status": order.cancellation_status,
-                    "cancellation_reason": order.cancellation_reason if has_pending_cancellation else None,
-                    "has_return_orders": has_return_orders,
-                    "return_orders": return_orders_info
-                },
+                "order": order_info,
                 "order_detail": list(product_map.values())
             })
 

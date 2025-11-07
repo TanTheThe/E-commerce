@@ -1,13 +1,14 @@
-# from fastapi import Request
-#
-# JTI_EXPIRY = 3600
-#
-# async def add_jti_to_blocklist(jti: str, request: Request) -> None:
-#     token_blocklist = request.app.state.redis
-#     await token_blocklist.set(name=jti, value="", ex=JTI_EXPIRY)
-#
-# async def token_in_blocklist(jti: str, request: Request) -> bool:
-#     token_blocklist = request.app.state.redis
-#     exists = await token_blocklist.exists(jti)
-#     return exists == 1
-#
+from fastapi import Request
+
+from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
+
+JTI_EXPIRY = 3600
+
+token_blacklist_service = TokenBlacklistService()
+
+async def add_jti_to_blocklist(jti: str, request: Request) -> None:
+    await token_blacklist_service.add_jwt_to_blocklist(jti, request)
+
+async def token_in_blocklist(jti: str, request: Request) -> bool:
+    return await token_blacklist_service.jwt_in_blocklist(jti, request)
+

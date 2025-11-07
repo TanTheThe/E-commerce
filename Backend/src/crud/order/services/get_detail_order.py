@@ -212,4 +212,10 @@ class GetDetailOrderService:
             "order_detail": order_detail_response
         }
 
+        if order.payment_method == "vnpay":
+            if order.payment_status == "success":
+                response["order"]["paid_amount"] = order.total_price
+            elif order.payment_status == "pending":
+                response["order"]["paid_amount"] = 0
+
         return response

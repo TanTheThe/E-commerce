@@ -4,7 +4,7 @@ from fastapi.security.http import HTTPAuthorizationCredentials
 from starlette import status
 from fastapi.exceptions import HTTPException
 from src.crud.authentication.utils import decode_token
-# from src.database.redis import token_in_blocklist
+from src.database.redis import token_in_blocklist
 
 
 class TokenBearer(HTTPBearer):
@@ -22,16 +22,16 @@ class TokenBearer(HTTPBearer):
                 detail="Invalid or expired token"
             )
 
-        # in_blocklist = await token_in_blocklist(token_data['jti'], request)
+        in_blocklist = await token_in_blocklist(token_data['jti'], request)
 
-        # if in_blocklist:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail={
-        #             "error": "This token is invalid or expired",
-        #             "resolution": "Please get new token"
-        #         }
-        #     )
+        if in_blocklist:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "This token is invalid or expired",
+                    "resolution": "Please get new token"
+                }
+            )
 
         self.verify_token_data(token_data)
 
@@ -99,3 +99,5 @@ async def customer_role_middleware(role: str = Depends(verify_token_and_get_role
 async def staff_role_middleware(role: str = Depends(verify_token_and_get_role)):
     if role != "staff":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ có staff mới có thể sử dụng tính năng này")
+
+
