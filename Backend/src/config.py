@@ -6,6 +6,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     DATABASE_URL: str
+    DATABASE_URI: str
     JWT_SECRET_CUSTOMER: str
     JWT_SECRET_ADMIN: str
     JWT_SECRET_STAFF: str

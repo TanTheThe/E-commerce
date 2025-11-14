@@ -136,7 +136,7 @@ const AccountSideBar = () => {
                     <div className="px-3 py-1 mt-4 border-t border-gray-100">
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center px-4 py-3 gap-3 text-left rounded-lg transition-all duration-200 hover:bg-red-50 group"
+                            className="w-full flex items-center px-4 py-3 gap-3 text-left rounded-lg transition-all duration-200 hover:bg-red-50 group cursor-pointer"
                         >
                             <div className="flex-shrink-0 text-gray-500 group-hover:text-red-600">
                                 <IoIosLogOut className="text-[18px]" />

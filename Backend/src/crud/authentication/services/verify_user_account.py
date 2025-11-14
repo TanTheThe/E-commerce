@@ -7,9 +7,12 @@ from src.database.models import User
 from src.errors.authentication import AuthException
 from fastapi import Request
 from src.schemas.user import UserRole
+import logging
 
 token_blacklist_service = TokenBlacklistService()
 user_repository = UserRepository()
+
+logger = logging.getLogger(__name__)
 
 class VerifyUserAccountService:
     async def verify_user_account(self, token: str, role: UserRole, request: Request, session: AsyncSession):
@@ -73,7 +76,8 @@ class VerifyUserAccountService:
                 User.deleted_at.is_(None),
             ]
 
-            user = await user_repository.update_user(condition_update, update_data, session)
+            user_tuple = await user_repository.update_user(condition_update, update_data, session)
+            user = user_tuple[0]
 
             await token_blacklist_service.add_token_to_blocklist(
                 token=token,
@@ -88,9 +92,12 @@ class VerifyUserAccountService:
 
             await session.commit()
 
-        except AuthException as e:
+        except Exception as e:
             await session.rollback()
+            logger.error(e)
             AuthException.verification_failed()
+
+
 
 
 

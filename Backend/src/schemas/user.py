@@ -135,9 +135,48 @@ class UserLoginModel(BaseModel):
 class Setup2FA(BaseModel):
     token: str
 
+    @field_validator('token')
+    @classmethod
+    def validate_token(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Token không được để trống')
+
+        if len(v) > 500:
+            raise ValueError('Token không hợp lệ')
+
+        if any(char in v for char in ['\n', '\r', '\0']):
+            raise ValueError('Token chứa ký tự không hợp lệ')
+
+        return v.strip()
+
 class VerifyLoginAdminModel(BaseModel):
     token: str
     otp: str
+
+    @field_validator('token')
+    @classmethod
+    def validate_token(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Token không được để trống')
+
+        if len(v) > 500:
+            raise ValueError('Token không hợp lệ')
+
+        if any(char in v for char in ['\n', '\r', '\0']):
+            raise ValueError('Token chứa ký tự không hợp lệ')
+
+        return v.strip()
+
+    @field_validator('otp')
+    @classmethod
+    def validate_otp(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Mã OTP không được để trống')
+
+        if not re.match(r'^\d{6}$', v.strip()):
+            raise ValueError('Mã OTP phải là 6 chữ số')
+
+        return v.strip()
 
 class ChangePasswordModel(BaseModel):
     old_password: str = Field(

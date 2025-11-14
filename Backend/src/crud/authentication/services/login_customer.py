@@ -7,13 +7,15 @@ from src.crud.user.repositories import UserRepository
 from src.database.models import User
 from src.errors.authentication import AuthException
 from src.schemas.user import UserLoginModel
-
+import logging
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 REFRESH_TOKEN_EXPIRY = 2
 
 user_repository = UserRepository()
 login_security_service = LoginSecurityService()
+
+logger = logging.getLogger(__name__)
 
 class LoginCustomerService:
     async def login_customer(self, user_data: UserLoginModel, request: Request, session: AsyncSession):
@@ -31,25 +33,25 @@ class LoginCustomerService:
             user = await user_repository.get_user(session=session, where_conditions=condition)
 
             if not user:
-                await login_security_service.log_failed_login_attempt(email, "user_not_found", request, session)
+                await login_security_service.log_failed_login_attempt(email, request, session)
                 AuthException.user_not_found()
 
             if not user.is_verified:
-                await login_security_service.log_failed_login_attempt(email, "not_verified", request, session)
+                await login_security_service.log_failed_login_attempt(email, request, session)
                 AuthException.user_not_verified()
 
             if user.customer_status != "active":
-                await login_security_service.log_failed_login_attempt(email, "account_disabled", request, session)
+                await login_security_service.log_failed_login_attempt(email, request, session)
                 AuthException.customer_account_disabled()
 
             if not user.is_customer:
-                await login_security_service.log_failed_login_attempt(email, "not_customer", request, session)
+                await login_security_service.log_failed_login_attempt(email, request, session)
                 AuthException.unauthorized_customer()
 
             password_valid = verify_password(password, user.password)
 
             if not password_valid:
-                await login_security_service.log_failed_login_attempt(email, "invalid_password", request, session)
+                await login_security_service.log_failed_login_attempt(email, request, session)
                 AuthException.invalid_account()
 
             user_payload = {
@@ -77,6 +79,7 @@ class LoginCustomerService:
             }
 
         except Exception as e:
+            logger.error(e)
             AuthException.login_failed()
 
 

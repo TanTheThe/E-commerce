@@ -9,6 +9,8 @@ import json
 RoleType = Literal["customer", "admin", "staff"]
 PurposeType = Literal["reset_password", "first_class_login", "verify_otp", "create_account"]
 
+logger = logging.getLogger(__name__)
+
 class TokenBlacklistService:
     PREFIX_JWT = "jwt:"
 
@@ -60,6 +62,7 @@ class TokenBlacklistService:
             return True
 
         except Exception as e:
+            logger.error(f"Error add JWT blocklist: {str(e)}")
             return False
 
     async def jwt_in_blocklist(self, jti: str, request: Request):
@@ -69,15 +72,18 @@ class TokenBlacklistService:
             exists = await redis.exists(key)
             return exists == 1
         except Exception as e:
-            logging.error(f"Error checking JWT blocklist for jti={jti}: {str(e)}")
+            logger.error(f"Error checking JWT blocklist for jti={jti}: {str(e)}")
             return False
 
     async def add_token_to_blocklist(self, token: str, role: RoleType, purpose: PurposeType, request: Request,
                                      ttl: Optional[int] = None, metadata: Optional[dict] = None):
         try:
             redis = self.get_redis(request)
+
             token_hash = self.hash_token(token)
+
             prefix = self.get_prefix(role, purpose)
+
             key = self.build_key(token_hash, prefix=prefix)
 
             if ttl is None:
@@ -93,10 +99,12 @@ class TokenBlacklistService:
             }
 
             await redis.set(key, json.dumps(value), ex=ttl)
+
             return True
         except ValueError as e:
             return False
         except Exception as e:
+            logger.error(f"Error add token to blocklist: {str(e)}")
             return False
 
 
@@ -111,6 +119,7 @@ class TokenBlacklistService:
         except ValueError as e:
             return False
         except Exception as e:
+            logger.error(f"Error check token in blocklist: {str(e)}")
             return False
 
 

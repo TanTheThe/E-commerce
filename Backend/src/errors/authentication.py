@@ -601,3 +601,13 @@ class AuthException:
                 "error_code": "auth_045",
             },
         )
+
+    @staticmethod
+    def cant_logout():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Không thể đăng xuất. Vui lòng thử lại",
+                "error_code": "auth_045",
+            },
+        )

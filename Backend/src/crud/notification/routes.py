@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends
 from typing import Optional
-from src.crud.notification.services import NotificationService
+from src.crud.notification.services.services import NotificationService
 from src.dependencies import AccessTokenBearer, customer_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session

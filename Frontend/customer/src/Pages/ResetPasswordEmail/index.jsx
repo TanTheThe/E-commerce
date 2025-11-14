@@ -26,10 +26,13 @@ const ResetPasswordEmail = () => {
 
         if (response?.success === true) {
             context.openAlertBox(
-                "success", "Please visit your email to receive the link"
+                "success", response.message || "Please visit your email to receive the link"
             )
         } else {
-            context.openAlertBox("error", response?.data?.detail?.message)
+            setIsLoading(false)
+            const rawMsg = response?.data?.detail?.message || response?.data?.detail?.[0]?.msg || "";
+            const cleanedMsg = rawMsg.replace(/^Value error,\s*/i, "");
+            context.openAlertBox("error", cleanedMsg);
         }
 
         setIsLoading(false);

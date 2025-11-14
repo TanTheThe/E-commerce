@@ -1,10 +1,8 @@
-from functools import lru_cache
-import json
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from vietnam_provinces import NESTED_DIVISIONS_JSON_PATH
-
+from sqlalchemy.orm import selectinload
 from src.crud.address.repositories import AddressRepository
-from src.database.models import Address
+from src.database.models import Address, Province, Ward
 from src.errors.address import AddressException
 from src.schemas.address import AddressUpdateModel
 
@@ -12,96 +10,65 @@ address_repository = AddressRepository()
 
 class UpdateAddressService:
     async def update_address(self, address_id: str, customer_id: str,
-                                     address_update: AddressUpdateModel, session: AsyncSession):
-        condition = [Address.id == address_id, Address.customer_id == customer_id, Address.deleted_at.is_(None)]
-        address_data = await address_repository.get_address(session, where_conditions=condition)
+                             address_update: AddressUpdateModel, session: AsyncSession):
+        condition = [Address.id == address_id, Address.user_id == customer_id, Address.deleted_at.is_(None)]
+        options = [selectinload(Address.province), selectinload(Address.ward)]
+        address_data = await address_repository.get_address(session, where_conditions=condition, options=options)
 
         if not address_data:
             AddressException.not_found()
 
-        if address_update.country == "Việt Nam":
-            city = address_update.city if address_update.city is not None else address_data.city
-            district = address_update.district if address_update.district is not None else address_data.district
-            ward = address_update.ward if address_update.ward is not None else address_data.ward
+        new_province = None
+        new_ward = None
 
-            if city and district and ward:
-                is_valid = await self.validate_vn_address(city, district, ward)
-                if not is_valid:
-                    AddressException.invalid_address()
+        if address_update.province_id is not None and address_update.ward_id is not None:
+            condition_province = [Province.id == address_update.province_id]
+            new_province = await address_repository.get_province(session, where_conditions=condition_province)
+            if not new_province:
+                AddressException.province_not_found()
 
-        update_data = address_update.model_dump(exclude_unset=True)
+            condition_ward = [Ward.id == address_update.ward_id]
+            new_ward = await address_repository.get_ward(session, where_conditions=condition_ward)
+            if not new_ward:
+                AddressException.ward_not_found()
 
-        address_result = await address_repository.update_address(condition, update_data, session)
+        if address_update.line is not None:
+            address_data.line = address_update.line
 
+        if address_update.country is not None:
+            address_data.country = address_update.country
+
+        address_data.updated_at = datetime.now()
+
+        session.add(address_data)
         await session.commit()
+        await session.refresh(address_data)
+
+        province_info = new_province if new_province else address_data.province
+        ward_info = new_ward if new_ward else address_data.ward
 
         return {
-            "line": address_result.line if address_result.line else None,
-            "street": address_result.street if address_result.street else None,
-            "ward": address_result.ward if address_result.ward else None,
-            "city": address_result.city if address_result.city else None,
-            "district": address_result.district if address_result.district else None,
-            "country": address_result.country if address_result.country else None,
+            "id": str(address_data.id),
+            "line": address_data.line,
+            "country": address_data.country,
+            "created_at": address_data.created_at.isoformat() if address_data.created_at else None,
+            "province_info": {
+                "id": str(province_info.id),
+                "name": province_info.name,
+                "code": province_info.code,
+                "code_name": province_info.code_name,
+                "division_type": province_info.division_type,
+                "phone_code": province_info.phone_code
+            } if province_info else None,
+            "ward_info": {
+                "id": str(ward_info.id),
+                "name": ward_info.name,
+                "code": ward_info.code,
+                "code_name": ward_info.code_name,
+                "division_type": ward_info.division_type
+            } if ward_info else None
         }
 
-    @lru_cache(maxsize=1)
-    def load_nested_divisions(self):
-        with open(NESTED_DIVISIONS_JSON_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-
-    @lru_cache(maxsize=1000)
-    async def validate_vn_address(self, city: str, district: str, ward: str):
-        try:
-            divisions_data = self.load_nested_divisions()
-
-            city_normalized = self.normalize_text(city)
-            district_normalized = self.normalize_text(district)
-            ward_normalized = self.normalize_text(ward)
-
-            province_found = None
-            for province in divisions_data:
-                province_name_normalized = self.normalize_text(province['name'])
-                if city_normalized in province_name_normalized or province_name_normalized in city_normalized:
-                    province_found = province
-                    break
-
-            if not province_found:
-                return False
-
-            district_found = None
-            for district_obj in province_found.get('districts', []):
-                district_name_normalized = self.normalize_text(district_obj['name'])
-                if district_normalized in district_name_normalized or district_name_normalized in district_normalized:
-                    district_found = district_obj
-                    break
-
-            if not district_found:
-                return False
-
-            for ward_obj in district_found.get('wards', []):
-                ward_name_normalized = self.normalize_text(ward_obj['name'])
-                if ward_normalized in ward_name_normalized or ward_name_normalized in ward_normalized:
-                    return True
-
-            return False
-
-        except Exception as e:
-            return False
-
-    def normalize_text(self, text: str):
-        text = text.lower().strip()
-
-        prefixes = [
-            'tỉnh', 'thành phố', 'tp.', 'tp', 'quận', 'huyện', 'thị xã', 'phường', 'xã', 'thị trấn', 'tt.', 'tt'
-        ]
-
-        for prefix in prefixes:
-            if text.startswith(prefix + ' '):
-                text = text[len(prefix):].strip()
-            elif text.startswith(prefix + '.'):
-                text = text[len(prefix) + 1:].strip()
-
-        return text
 
 
 

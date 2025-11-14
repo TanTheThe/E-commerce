@@ -25,8 +25,8 @@ const columns = [
     { id: 'userEmail', label: 'USER EMAIL', minWidth: 180 },
     { id: 'userPhone', label: 'USER PHONE', minWidth: 140 },
     { id: 'warehouseRole', label: 'VAI TRÒ KHO', minWidth: 180 },
-    { id: 'warehouseCode', label: 'MÃ KHO', minWidth: 120 },
-    { id: 'isVerified', label: 'XÁC THỰC', minWidth: 150 },
+    { id: 'warehouseCode', label: 'MÃ KHO', minWidth: 100 },
+    { id: 'isVerified', label: 'XÁC THỰC', minWidth: 170 },
     { id: 'status', label: 'STATUS', minWidth: 160 },
     { id: 'createdAt', label: 'CREATED AT', minWidth: 160 },
     { id: 'actions', label: 'ACTIONS', minWidth: 200 },
@@ -59,6 +59,10 @@ const Staffs = () => {
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const verified = urlParams.get('verified');
+
+        console.log(urlParams);
+
+        console.log(verified);
 
         if (verified === 'true') {
             context.openAlertBox('success', 'Xác thực tài khoản thành công!');

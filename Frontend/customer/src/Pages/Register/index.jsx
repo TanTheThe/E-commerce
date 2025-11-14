@@ -23,6 +23,7 @@ const Register = () => {
         email: "",
         password: ""
     })
+    const navigate = useNavigate();
 
     const context = useContext(MyContext)
 
@@ -58,9 +59,12 @@ const Register = () => {
                 email: "",
                 password: ""
             })
+            navigate('/login');
         } else {
             setIsLoading(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
+            const rawMsg = response?.data?.detail?.message || response?.data?.detail?.[0]?.msg || "";
+            const cleanedMsg = rawMsg.replace(/^Value error,\s*/i, "");
+            context.openAlertBox("error", cleanedMsg);
         }
     }
 

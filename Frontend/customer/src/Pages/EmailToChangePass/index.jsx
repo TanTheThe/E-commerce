@@ -27,7 +27,7 @@ const EmailToChangePass = () => {
 
         if (response?.success === true) {
             context.openAlertBox(
-                "success", "Please visit your email to get otp"
+                "success", response.message || "Please visit your email to get otp"
             )
             navigate("/forgot-password-otp", { state: { email } });
         } else {

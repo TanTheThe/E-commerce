@@ -6,9 +6,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.user.repositories import UserRepository
 from fastapi import HTTPException
 from src.schemas.user import ChangePasswordModel, UserRole
+import logging
 
 user_repository = UserRepository()
 
+logger = logging.getLogger(__name__)
 
 class ChangePasswordService:
     async def change_password(self, user_id: str, password_data: ChangePasswordModel, role: UserRole, session: AsyncSession):
@@ -27,16 +29,20 @@ class ChangePasswordService:
 
             role_display = self.get_role_display(role)
 
-            return role_display, {
-                        "user_id": str(user.id),
-                        "email": user.email,
-                        "updated_at": datetime.now().isoformat()
-                    }
+            return {
+                "role_display": role_display,
+                "data": {
+                    "user_id": str(user.id),
+                    "email": user.email,
+                    "updated_at": datetime.now().isoformat()
+                }
+            }
 
         except HTTPException:
             raise
         except Exception as e:
             await session.rollback()
+            logger.error("Error change password: ", e)
             AuthException.password_change_failed()
 
 
@@ -152,6 +158,7 @@ class ChangePasswordService:
             await user_repository.update_user(condition, update_data, session)
 
         except Exception as e:
+            logger.error("Error update user password: ", e)
             raise
 
 

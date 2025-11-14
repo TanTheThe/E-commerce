@@ -1,29 +1,10 @@
 from datetime import datetime
 from sqlalchemy.orm import selectinload
-from src.crud.notification.services import NotificationService
-from src.crud.payment_refund.repositories import PaymentRefundRepository
-from src.crud.payment_refund.services import PaymentRefundService
-from src.crud.vnpay.repositories import VNPayRepository
-from src.database.models import Special_Offer, User, Address, Order_Detail, Product_Variant, Product, Color, Order
-from src.crud.address.repositories import AddressRepository
+from src.database.models import Order_Detail, Order
 from src.crud.order.repositories import OrderRepository
-from src.crud.special_offer.repositories import SpecialOfferRepository
-from src.crud.user.repositories import UserRepository
-from src.crud.product.repositories import ProductRepository
-from src.crud.order_detail.repositories import OrderDetailRepository
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.color.repositories import ColorRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
-from sqlalchemy import update
-from src.errors.address import AddressException
-from src.errors.order import OrderException
-from src.errors.product import ProductException
-from src.errors.special_offer import SpecialOfferException
-from src.schemas.order import OrderCreateModel, PaymentStatusOrderType, CancellationStatusType
-import time
-import uuid
-from src.errors.authentication import AuthException
+from src.schemas.order import CancellationStatusType
 
 order_repository = OrderRepository()
 

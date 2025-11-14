@@ -1,6 +1,6 @@
-from typing import Optional, Any, List, Tuple, Dict
-from sqlalchemy import ColumnElement, func, update
-from src.database.models import Address
+from typing import Optional, Any, List, Tuple
+from sqlalchemy import ColumnElement, func
+from src.database.models import Address, Province, Ward
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_
 from datetime import datetime
@@ -109,18 +109,128 @@ class AddressRepository:
         return address
 
 
-    async def update_address(self, where_conditions: Optional[List[ColumnElement[bool]]],
-                             update_data: Dict[str, Any], session: AsyncSession):
-        query = (
-            update(Address)
-            .where(and_(*where_conditions))
-            .values(**update_data)
-            .returning(Address)
-        )
+    async def get_province(self, session: AsyncSession,
+                           joins: Optional[List[Tuple[Any, dict]]] = None,
+                           where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                           order_by: Optional[Any] = None,
+                           options: Optional[List[Any]] = None):
+
+        query = select(Province)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
 
         result = await session.exec(query)
 
-        return result.one_or_none()
+        province = result.one_or_none()
+
+        return province
+
+
+    async def get_all_provinces(self, session: AsyncSession,
+                           joins: Optional[List[Tuple[Any, dict]]] = None,
+                           where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                           order_by: Optional[Any] = None,
+                           options: Optional[List[Any]] = None):
+
+        query = select(Province)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        provinces = result.all()
+
+        return provinces
+
+
+    async def get_ward(self, session: AsyncSession,
+                           joins: Optional[List[Tuple[Any, dict]]] = None,
+                           where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                           order_by: Optional[Any] = None,
+                           options: Optional[List[Any]] = None):
+
+        query = select(Ward)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        ward = result.one_or_none()
+
+        return ward
+
+
+    async def get_all_wards(self, session: AsyncSession,
+                           joins: Optional[List[Tuple[Any, dict]]] = None,
+                           where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                           order_by: Optional[Any] = None,
+                           options: Optional[List[Any]] = None):
+
+        query = select(Ward)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        wards = result.all()
+
+        return wards
 
 
     async def delete_address(self, where_conditions: Optional[List[ColumnElement[bool]]], session: AsyncSession):

@@ -1,7 +1,6 @@
 from datetime import datetime
 from itsdangerous import SignatureExpired, BadSignature
 from sqlmodel.ext.asyncio.session import AsyncSession
-
 from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
 from src.crud.authentication.utils import decode_url_safe_token, verify_password, generate_password_hash
 from src.crud.user.repositories import UserRepository
@@ -9,9 +8,12 @@ from src.database.models import User
 from src.errors.authentication import AuthException
 from src.schemas.user import ForgotPasswordConfirmModel, UserRole
 from fastapi import Request
+import logging
 
 user_repository = UserRepository()
 token_blacklist_service = TokenBlacklistService()
+
+logger = logging.getLogger(__name__)
 
 class ForgotPasswordConfirmService:
     async def forgot_password_confirm(self, data: ForgotPasswordConfirmModel, role: UserRole, session: AsyncSession, request: Request):
@@ -63,7 +65,7 @@ class ForgotPasswordConfirmService:
 
             update_data = {
                 "password": password_hash,
-                'otp': None,
+                'otp_hash': None,
                 'expires_at': None,
                 'updated_at': datetime.now()
             }
@@ -95,6 +97,7 @@ class ForgotPasswordConfirmService:
         except BadSignature:
             AuthException.token_invalid()
         except Exception as e:
+            logger.error(e)
             await session.rollback()
             raise
 

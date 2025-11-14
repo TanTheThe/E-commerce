@@ -39,7 +39,7 @@ const ResetPassword = () => {
         const response = await postDataApi(`/customer/auth/confirm-reset`, {
             token,
             new_password: newPassword,
-            confirm_new_password: confirmPassword
+            new_password_confirm: confirmPassword
         });
 
         if (response?.success === true) {
@@ -55,7 +55,9 @@ const ResetPassword = () => {
             navigate(`/login`)
         } else {
             setIsLoading(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
+            const rawMsg = response?.data?.detail?.message || response?.data?.detail?.[0]?.msg || "";
+            const cleanedMsg = rawMsg.replace(/^Value error,\s*/i, "");
+            context.openAlertBox("error", cleanedMsg);
         }
     }
 

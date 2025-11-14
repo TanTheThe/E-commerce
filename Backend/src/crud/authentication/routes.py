@@ -5,11 +5,14 @@ from starlette import status
 from src.config import Config
 from src.crud.authentication.services.change_password import ChangePasswordService
 from src.crud.authentication.services.create_account import CreateAccountService
+from src.crud.authentication.services.detect_user_role import DetectUserRoleService
 from src.crud.authentication.services.forgot_password import ForgotPasswordService
 from src.crud.authentication.services.forgot_password_confirm import ForgotPasswordConfirmService
-from src.crud.authentication.services.login import LoginService
 from src.crud.authentication.services.login_admin_staff import LoginAdminStaffService
 from src.crud.authentication.services.login_customer import LoginCustomerService
+from src.crud.authentication.services.logout import LogoutService
+from src.crud.authentication.services.setup_2fa import Setup2FAService
+from src.crud.authentication.services.verify_login import VerifyLoginService
 from src.crud.authentication.services.verify_otp import VerifyOtpService
 from src.crud.authentication.services.verify_user_account import VerifyUserAccountService
 from src.dependencies import AccessTokenBearer, RefreshTokenBearer
@@ -20,7 +23,6 @@ from src.schemas.user import AdminStaffRole, ChangePasswordModel, UserCreateMode
     VerifyOTPModel, VerifyLoginAdminModel, Setup2FA, ForgotPasswordConfirmModel
 from src.database.main import get_session
 from datetime import datetime
-from src.crud.authentication.services.services import AuthenticationService
 from src.dependencies import admin_role_middleware, customer_role_middleware, staff_role_middleware
 
 auth_admin_router = APIRouter(prefix="/auth")
@@ -31,9 +33,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 REFRESH_TOKEN_EXPIRY = 2
 
-auth_service = AuthenticationService()
 access_token_bearer = AccessTokenBearer()
-login_service = LoginService()
 change_password_service = ChangePasswordService()
 create_account_service = CreateAccountService()
 login_customer_service = LoginCustomerService()
@@ -42,9 +42,15 @@ forgot_password_confirm_service = ForgotPasswordConfirmService()
 verify_otp_service = VerifyOtpService()
 verify_user_account_service = VerifyUserAccountService()
 login_admin_staff_service = LoginAdminStaffService()
+setup_2fa_service = Setup2FAService()
+verify_login_service = VerifyLoginService()
+logout_service = LogoutService()
+detect_user_role_service = DetectUserRoleService()
 
 
 @auth_customer_router.post("/login")
+@limiter.limit("15/minute")
+@limiter.limit("30/hour")
 async def login_customer(request: Request, user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
     login_data = await login_customer_service.login_customer(user_data, request, session)
 
@@ -57,21 +63,23 @@ async def login_customer(request: Request, user_data: UserLoginModel, session: A
     )
 
 
-# @auth_customer_router.get("/logout", dependencies=[Depends(customer_role_middleware)])
-# async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
-#     await auth_service.revoke_token_service(token_details, request)
-#
-#     return JSONResponse(
-#         content={
-#             "message": "Đăng xuất thành công"
-#         },
-#         status_code=status.HTTP_200_OK
-#     )
+@auth_customer_router.get("/logout", dependencies=[Depends(customer_role_middleware)])
+@limiter.limit("20/minute")
+async def logout_customer(request: Request, token_details: dict = Depends(AccessTokenBearer()),
+                       session: AsyncSession = Depends(get_session)):
+    await logout_service.revoke_token(token_details, request, session, UserRole.CUSTOMER)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Đăng xuất thành công"
+        }
+    )
 
 
 @auth_customer_router.post('/forgot-password')
-@limiter.limit("3/minute")
-async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
+@limiter.limit("10/minute")
+async def forgot_password(request: Request, email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
     message = await forgot_password_service.forgot_password(email_data.email, email_data.check, UserRole.CUSTOMER, session)
 
     return JSONResponse(
@@ -83,7 +91,7 @@ async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSes
 
 
 @auth_customer_router.post('/confirm-reset')
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def forget_password_confirm(data: ForgotPasswordConfirmModel,
                                   request: Request,
                                   session: AsyncSession = Depends(get_session)):
@@ -97,8 +105,8 @@ async def forget_password_confirm(data: ForgotPasswordConfirmModel,
 
 
 @auth_customer_router.post("/forgot-password/verify-otp")
-@limiter.limit("5/minute")
-@limiter.limit("10/hour")
+@limiter.limit("10/minute")
+@limiter.limit("20/hour")
 async def verify_otp(request: Request, data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
     token = await verify_otp_service.verify_otp(data, UserRole.CUSTOMER, session, request)
 
@@ -141,8 +149,8 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 
 
 @auth_customer_router.put('/change-password', dependencies=[Depends(customer_role_middleware)])
-@limiter.limit("5/minute")
-async def change_password_customer(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
+@limiter.limit("10/minute")
+async def change_password_customer(passwords: ChangePasswordModel, request: Request, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
     role_display, result = await change_password_service.change_password(user_id, passwords, UserRole.CUSTOMER, session)
@@ -150,18 +158,14 @@ async def change_password_customer(passwords: ChangePasswordModel, session: Asyn
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đổi mật khẩu {role_display} thành công",
-            "content": {
-                "user_id": result.get("user_id"),
-                "email": result.get("email"),
-                "updated_at": result.get("updated_at")
-            }
+            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "content": result["data"]
         }
     )
 
 
 @auth_customer_router.post("/signup", status_code=status.HTTP_201_CREATED)
-@limiter.limit("6/hour")
+@limiter.limit("10/hour")
 async def create_user_account(user_data: UserCreateModel, 
                               bg_tasks: BackgroundTasks,
                               request: Request = None,
@@ -178,7 +182,7 @@ async def create_user_account(user_data: UserCreateModel,
 
 
 @auth_customer_router.get('/verify/{token}')
-@limiter.limit("6/hour")
+@limiter.limit("10/hour")
 async def verify_user_account(token: str, request: Request, session: AsyncSession = Depends(get_session)):
     try:
         await verify_user_account_service.verify_user_account(token, UserRole.CUSTOMER, request, session)
@@ -192,98 +196,124 @@ async def verify_user_account(token: str, request: Request, session: AsyncSessio
 
 
 @auth_admin_router.post("/login")
-async def login_admin(user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
-    allowed_roles = [UserRole.ADMIN, UserRole.STAFF]
-    admin_staff_role = await login_admin_staff_service.detect_user_role(user_data.email, allowed_roles, session)
+@limiter.limit("15/minute")
+@limiter.limit("30/hour")
+async def login_admin(user_data: UserLoginModel, request: Request, session: AsyncSession = Depends(get_session)):
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_user_role(user_data.email, allowed_roles, session)
 
-    return await login_service.login_admin_staff(user_data, admin_staff_role, session)
+    result = await login_admin_staff_service.login_admin_staff(user_data, admin_staff_role, request, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": result["message"],
+            "content": result["data"]
+        }
+    )
 
 
 @auth_admin_router.post("/login/2fa")
-async def login_admin_with_2fa(user_data: Setup2FA, session: AsyncSession = Depends(get_session)):
-    detected_role = await auth_service.detect_role_from_token(
-        user_data.token,
-        [UserRole.ADMIN, UserRole.STAFF],
-        purpose="first_class_login"
+@limiter.limit("15/minute")
+@limiter.limit("30/hour")
+async def login_admin_with_2fa(user_data: Setup2FA, request: Request, session: AsyncSession = Depends(get_session)):
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_role_from_token(user_data.token, allowed_roles, "first_class_login", session)
+
+    result = await setup_2fa_service.setup_2fa(user_data, admin_staff_role, request, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": result["message"],
+            "content": result["data"]
+        }
     )
-
-    admin_staff_role = AdminStaffRole.ADMIN if detected_role == UserRole.ADMIN else AdminStaffRole.STAFF
-
-    return await login_service.setup_2fa(user_data, admin_staff_role, session)
 
 
 @auth_admin_router.post("/login/verify")
-async def verify_login_admin(user_data: VerifyLoginAdminModel, session: AsyncSession = Depends(get_session)):
-    detected_role = await auth_service.detect_role_from_token(
-        user_data.token,
-        [UserRole.ADMIN, UserRole.STAFF],
-        purpose="first_class_login"
+@limiter.limit("15/minute")
+@limiter.limit("30/hour")
+async def verify_login_admin(user_data: VerifyLoginAdminModel, request: Request, session: AsyncSession = Depends(get_session)):
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_role_from_token(user_data.token, allowed_roles, "first_class_login", session)
+
+    result = await verify_login_service.verify_login(user_data, admin_staff_role, request, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": result["message"],
+            "content": result["data"]
+        }
     )
 
-    admin_staff_role = AdminStaffRole.ADMIN if detected_role == UserRole.ADMIN else AdminStaffRole.STAFF
 
-    return await login_service.verify_login(user_data, admin_staff_role, session)
+@auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
+@limiter.limit("20/minute")
+async def logout_admin(request: Request, token_details: dict = Depends(AccessTokenBearer()),
+                       session: AsyncSession = Depends(get_session)):
+    await logout_service.revoke_token(token_details, request, session, UserRole.ADMIN)
 
-
-# @auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
-# async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
-#     await auth_service.revoke_token_service(token_details, request)
-#
-#     return JSONResponse(
-#         content={
-#             "message": "Đăng xuất thành công"
-#         },
-#         status_code=status.HTTP_200_OK
-#     )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Đăng xuất thành công"
+        }
+    )
 
 
 @auth_admin_router.post('/forgot-password')
-async def forgot_password(email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
-    detected_role = await auth_service.detect_user_role(
-        email_data.email,
-        [UserRole.ADMIN, UserRole.STAFF],
-        session
-    )
+@limiter.limit("10/minute")
+async def forgot_password(request: Request, email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_user_role(email_data.email, allowed_roles, session)
 
-    message = await auth_service.forgot_password_service(email_data.email, email_data.check, detected_role, session)
+    message = await forgot_password_service.forgot_password(email_data.email, email_data.check, admin_staff_role, session)
 
     return JSONResponse(
-        content={"message": message},
-        status_code=status.HTTP_200_OK
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": message
+        }
     )
 
 
 @auth_admin_router.post('/confirm-reset')
-async def forgot_password_confirm(data: ForgotPasswordConfirmModel,
+@limiter.limit("10/minute")
+async def forget_password_confirm(data: ForgotPasswordConfirmModel,
+                                  request: Request,
                                   session: AsyncSession = Depends(get_session)):
-    detected_role = await auth_service.detect_role_from_token(
-        data.token,
-        [UserRole.ADMIN, UserRole.STAFF],
-        purpose="reset_password"
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_role_from_token(data.token, allowed_roles,
+                                                                             "reset_password", session)
+
+    message = await forgot_password_confirm_service.forgot_password_confirm(data, admin_staff_role, session, request)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": message
+        }
     )
-
-    message = await auth_service.forgot_password_confirm_service(data, detected_role, session)
-
-    return JSONResponse(content={"message": message}, status_code=200)
 
 
 @auth_admin_router.post("/forgot-password/verify-otp")
-async def verify_otp(data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
-    detected_role = await auth_service.detect_user_role(
-        data.email,
-        [UserRole.ADMIN, UserRole.STAFF],
-        session
-    )
+@limiter.limit("10/minute")
+@limiter.limit("20/hour")
+async def verify_otp(request: Request, data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
+    allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
+    admin_staff_role = await detect_user_role_service.detect_user_role(data.email, allowed_roles, session)
 
-    token = await auth_service.verify_otp(data, detected_role, session)
+    token = await verify_otp_service.verify_otp(data, admin_staff_role, session, request)
 
     return JSONResponse(
+        status_code=status.HTTP_200_OK,
         content={
+            "message": "Token sau khi xác thực OTP thành công",
             "content": {
                 "token": token
             }
-        },
-        status_code=status.HTTP_200_OK
+        }
     )
 
 
@@ -312,13 +342,22 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
             "error_code": "auth_014",
         },
     )
-    
-@auth_admin_router.put('/change-password', dependencies=[Depends(admin_role_middleware)])
-async def change_password_admin(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
-                                token_details: dict = Depends(access_token_bearer)):
-    user_id = token_details['user']['id']
-    return await change_password_service.change_password(user_id, passwords, UserRole.ADMIN, session)
 
+
+@auth_admin_router.put('/change-password', dependencies=[Depends(admin_role_middleware)])
+@limiter.limit("10/minute")
+async def change_password_admin(request: Request, passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
+                                   token_details: dict = Depends(access_token_bearer)):
+    user_id = token_details['user']['id']
+    result = await change_password_service.change_password(user_id, passwords, UserRole.ADMIN, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "content": result["data"]
+        }
+    )
 
 
 
@@ -326,8 +365,10 @@ async def change_password_admin(passwords: ChangePasswordModel, session: AsyncSe
 
 
 @auth_admin_router.post("/signup", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
-async def create_user_account(user_data: UserCreateModel, 
+@limiter.limit("10/hour")
+async def create_user_account(user_data: UserCreateModel,
                               bg_tasks: BackgroundTasks,
+                              request: Request = None,
                               session: AsyncSession = Depends(get_session)):
     new_user = await create_account_service.create_user_account(user_data, UserRole.STAFF, bg_tasks, session)
 
@@ -341,28 +382,40 @@ async def create_user_account(user_data: UserCreateModel,
 
 
 @auth_staff_router.get('/verify/{token}')
-async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
+@limiter.limit("10/hour")
+async def verify_user_account(token: str, request: Request, session: AsyncSession = Depends(get_session)):
     try:
-        await create_account_service.verify_user_account(token, UserRole.STAFF, session)
+        await verify_user_account_service.verify_user_account(token, UserRole.STAFF, request, session)
         return RedirectResponse(url=f"http://{Config.ADMIN_DOMAIN_CLIENT}/staffs?verified=true", status_code=302)
-    except Exception:
+    except Exception as e:
         return RedirectResponse(url=f"http://{Config.ADMIN_DOMAIN_CLIENT}/staffs?verified=false", status_code=302)
 
 
-# @auth_staff_router.get("/logout", dependencies=[Depends(staff_role_middleware)])
-# async def revoke_token(request: Request, token_details: dict = Depends(AccessTokenBearer())):
-#     await auth_service.revoke_token_service(token_details, request)
-#
-#     return JSONResponse(
-#         content={
-#             "message": "Đăng xuất thành công"
-#         },
-#         status_code=status.HTTP_200_OK
-#     )
+@auth_staff_router.get("/logout", dependencies=[Depends(staff_role_middleware)])
+@limiter.limit("20/minute")
+async def logout_staff(request: Request, token_details: dict = Depends(AccessTokenBearer()),
+                       session: AsyncSession = Depends(get_session)):
+    await logout_service.revoke_token(token_details, request, session, UserRole.STAFF)
 
-    
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Đăng xuất thành công"
+        }
+    )
+
+
 @auth_staff_router.put('/change-password', dependencies=[Depends(staff_role_middleware)])
-async def change_password_staff(passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
+@limiter.limit("10/minute")
+async def change_password_staff(request: Request, passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
-    return await change_password_service.change_password(user_id, passwords, UserRole.STAFF, session)
+    result = await change_password_service.change_password(user_id, passwords, UserRole.STAFF, session)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "content": result["data"]
+        }
+    )

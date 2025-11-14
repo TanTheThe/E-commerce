@@ -237,8 +237,8 @@ class UserService:
         return user_block
 
     async def get_profile_customer_service(self, id: str, session: AsyncSession):
-        condition = and_(User.id == id)
-        user = await user_repository.get_user(condition, session)
+        condition = [User.id == id, User.deleted_at.is_(None)]
+        user = await user_repository.get_user(session=session, where_conditions=condition)
 
         if not user:
             AuthException.user_not_found()
@@ -253,8 +253,10 @@ class UserService:
         return filtered_user
 
     async def get_profile_admin_staff_service(self, id: str, session: AsyncSession):
-        condition = and_(User.id == id, User.deleted_at.is_(None))
-        user = await user_repository.get_user(condition, session)
+        condition = [User.id == id, User.deleted_at.is_(None)]
+        user = await user_repository.get_user(session=session, where_conditions=condition)
+        if not user:
+            AuthException.user_not_found()
 
         if not user:
             AuthException.user_not_found()

@@ -8,6 +8,51 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 
 
+class Province(SQLModel, table=True):
+    __tablename__ = 'province'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    code: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    code_name: str = Field(sa_column=Column(pg.VARCHAR, unique=True, nullable=False))
+    division_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    phone_code: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+
+    wards: List["Ward"] = Relationship(back_populates="province")
+    addresses: List["Address"] = Relationship(back_populates="province")
+
+
+class Ward(SQLModel, table=True):
+    __tablename__ = 'ward'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    code: int = Field(sa_column=Column(pg.INTEGER, nullable=False))
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    code_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, index=True))
+    short_code_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    division_type: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    province_id: uuid.UUID = Field(foreign_key="province.id")
+
+    province: Optional[Province] = Relationship(back_populates="wards")
+    addresses: List["Address"] = Relationship(back_populates="ward")
+
+
 class Address(SQLModel, table=True):
     __tablename__ = 'address'
 
@@ -21,10 +66,12 @@ class Address(SQLModel, table=True):
     )
 
     line: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    street: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    ward: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    city: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    district: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    ward_id: uuid.UUID = Field(foreign_key="ward.id")
+    province_id: uuid.UUID = Field(foreign_key="province.id")
+
+    district: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True), default=None)
+
     country: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="Việt Nam"), default="Việt Nam")
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -32,6 +79,8 @@ class Address(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="user.id")
 
     user: Optional["User"] = Relationship(back_populates="address", sa_relationship_kwargs={'lazy': 'noload'})
+    ward: Optional[Ward] = Relationship(back_populates="addresses", sa_relationship_kwargs={'lazy': 'noload'})
+    province: Optional[Province] = Relationship(back_populates="addresses", sa_relationship_kwargs={'lazy': 'noload'})
 
 
 class Order(SQLModel, table=True):
@@ -1736,6 +1785,63 @@ class LoginAttempt(SQLModel, table=True):
         sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True),
         default=datetime.now
     )
+
+
+class Setup2FAAttempt(SQLModel, table=True):
+    __tablename__ = 'setup_2fa_attempts'
+
+    __table_args__ = (
+        Index('idx_user_id_attempted_at', 'user_id', 'attempted_at'),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    is_successful: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")),
+        default=False
+    )
+    attempted_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True),
+        default=datetime.now
+    )
+
+
+class OTPVerificationAttempt(SQLModel, table=True):
+    __tablename__ = 'otp_verification_attempts'
+
+    __table_args__ = (
+        Index('idx_otp_user_id_attempted_at', 'user_id', 'attempted_at'),
+        Index('idx_otp_ip_attempted_at', 'ip_address', 'attempted_at'),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    ip_address: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    is_successful: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")),
+        default=False
+    )
+    attempted_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True),
+        default=datetime.now
+    )
+
+
+
 
 
 

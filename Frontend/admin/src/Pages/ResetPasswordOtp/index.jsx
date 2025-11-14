@@ -42,7 +42,9 @@ const ResetPasswordOtp = () => {
             navigate(`/reset-password/${response?.data?.token}`)
         } else {
             setIsLoading(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
+            const rawMsg = response?.data?.detail?.message || response?.data?.detail?.[0]?.msg || "";
+            const cleanedMsg = rawMsg.replace(/^Value error,\s*/i, "");
+            context.openAlertBox("error", cleanedMsg);
         }
 
         setIsLoading(false);

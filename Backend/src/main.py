@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import sessionmaker
-from src.database.main import engine
+from src.database.main import engine, init_db
 from sqlmodel.ext.asyncio.session import AsyncSession
 from contextlib import asynccontextmanager
 from src.api_router import admin_router, customer_router, staff_router
@@ -19,14 +19,15 @@ async def lifespan(app: FastAPI):
         host=Config.REDIS_HOST,
         port=Config.REDIS_PORT,
         db=0,
-        decode_responses=True
+        decode_responses=True,
+        socket_timeout=5,
+        socket_connect_timeout=5
     )
 
     yield
 
     await app.state.engine.dispose()
-    await app.state.redis.close()
-    await app.state.redis.connection_pool.disconnect()
+    await app.state.redis.aclose()
 
 app = FastAPI(title="E-commerce", version="v1", lifespan=lifespan)
 

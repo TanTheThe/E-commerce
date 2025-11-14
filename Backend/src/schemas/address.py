@@ -14,14 +14,12 @@ class AddressModel(BaseModel):
 
 
 class AddressCreateModel(BaseModel):
-    line: str = Field(..., min_length=1, max_length=255, description="Số nhà, tên đường")
-    street: str = Field(..., min_length=1, max_length=100)
-    ward: str = Field(..., min_length=1, max_length=100, description="Phường/Xã")
-    district: str = Field(..., min_length=1, max_length=100, description="Quận/Huyện")
-    city: str = Field(..., min_length=1, max_length=100, description="Tỉnh/Thành phố")
+    line: str = Field(..., min_length=1, max_length=255, description="Số nhà, tòa nhà, tên đường")
+    ward_id: str = Field(..., description="Phường/Xã")
+    province_id: str = Field(..., description="Tỉnh/Thành phố")
     country: Optional[str] = Field(default="Việt Nam", max_length=100)
 
-    @field_validator('line', 'street', 'ward', 'district', 'city')
+    @field_validator('line')
     @classmethod
     def validate_not_empty(cls, v: str) -> str:
         if not v or not v.strip():
@@ -37,14 +35,12 @@ class AddressCreateModel(BaseModel):
 
 
 class AddressUpdateModel(BaseModel):
-    line: Optional[str] = Field(None, min_length=1, max_length=255)
-    street: Optional[str] = Field(None, min_length=1, max_length=100)
-    ward: Optional[str] = Field(None, min_length=1, max_length=100)
-    city: Optional[str] = Field(None, min_length=1, max_length=100)
-    district: Optional[str] = Field(None, min_length=1, max_length=100)
-    country: Optional[str] = Field(default="Việt Nam", max_length=100)
+    line: Optional[str] = Field(None, min_length=1, max_length=255, description="Số nhà, tòa nhà, tên đường")
+    ward_id: Optional[str] = Field(..., description="Phường/Xã")
+    province_id: Optional[str] = Field(..., description="Tỉnh/Thành phố")
+    country: Optional[str] = Field(None, max_length=100)
 
-    @field_validator('line', 'street', 'ward', 'district', 'city')
+    @field_validator('line')
     @classmethod
     def validate_not_empty(cls, v: str) -> str:
         if not v or not v.strip():
@@ -60,16 +56,9 @@ class AddressUpdateModel(BaseModel):
 
     @model_validator(mode='after')
     def validate_address_completeness(self):
-        address_fields_updated = any([
-            self.city is not None,
-            self.district is not None,
-            self.ward is not None
-        ])
-
-        if address_fields_updated:
-            if not all([self.city, self.district, self.ward]):
+        if self.province_id is not None or self.ward_id is not None:
+            if not all([self.province_id, self.ward_id]):
                 raise ValueError(
-                    'Nếu cập nhật địa chỉ, vui lòng cung cấp đầy đủ Tỉnh/Thành, Quận/Huyện và Phường/Xã'
+                    'Nếu cập nhật địa chỉ, vui lòng cung cấp đầy đủ Province và Ward'
                 )
-
         return self

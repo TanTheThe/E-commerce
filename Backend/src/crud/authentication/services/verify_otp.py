@@ -1,15 +1,16 @@
 from datetime import datetime
-
 from sqlmodel.ext.asyncio.session import AsyncSession
-
 from src.crud.authentication.utils import verify_password, create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
 from src.errors.authentication import AuthException
 from src.schemas.user import VerifyOTPModel, UserRole
 from fastapi import Request
+import logging
 
 user_repository = UserRepository()
+
+logger = logging.getLogger(__name__)
 
 class VerifyOtpService:
     async def verify_otp(self, data: VerifyOTPModel, role: UserRole, session: AsyncSession, request: Request):
@@ -71,12 +72,18 @@ class VerifyOtpService:
                 "timestamp": datetime.now().isoformat(),
             }
 
-            token = create_url_safe_token(token_payload, role, "reset_password")
+            token = create_url_safe_token(
+                token_payload,
+                role.value,
+                purpose="reset_password"
+            )
+
+            print("j9dja90dja", token)
 
             return token
         except Exception as e:
             await session.rollback()
-            AuthException.verification_failed()
+            logger.error(e)
 
 
     async def validate_user_role(self, user, role: UserRole):

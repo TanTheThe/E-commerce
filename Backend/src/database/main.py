@@ -7,15 +7,21 @@ from sqlalchemy import event
 import time
 
 engine: AsyncEngine = create_async_engine(
-    url=Config.DATABASE_URL,
+    url=Config.DATABASE_URI,
     pool_size=10,
     max_overflow=20,
     future=True,
-    echo=False
+    echo=False,
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 async_session_maker = async_sessionmaker(
-    engine,
+    bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,

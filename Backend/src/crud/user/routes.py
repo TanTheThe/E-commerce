@@ -143,7 +143,7 @@ async def get_all_customer_for_offer(offer_id: str,
 #     )
 
 
-@user_admin_router.get('/')
+@user_admin_router.get('')
 async def get_profile_admin(token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
@@ -163,7 +163,7 @@ async def get_profile_admin(token_details: dict = Depends(access_token_bearer),
     )
 
 
-@user_admin_router.put('/', dependencies=[Depends(admin_role_middleware)])
+@user_admin_router.put('', dependencies=[Depends(admin_role_middleware)])
 async def update_profile_admin(user_update_data: UserUpdateModel,
                                session: AsyncSession = Depends(get_session),
                                token_details: dict = Depends(access_token_bearer)):

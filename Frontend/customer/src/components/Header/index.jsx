@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Search from "../Search";
 import Button from "@mui/material/Button";
 import Badge from "@mui/material/Badge";
@@ -24,6 +24,7 @@ const Header = () => {
     const context = useContext(MyContext);
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
+    const navigate = useNavigate();
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -50,9 +51,12 @@ const Header = () => {
         const response = await fetchWithAutoRefresh("/customer/auth/logout", "GET");
 
         if (response?.success === true) {
-            context.setIsLogin(false);
             localStorage.removeItem("accesstoken");
             localStorage.removeItem("refreshtoken");
+            context?.setIsLogin(false);
+            context?.setUserData(null);
+            navigate('/login');
+            context?.openAlertBox("success", "Logged out successfully!");
         }
     };
 

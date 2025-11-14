@@ -1,4 +1,4 @@
-from src.crud.notification.services import NotificationService
+from src.crud.notification.services.services import NotificationService
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
 from src.crud.vnpay.repositories import VNPayRepository

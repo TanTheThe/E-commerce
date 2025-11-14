@@ -40,3 +40,23 @@ class AddressException:
                 "error_code": "address_002"
             }
         )
+
+    @staticmethod
+    def province_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Không tìm thấy tỉnh thành trên",
+                "error_code": "address_003"
+            }
+        )
+
+    @staticmethod
+    def ward_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Không tìm thấy phường/xã trên",
+                "error_code": "address_003"
+            }
+        )

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import random
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.config import Config
 from src.crud.authentication.utils import create_url_safe_token, generate_password_hash
@@ -10,10 +9,13 @@ from src.mail import mail, create_message
 from src.schemas.user import ResetMethod, UserRole
 import re
 import secrets
+import logging
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
 user_repository = UserRepository()
+
+logger = logging.getLogger(__name__)
 
 class ForgotPasswordService:
     async def forgot_password(self, email: str, check: ResetMethod, role: UserRole, session: AsyncSession):
@@ -36,6 +38,7 @@ class ForgotPasswordService:
                 AuthException.invalid_reset_method()
 
         except Exception as e:
+            logger.error("Send reset email or otp error: ", e)
             AuthException.forgot_password_failed()
 
 
@@ -218,6 +221,7 @@ class ForgotPasswordService:
             return f"Vui lòng kiểm tra email của bạn để biết hướng dẫn đặt lại mật khẩu {role_display}"
 
         except Exception as e:
+            logger.error("Send reset email error: ", e)
             AuthException.email_send_failed()
 
     async def send_reset_otp(self, user, role: UserRole, session: AsyncSession):
@@ -367,6 +371,7 @@ class ForgotPasswordService:
 
         except Exception as e:
             await session.rollback()
+            logger.error("Send reset otp error: ", e)
             AuthException.otp_send_failed()
 
 
