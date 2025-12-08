@@ -106,9 +106,9 @@ class UpdateProductService:
 
             if new_brand_id is not None:
                 if new_brand_id:
-                    brand_condition = and_(Brand.id == new_brand_id, Brand.deleted_at.is_(None),
-                                           Brand.is_active == True)
-                    brand_exists = await brand_repository.get_brand(brand_condition, session)
+                    brand_condition = [Brand.id == new_brand_id, Brand.deleted_at.is_(None),
+                                           Brand.is_active == True]
+                    brand_exists = await brand_repository.get_brand(session=session, where_conditions=brand_condition)
                     if not brand_exists:
                         BrandException.brand_not_found()
 

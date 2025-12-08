@@ -3,7 +3,7 @@ import sqlalchemy.dialects.postgresql as pg
 from sqlmodel import SQLModel, Field, Column, Relationship
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import text, UniqueConstraint, Index
+from sqlalchemy import CheckConstraint, ForeignKeyConstraint, text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import JSONB
 
 
@@ -691,6 +691,18 @@ class Size(SQLModel, table=True):
 
 class Cart(SQLModel, table=True):
     __tablename__ = "cart"
+    
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", 
+            "deleted_at",
+            name="uq_cart_user_active",
+            postgresql_where=text("deleted_at IS NULL")
+        ),
+        Index("ix_cart_user_id", "user_id"),
+        Index("ix_cart_deleted_at", "deleted_at"),
+        Index("ix_cart_user_deleted", "user_id", "deleted_at"),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4)
@@ -703,16 +715,44 @@ class Cart(SQLModel, table=True):
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
 
     user: Optional["User"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
-    items: List["Cart_Item"] = Relationship(back_populates="cart", sa_relationship_kwargs={"lazy": "noload"})
+    items: List["Cart_Item"] = Relationship(
+        back_populates="cart", 
+        sa_relationship_kwargs={
+            "lazy": "noload",
+            "cascade": "all, delete-orphan"
+        }
+    )
 
 
 class Cart_Item(SQLModel, table=True):
     __tablename__ = "cart_item"
     __table_args__ = (
         UniqueConstraint(
-            "cart_id", "product_id", "product_variant_id",
-            name="uq_cart_item_cart_product_variant"
+            "cart_id", 
+            "product_variant_id",
+            "deleted_at",
+            name="uq_cart_item_cart_variant_active",
+            postgresql_where=text("deleted_at IS NULL")
         ),
+        CheckConstraint(
+            "quantity > 0 AND quantity <= 999",
+            name="ck_cart_item_quantity_range"
+        ),
+        CheckConstraint(
+            "price >= 0",
+            name="ck_cart_item_price_positive"
+        ),
+        ForeignKeyConstraint(
+            ["cart_id"],
+            ["cart.id"],
+            name="fk_cart_item_cart",
+            ondelete="CASCADE"  
+        ),
+        Index("ix_cart_item_cart_id", "cart_id"),
+        Index("ix_cart_item_product_variant_id", "product_variant_id"),
+        Index("ix_cart_item_deleted_at", "deleted_at"),
+        Index("ix_cart_item_cart_deleted", "cart_id", "deleted_at"),
+        Index("ix_cart_item_variant_deleted", "product_variant_id", "deleted_at"),
     )
 
     id: uuid.UUID = Field(

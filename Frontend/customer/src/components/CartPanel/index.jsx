@@ -124,8 +124,8 @@ const CartPanel = () => {
                     setAllVariants(prev => [...prev, ...(response.data.products || [])]);
                 }
 
-                const totalVariants = response.data.products?.reduce((sum, product) => sum + product.variants.length, 0) || 0;
-                setHasMore(totalVariants === 30);
+                const { has_more, total_items_in_cart } = response.data;
+                setHasMore(has_more);
             } else {
                 console.error('Failed to fetch cart:', response.message);
             }
@@ -187,10 +187,14 @@ const CartPanel = () => {
             });
 
             if (response.success) {
-                const { deleted_count, invalid_count } = response.data;
+                const {
+                    deleted_items_count,
+                    not_found_items_count,
+                    not_found_item_ids,
+                } = response.data;
 
-                if (invalid_count && invalid_count > 0) {
-                    toast.warning(`Có ${invalid_count} sản phẩm không thể xóa`);
+                if (not_found_items_count > 0) {
+                    toast.warning(warning || `Có ${not_found_items_count} sản phẩm không tìm thấy`);
                 }
 
                 setSelectedVariants(prev => {
@@ -205,7 +209,24 @@ const CartPanel = () => {
                     return newQty;
                 });
 
-                await fetchCartData(1);
+                setAllVariants(prevVariants => {
+                    return prevVariants.map(product => ({
+                        ...product,
+                        variants: product.variants.filter(
+                            variant => !itemIds.includes(variant.cart_item_id)
+                        )
+                    })).filter(product => product.variants.length > 0);
+                });
+
+                if (cartData) {
+                    setCartData(prev => ({
+                        ...prev,
+                        total_items_in_cart: (prev.total_items_in_cart || 0) - deleted_items_count,
+                        items_count: prev.items_count - deleted_items_count
+                    }));
+                }
+
+                toast.success(`Đã xóa ${deleted_items_count} sản phẩm`);
             } else {
                 toast.error(response.data.detail.message || 'Không thể xóa sản phẩm');
             }
@@ -224,6 +245,11 @@ const CartPanel = () => {
     const handleDeleteSelected = async () => {
         if (selectedVariants.size === 0) {
             toast.warning('Vui lòng chọn sản phẩm cần xóa');
+            return;
+        }
+
+        if (selectedVariants.size > 100) {
+            toast.warning('Chỉ có thể xóa tối đa 100 sản phẩm cùng lúc');
             return;
         }
 

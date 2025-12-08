@@ -57,8 +57,8 @@ class CreateProductService:
 
             existing_brand = None
             if product_data.brand_id:
-                condition = and_(Brand.id == product_data.brand_id, Brand.deleted_at.is_(None), Brand.is_active == True)
-                existing_brand = await brand_repository.get_brand(condition, session)
+                condition = [Brand.id == product_data.brand_id, Brand.deleted_at.is_(None), Brand.is_active == True]
+                existing_brand = await brand_repository.get_brand(session=session, where_conditions=condition)
                 if not existing_brand:
                     BrandException.brand_not_found()
 

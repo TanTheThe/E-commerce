@@ -101,6 +101,26 @@ class ProductException:
                 "error_code": "product_010",
             },
         )
+        
+    @staticmethod
+    def variant_sold_out():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Biến thể sản phẩm này đã hết hàng",
+                "error_code": "product_010",
+            },
+        )
+        
+    @staticmethod
+    def invalid_variant_price():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Giá của biến thể sản phẩm không hợp lệ",
+                "error_code": "product_010",
+            },
+        )
 
     @staticmethod
     def invalid_create_product():

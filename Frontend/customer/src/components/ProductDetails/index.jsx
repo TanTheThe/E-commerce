@@ -340,8 +340,18 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
             return;
         }
 
-        if (quantity <= 0 || quantity > selectedVariant.quantity) {
-            toast.error('Số lượng không hợp lệ');
+        if (quantity < 1) {
+            toast.error('Số lượng phải lớn hơn 0');
+            return;
+        }
+
+        if (quantity > 999) {
+            toast.error('Số lượng tối đa là 999');
+            return;
+        }
+
+        if (quantity > selectedVariant.quantity) {
+            toast.error(`Chỉ còn ${selectedVariant.quantity} sản phẩm`);
             return;
         }
 
@@ -372,18 +382,16 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                     }
                 }
 
-                try {
-                    const cartCountRes = await getDataApi("/customer/cart/count");
-                    if (cartCountRes.success) {
-                        context.setCartItemsCount(cartCountRes.data.count_cart_items);
-                    }
-                } catch (error) {
-                    console.error("Error updating cart count:", error);
+                if (response.data?.items_count !== undefined) {
+                    context.setCartItemsCount(response.data.items_count);
                 }
 
-                toast.success(response.message || 'Đã thêm vào giỏ hàng');
+                const addedQty = quantity;
+                toast.success(`Đã thêm ${addedQty} sản phẩm vào giỏ hàng`);
             } else {
-                toast.error(response.data.detail.message || 'Có lỗi xảy ra');
+                const rawMsg = response?.data?.detail?.message || response?.data?.detail?.[0]?.msg || "Không thể tạo địa chỉ mới";
+                const cleanedMsg = rawMsg.replace(/^Value error,\s*/i, "");
+                toast.error(cleanedMsg)
             }
         } catch (error) {
             console.error('Add to cart error:', error);
@@ -480,10 +488,10 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                             return (
                                 <Button
                                     key={size}
-                                    className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''} ${isOutOfStock ? 'cursor-not-allowed opacity-50' : ''
+                                    className={`${selectedSize === size ? '!bg-[#ff5252] !text-white' : ''} ${isOutOfStock || isAddingToCart ? 'cursor-not-allowed opacity-50' : ''
                                         }`}
-                                    onClick={() => !isOutOfStock && handleSizeSelect(size)}
-                                    disabled={isOutOfStock}
+                                    onClick={() => !isOutOfStock && !isAddingToCart && handleSizeSelect(size)}
+                                    disabled={isOutOfStock || isAddingToCart}
                                 >
                                     {size}
                                 </Button>
@@ -501,10 +509,9 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                             <div
                                 key={color.id}
                                 data-color-id={getColorIdentifier(color)}
-                                className={`flex items-center gap-2 p-2 border rounded ${color.isOutOfStock ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                                    } ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'
-                                    }`}
-                                onClick={() => !color.isOutOfStock && handleColorSelect(color)}
+                                className={`flex items-center gap-2 p-2 border rounded ${color.isOutOfStock || isAddingToCart ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                    } ${selectedColor === getColorIdentifier(color) ? 'border-[#ff5252] bg-red-50' : 'border-gray-300'}`}
+                                onClick={() => !color.isOutOfStock && !isAddingToCart && handleColorSelect(color)}
                             >
                                 <img
                                     src={color.image}
@@ -534,7 +541,7 @@ const ProductDetailsComponent = ({ product, onProductUpdated }) => {
                         value={quantity}
                         onChange={setQuantity}
                         max={selectedVariant?.quantity || 1}
-                        disabled={!selectedVariant}
+                        disabled={!selectedVariant || isAddingToCart}
                     />
                 </div>
 

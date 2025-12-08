@@ -41,3 +41,43 @@ class CartException:
                 "error_code": "cart_004",
             },
         )
+        
+    @staticmethod
+    def database_constraint_violation():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Vi phạm ràng buộc tạo một lúc 2 giỏ hàng",
+                "error_code": "cart_001",
+            },
+        )
+        
+    @staticmethod
+    def cart_items_limit_exceeded(MAX_CART_ITEMS):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Số lượng sản phẩm trong giỏ hàng đã vượt mức {MAX_CART_ITEMS}",
+                "error_code": "cart_001",
+            },
+        )
+        
+    @staticmethod
+    def cart_value_exceeded(MAX_CART_ITEMS):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Số lượng sản phẩm trong giỏ hàng đã vượt mức {MAX_CART_ITEMS}",
+                "error_code": "cart_001",
+            },
+        )
+        
+    @staticmethod
+    def deletion_failed():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Thất bại khi xóa sản phẩm khỏi giỏ hàng",
+                "error_code": "cart_001",
+            },
+        )

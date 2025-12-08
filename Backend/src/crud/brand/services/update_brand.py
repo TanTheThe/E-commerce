@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 
 class UpdateBrandService:
     async def update_brand(self, id: str, brand_update: BrandUpdateModel, session: AsyncSession):
-        condition = and_(Brand.id == id, Brand.deleted_at.is_(None))
-        existing_brand = await brand_repository.get_brand(condition, session)
+        condition = [Brand.id == id, Brand.deleted_at.is_(None)]
+        existing_brand = await brand_repository.get_brand(session=session, where_conditions=condition)
 
         if not existing_brand:
             BrandException.brand_not_found()
 
         if brand_update.name and brand_update.name != existing_brand.name:
-            condition_check_name = and_(Brand.name == brand_update.name, Brand.deleted_at.is_(None), Brand.id != id)
-            duplicate_brand = await brand_repository.get_brand(condition_check_name, session)
+            condition_check_name = [Brand.name == brand_update.name, Brand.deleted_at.is_(None), Brand.id != id]
+            duplicate_brand = await brand_repository.get_brand(session=session, where_conditions=condition_check_name)
 
             if duplicate_brand:
                 BrandException.brand_name_exists()
@@ -55,13 +55,13 @@ class UpdateBrandService:
 
     async def generate_unique_slug_for_update(self, base_slug: str, current_id: str, session: AsyncSession,
                                               max_attempts: int = 100):
-        condition_slug = and_(
+        condition_slug = [
             Brand.slug == base_slug,
             Brand.deleted_at.is_(None),
             Brand.id != current_id
-        )
+        ]
 
-        existing_slug = await brand_repository.get_brand(condition_slug, session)
+        existing_slug = await brand_repository.get_brand(session=session, where_conditions=condition_slug)
 
         if not existing_slug:
             return base_slug
@@ -69,12 +69,12 @@ class UpdateBrandService:
         counter = 1
         while counter <= max_attempts:
             new_slug = f"{base_slug}-{counter}"
-            condition_slug = and_(
+            condition_slug = [
                 Brand.slug == new_slug,
                 Brand.deleted_at.is_(None),
                 Brand.id != current_id
-            )
-            existing_slug = await brand_repository.get_brand(condition_slug, session)
+            ]
+            existing_slug = await brand_repository.get_brand(session=session, where_conditions=condition_slug)
 
             if not existing_slug:
                 return new_slug

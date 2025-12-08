@@ -8,15 +8,57 @@ from src.schemas.cart import CartCreateModel, CartItemCreateModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
+import logging
 
 cart_repository = CartRepository()
 product_variant_repository = ProductVariantRepository()
 
+logger = logging.getLogger(__name__)
+
+MAX_CART_ITEMS = 50
+MAX_QUANTITY_PER_ITEM = 999
+
 
 class CreateCartService:
     async def create_cart(self, user_id: str, cart_data: CartCreateModel, session: AsyncSession):
+        try:
+            product_variant = await self.validate_product_variant(cart_data.product_variant_id, session)
+            
+            cart = await self.get_or_create_cart(user_id, session)
+            
+            await self.validate_cart_constraints(cart, cart_data.quantity)
+            
+            discounted_price = await self.calculate_discounted_price(product_variant.price, 
+                                                                    product_variant.product.special_offer, session)
+                
+            await self.add_or_update_cart_item(
+                cart=cart,
+                product_variant=product_variant,
+                cart_data=cart_data,
+                discounted_price=discounted_price,
+                session=session
+            )
+
+            await session.commit()
+
+            final_cart = await self.get_cart_with_details(str(cart.id), session)
+            return await self.format_cart_response(final_cart, session)
+        
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"Integrity error in create_cart for user {user_id}: {str(e)}")
+            CartException.database_constraint_violation()
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Failed to create cart for user {user_id}: {str(e)}")
+            raise
+
+
+    async def validate_product_variant(self, variant_id: str, session: AsyncSession):
         condition_variant = and_(
-            Product_Variant.id == cart_data.product_variant_id,
+            Product_Variant.id == variant_id,
             Product_Variant.deleted_at.is_(None)
         )
 
@@ -49,15 +91,19 @@ class CreateCartService:
             ProductException.not_found_variant()
 
         if product_variant.quantity is None or product_variant.quantity < 0:
-            ProductException.not_found_variant()
+            ProductException.variant_sold_out()
 
         if product_variant.price is None or product_variant.price <= 0:
-            ProductException.not_found_variant()
+            ProductException.invalid_variant_price()
 
         product = product_variant.product
         if not product or product.deleted_at is not None or product.status != "active":
             ProductException.not_found()
-
+            
+        return product_variant
+    
+    
+    async def get_or_create_cart(self, user_id: str, session: AsyncSession):
         condition_user_id = [
             Cart.user_id == user_id,
             Cart.deleted_at.is_(None)
@@ -94,23 +140,61 @@ class CreateCartService:
         cart = await cart_repository.get_cart(condition_user_id, session, joins_user_id)
 
         if not cart:
-            cart = await cart_repository.create_cart(user_id, session)
-            if not cart:
-                CartException.fail_create_cart()
+            try:
+                cart = await cart_repository.create_cart(user_id, session)
+                if not cart:
+                    CartException.fail_create_cart()
+            except IntegrityError:
+                logger.info(f"Race condition detected when creating cart for user {user_id}, retrying...")
+                await session.rollback()
+                
+                cart = await cart_repository.get_cart(condition_user_id, session, joins_user_id)
+                if not cart:
+                    raise CartException.fail_create_cart()
+        
+        return cart
 
-        original_price = product_variant.price
-        special_offer = product.special_offer
-        discounted_price = await self.calculate_discounted_price(original_price, special_offer, session)
+    async def validate_cart_constraints(self, cart, new_quantity: int):
+        active_items = [
+            item for item in cart.items
+            if item.deleted_at is None
+        ]
+        
+        if len(active_items) >= MAX_CART_ITEMS:
+            CartException.cart_items_limit_exceeded(MAX_CART_ITEMS)
+                
+    async def calculate_discounted_price(self, original_price: int, special_offer: Special_Offer, session: AsyncSession):
+        if original_price is None or original_price <= 0:
+            return 0
 
-        if discounted_price < 0:
-            discounted_price = 0
+        valid_offer = self.is_offer_valid(special_offer)
 
+        if not valid_offer:
+            return original_price
+
+        if not special_offer.discount or special_offer.discount <= 0:
+            return original_price
+
+        if special_offer.type == "percent":
+            discount_percent = min(special_offer.discount, 100)
+            discount_amount = (original_price * discount_percent) / 100
+            final_price = original_price - discount_amount
+        elif special_offer.type == "fixed":
+            final_price = max(0, original_price - special_offer.discount)
+        else:
+            return original_price
+
+        final_price = int(round(final_price / 1000) * 1000)
+
+        return max(0, int(final_price))
+
+    async def add_or_update_cart_item(self, cart, product_variant, cart_data: CartCreateModel, discounted_price: int, session: AsyncSession):
         condition_check_variant_cart = [
             Cart_Item.product_variant_id == cart_data.product_variant_id,
             Cart_Item.cart_id == cart.id,
             Cart_Item.deleted_at.is_(None)
         ]
-
+        
         existing_cart_item = await cart_repository.get_cart_item(condition_check_variant_cart, session)
 
         if existing_cart_item:
@@ -119,9 +203,9 @@ class CreateCartService:
             if new_quantity > product_variant.quantity:
                 ProductException.not_enough_variant()
 
-            condition_update_cart_item = and_(Cart_Item.id == existing_cart_item.id)
+            condition_update = and_(Cart_Item.id == existing_cart_item.id)
             await cart_repository.update_cart_item(
-                condition_update_cart_item,
+                condition_update,
                 {
                     "quantity": new_quantity,
                     "price": discounted_price,
@@ -135,7 +219,7 @@ class CreateCartService:
 
             cart_item_create = CartItemCreateModel(
                 cart_id=cart.id,
-                product_id=product.id,
+                product_id=product_variant.product.id,
                 product_variant_id=product_variant.id,
                 quantity=cart_data.quantity,
                 price=discounted_price
@@ -144,17 +228,16 @@ class CreateCartService:
             cart_item = await cart_repository.create_cart_item(cart_item_create, session)
             if not cart_item:
                 CartException.fail_create_cart()
-
-        await session.commit()
-
+    
+    async def get_cart_with_details(self, cart_id: str, session: AsyncSession):
         condition_cart_response = [
-            Cart.id == cart.id,
+            Cart.id == cart_id,
             Cart.deleted_at.is_(None)
         ]
 
         joins_cart_response = [
             selectinload(Cart.user),
-            selectinload(Cart.items).options(
+            selectinload(Cart.items.and_(Cart_Item.deleted_at.is_(None))).options(
                 selectinload(Cart_Item.product).load_only(
                     Product.id,
                     Product.name,
@@ -180,35 +263,13 @@ class CreateCartService:
                 Cart_Item.deleted_at
             )
         ]
-        final_cart = await cart_repository.get_cart(condition_cart_response, session, joins_cart_response)
 
-        return await self.format_cart_response(final_cart, session)
-
-    async def calculate_discounted_price(self, original_price, special_offer: Special_Offer, session: AsyncSession):
-        if original_price is None or original_price <= 0:
-            return 0
-
-        valid_offer = self._is_offer_valid(special_offer)
-
-        if not valid_offer:
-            return original_price
-
-        if not special_offer.discount or special_offer.discount <= 0:
-            return original_price
-
-        if special_offer.type == "percent":
-            discount_percent = min(special_offer.discount, 100)
-            discount_amount = (original_price * discount_percent) / 100
-            final_price = original_price - discount_amount
-        elif special_offer.type == "fixed":
-            final_price = max(0, original_price - special_offer.discount)
-        else:
-            return original_price
-
-        final_price = int(round(final_price / 1000) * 1000)
-
-        return max(0, int(final_price))
-
+        return await cart_repository.get_cart(
+            condition_cart_response, 
+            session, 
+            joins_cart_response
+        )
+    
     async def format_cart_response(self, cart: Cart, session: AsyncSession):
         items = []
         for cart_item in cart.items:
@@ -257,7 +318,7 @@ class CreateCartService:
             "items": items
         }
 
-    def _is_offer_valid(self, offer: Special_Offer) -> bool:
+    def is_offer_valid(self, offer: Special_Offer) -> bool:
         if not offer:
             return False
 

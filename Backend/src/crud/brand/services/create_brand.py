@@ -22,8 +22,8 @@ class CreateBrandService:
         if brand_data.logo and len(brand_data.logo.strip()) > 500:
             raise BrandException.invalid_logo_url()
 
-        condition = and_(Brand.name == brand_data.name, Brand.deleted_at.is_(None))
-        existing_brand = await brand_repository.get_brand(condition, session)
+        condition = [Brand.name == brand_data.name, Brand.deleted_at.is_(None)]
+        existing_brand = await brand_repository.get_brand(session=session, where_conditions=condition)
 
         if existing_brand:
             BrandException.brand_name_exists()
@@ -57,16 +57,16 @@ class CreateBrandService:
 
     async def generate_unique_slug(self, base_slug: str, session: AsyncSession, force_new: bool = False) -> str:
         if not force_new:
-            condition_slug = and_(Brand.slug == base_slug, Brand.deleted_at.is_(None))
-            existing_slug = await brand_repository.get_brand(condition_slug, session)
+            condition_slug = [Brand.slug == base_slug, Brand.deleted_at.is_(None)]
+            existing_slug = await brand_repository.get_brand(session=session, where_conditions=condition_slug)
             if not existing_slug:
                 return base_slug
 
         counter = 1
         while True:
             new_slug = f"{base_slug}-{counter}"
-            condition_slug = and_(Brand.slug == new_slug, Brand.deleted_at.is_(None))
-            existing_slug = await brand_repository.get_brand(condition_slug, session)
+            condition_slug = [Brand.slug == new_slug, Brand.deleted_at.is_(None)]
+            existing_slug = await brand_repository.get_brand(session=session, where_conditions=condition_slug)
             if not existing_slug:
                 return new_slug
             counter += 1
