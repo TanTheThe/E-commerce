@@ -1,6 +1,5 @@
 from src.crud.product.repositories import ProductRepository
 from src.crud.user.repositories import UserRepository
-from src.crud.notification.services.services import NotificationService
 from src.database.models import Special_Offer, User, UserSpecialOffer
 from src.errors.authentication import AuthException
 from src.errors.special_offer import SpecialOfferException
@@ -12,7 +11,6 @@ from datetime import datetime
 special_offer_repository = SpecialOfferRepository()
 product_repository = ProductRepository()
 user_repository = UserRepository()
-notification_service = NotificationService()
 
 
 class AssignOfferToUsersService:

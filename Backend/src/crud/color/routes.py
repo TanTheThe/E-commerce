@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Query
 from typing import Optional
 from src.crud.color.services import ColorService
 from src.dependencies import AccessTokenBearer
@@ -31,7 +31,8 @@ async def create_color(color_data: ColorCreateModel,
 
 @color_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def get_all_color(search: Optional[str] = None,
-                        skip: int = 0, limit: int = 10,
+                        skip: int = Query(0, ge=0),
+                        limit: int = Query(10, ge=1, le=100),
                         token_details: dict = Depends(access_token_bearer),
                         session: AsyncSession = Depends(get_session)):
     filter_data = ColorFilterModel(search=search)
@@ -46,8 +47,7 @@ async def get_all_color(search: Optional[str] = None,
     )
 
 @color_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def update_color(id: str,
-                       color_update: ColorUpdateModel,
+async def update_color(id: str, color_update: ColorUpdateModel,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     color_update_dict = await color_service.update_color_service(id, color_update, session)
@@ -61,8 +61,7 @@ async def update_color(id: str,
     )
 
 @color_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def delete_color(id: str,
-                       token_details: dict = Depends(access_token_bearer),
+async def delete_color(id: str, token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     color_deleted = await color_service.delete_color(id, session)
 

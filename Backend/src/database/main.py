@@ -1,3 +1,5 @@
+from typing import AsyncGenerator
+
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker
 from src.config import Config
@@ -17,7 +19,7 @@ engine: AsyncEngine = create_async_engine(
         "prepared_statement_cache_size": 0,
     },
     pool_pre_ping=True,
-    pool_recycle=300
+    pool_recycle=3600
 )
 
 async_session_maker = async_sessionmaker(
@@ -46,7 +48,7 @@ async def init_db():
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
-async def get_session(request: Request) -> AsyncSession:
+async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     # start = time.time()
     # SessionLocal = request.app.state.session
     # session = SessionLocal()
@@ -57,11 +59,12 @@ async def get_session(request: Request) -> AsyncSession:
     #     await session.close()
 
     SessionLocal = request.app.state.session
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        await session.close()
+    async with SessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
 
 
 

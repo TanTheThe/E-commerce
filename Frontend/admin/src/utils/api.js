@@ -30,6 +30,32 @@ export const postDataApi = async (url, data) => {
     }
 }
 
+export const uploadFileApi = async (url, formData) => {
+    try {
+        const response = await axios.post(
+            apiUrl + url,
+            formData,
+            {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem("accesstoken")}`,
+                }
+            })
+
+        return {
+            success: true,
+            statusCode: 200,
+            data: response.data.content,
+            message: response.data.message
+        }
+    } catch (error) {
+        return {
+            success: false,
+            statusCode: 400,
+            data: error?.response?.data
+        }
+    }
+}
+
 export const getDataApi = async (url) => {
     try {
         const response = await axios.get(

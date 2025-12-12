@@ -34,7 +34,7 @@ class AddressException:
     @staticmethod
     def invalid_address():
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": "Địa chỉ đã nhập không hợp lệ",
                 "error_code": "address_002"
@@ -57,6 +57,16 @@ class AddressException:
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "message": "Không tìm thấy phường/xã trên",
+                "error_code": "address_003"
+            }
+        )
+
+    @staticmethod
+    def invalid_province_ward():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Địa chỉ không hợp lệ: thiếu thông tin phường/xã hoặc tỉnh/thành phố",
                 "error_code": "address_003"
             }
         )

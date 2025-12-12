@@ -79,7 +79,6 @@ class WebhookShippingService:
                     args=[str(order.id)],
                     countdown=259200    # 3 days = 3 * 24 * 60 * 60
                 )
-                print(f"Scheduled auto-confirm for order {order.id} in 3 days")
 
             response = {
                 'old_status': old_status,

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     VNPAY_RETURN_URL: str
     VNPAY_API_URL: str
 
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+    BUCKET_NAME: str
+
     model_config = SettingsConfigDict(
         env_file='../.env',
         extra='ignore'

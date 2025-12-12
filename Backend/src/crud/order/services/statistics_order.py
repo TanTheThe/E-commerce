@@ -1,4 +1,7 @@
-from src.crud.notification.services.services import NotificationService
+from datetime import datetime
+
+from sqlalchemy import ColumnElement
+
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
 from src.crud.vnpay.repositories import VNPayRepository
@@ -12,7 +15,7 @@ from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.color.repositories import ColorRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, func
+from sqlmodel import and_, func, select
 from src.errors.order import OrderException
 
 order_repository = OrderRepository()
@@ -26,35 +29,55 @@ color_repository = ColorRepository()
 vnpay_repository = VNPayRepository()
 payment_refund_service = PaymentRefundService()
 payment_refund_repository = PaymentRefundRepository()
-notification_service = NotificationService()
+
+COMPLETED_ORDER_STATUSES = ["delivered", "received"]
 
 class StatisticsOrderService:
-    async def count_new_orders(self, to_date, from_date, session: AsyncSession):
-        condition = and_(Order.created_at >= from_date, Order.created_at <= to_date)
-        orders = await order_repository.count_orders(condition, session)
+    async def get_comprehensive_statistics(self, session: AsyncSession, from_date: datetime, to_date: datetime):
+        base_condition = and_(
+            Order.deleted_at.is_(None),
+            Order.created_at >= from_date,
+            Order.created_at <= to_date
+        )
 
-        if orders is None:
-            OrderException.not_found()
+        completed_condition = and_(
+            base_condition,
+            Order.status.in_(COMPLETED_ORDER_STATUSES)
+        )
 
-        return len(orders)
+        count_orders = await self.count_orders(session, base_condition)
+        total_sales = await self.get_total_sales(session, completed_condition)
+        total_revenue = await self.get_total_revenue(session, completed_condition)
 
-    async def get_total_sales(self, today, seven_days_ago, session: AsyncSession):
-        condition = and_(Order.created_at >= seven_days_ago, Order.status.in_(["delivered", "received"]))
-        column_expr = func.coalesce(func.sum(Order.sub_total), 0)
-        total_sales = await order_repository.get_statistics(column_expr, condition, session)
+        avg_order_value = (
+            total_revenue / count_orders if count_orders > 0 else 0
+        )
 
-        if total_sales is None:
-            OrderException.fail_get_total_sales()
+        return {
+            "count_orders": count_orders,
+            "total_sales": float(total_sales),
+            "total_revenue": float(total_revenue),
+            "average_order_value": round(avg_order_value, 2)
+        }
 
-        return total_sales
+    async def count_orders(self, session: AsyncSession, condition: ColumnElement[bool]):
+        statement = select(func.count(Order.id)).where(condition)
+        result = await session.exec(statement)
+        return result.one() or 0
 
-    async def get_total_revenue(self, today, seven_days_ago, session: AsyncSession):
-        condition = and_(Order.created_at >= seven_days_ago, Order.status.in_(["delivered", "received"]))
-        column_expr = func.coalesce(func.sum(Order.total_price), 0)
-        total_revenue = await order_repository.get_statistics(column_expr, condition, session)
+    async def get_total_sales(self, session: AsyncSession, condition: ColumnElement[bool]):
+        statement = select(
+            func.coalesce(func.sum(Order.sub_total), 0)
+        ).where(condition)
 
-        if total_revenue is None:
-            OrderException.fail_get_total_revenue()
+        result = await session.exec(statement)
+        return float(result.one() or 0)
 
-        return total_revenue
+    async def get_total_revenue(self, session: AsyncSession, condition: ColumnElement[bool]):
+        statement = select(
+            func.coalesce(func.sum(Order.total_price), 0)
+        ).where(condition)
+
+        result = await session.exec(statement)
+        return float(result.one() or 0)
 

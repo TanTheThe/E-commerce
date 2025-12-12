@@ -1,7 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, engine_from_config
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -9,12 +9,25 @@ from alembic import context
 from src.database.models import Product, Product_Variant, Categories_Product, Categories, Order, Order_Detail, Color, User, Address, Evaluate, Special_Offer
 from sqlmodel import SQLModel
 from src.config import Config
+import os
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
+database_uri = os.getenv("DATABASE_URI")
+
 config.set_main_option('sqlalchemy.url', Config.DATABASE_URI)
+
+if database_uri:
+    sync_database_uri = database_uri.replace(
+        "postgresql+asyncpg://",
+        "postgresql://"
+    ).replace(
+        "?prepared_statement_cache_size=0",
+        ""
+    )
+    config.set_main_option("sqlalchemy.url", sync_database_uri)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -85,7 +98,31 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
-    asyncio.run(run_async_migrations())
+    # asyncio.run(run_async_migrations())
+    configuration = config.get_section(config.config_ini_section)
+    configuration["sqlalchemy.url"] = config.get_main_option("sqlalchemy.url")
+
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,  # Không dùng pool cho migration
+        connect_args={
+            "connect_timeout": 60,  # Tăng timeout
+            "options": "-c statement_timeout=300000"  # 5 phút
+        }
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
 
 
 if context.is_offline_mode():

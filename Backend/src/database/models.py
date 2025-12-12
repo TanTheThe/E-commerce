@@ -115,6 +115,7 @@ class Order(SQLModel, table=True):
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     delivered_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     received_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    estimated_delivery_date: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True), default=None)
 
     address_snapshot: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
     special_offer_snapshot: dict = Field(sa_column=Column(pg.JSONB, nullable=False))
@@ -693,10 +694,10 @@ class Cart(SQLModel, table=True):
     __tablename__ = "cart"
     
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_cart_user_active",
             "user_id", 
-            "deleted_at",
-            name="uq_cart_user_active",
+            unique=True,
             postgresql_where=text("deleted_at IS NULL")
         ),
         Index("ix_cart_user_id", "user_id"),
@@ -727,11 +728,11 @@ class Cart(SQLModel, table=True):
 class Cart_Item(SQLModel, table=True):
     __tablename__ = "cart_item"
     __table_args__ = (
-        UniqueConstraint(
-            "cart_id", 
+        Index(
+            "uq_cart_item_cart_variant_active",
+            "cart_id",
             "product_variant_id",
-            "deleted_at",
-            name="uq_cart_item_cart_variant_active",
+            unique=True,
             postgresql_where=text("deleted_at IS NULL")
         ),
         CheckConstraint(

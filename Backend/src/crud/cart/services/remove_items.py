@@ -45,7 +45,7 @@ class RemoveCartItemsService:
 
     async def get_user_cart(self, user_id: str, session: AsyncSession):
         condition_check_user_cart = [Cart.user_id == user_id, Cart.deleted_at.is_(None)]
-        cart = await cart_repository.get_cart(condition_check_user_cart, session)
+        cart = await cart_repository.get_cart(session=session, where_conditions=condition_check_user_cart)
         
         return cart
     
@@ -72,10 +72,10 @@ class RemoveCartItemsService:
             ),
         ]
         
-        cart_items = await cart_repository.get_all_cart_item(
-            condition_get_all_cart_item,
-            session,
-            joins_get_all_cart_item
+        cart_items = await cart_repository.get_all_cart_items(
+            session=session,
+            where_conditions=condition_get_all_cart_item,
+            options=joins_get_all_cart_item
         )
 
         return cart_items or []
@@ -91,7 +91,7 @@ class RemoveCartItemsService:
                 'not_found_item_ids': requested_ids
             }
         
-        valid_item_ids = [item.id for item in cart_items]
+        valid_item_ids = [str(item.id) for item in cart_items]
         valid_item_ids_set = set(valid_item_ids)
         requested_ids_set = set(requested_ids)
         

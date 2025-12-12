@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, delete
 from src.database.models import Product, Material, Product_Material
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -20,33 +20,95 @@ class MaterialRepository:
         return new_material
 
 
-    async def get_all_material(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, skip: int = 0, limit: int = 10,
-                               joins: list = None, order_by_clause=None):
-        count_stmt = select(func.count(Material.id)).where(*conditions)
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
+    async def get_all_material(self, session: AsyncSession,
+                            select_columns: Optional[List[Any]] = None,
+                            joins: Optional[List[Tuple[Any, dict]]] = None,
+                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            group_by_columns: Optional[List[Any]] = None,
+                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            order_by: Optional[Any] = None,
+                            skip: int = 0, limit: int = 10,
+                            options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Material)
+        else:
+            query = select(*select_columns).select_from(Material)
 
-        statement = select(Material).where(*conditions).options(
-            *joins if joins else []
-        ).offset(skip).limit(limit)
-        
-        if order_by_clause is not None:
-            statement = statement.order_by(order_by_clause)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        result = await session.exec(statement)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
 
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         materials = result.all()
 
         return materials, total
 
 
-    async def get_material(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Material).options(
-            *joins if joins else []
-        ).where(*conditions)
-        result = await session.exec(statement)
+    async def get_material(self, session: AsyncSession,
+                        select_columns: Optional[List[Any]] = None,
+                        joins: Optional[List[Tuple[Any, dict]]] = None,
+                        where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        group_by_columns: Optional[List[Any]] = None,
+                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        order_by: Optional[Any] = None,
+                        options: Optional[List[Any]] = None):
 
-        return result.one_or_none()
+        if select_columns is None:
+            query = select(Material)
+        else:
+            query = select(*select_columns).select_from(Material)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        material = result.one_or_none()
+
+        return material
 
 
     async def update_material(self, condition: Optional[ColumnElement[bool]], material_data: MaterialUpdateModel,
@@ -74,18 +136,6 @@ class MaterialRepository:
         return result.one_or_none()
 
 
-    async def count_products_by_material(self, material_id: str, session: AsyncSession):
-        query = select(func.count(Product_Material.product_id)).where(
-            Product_Material.material_id == material_id
-        ).join(
-            Product, and_(Product_Material.product_id == Product.id)
-        ).where(
-            Product.deleted_at.is_(None), Product.status == "active"
-        )
-        result = await session.exec(query)
-        return result.one_or_none()
-
-
     async def assign_materials_to_product(self, product_id: str, materials: List[Dict], session: AsyncSession):
         delete_stmt = delete(Product_Material).where(and_(Product_Material.product_id == product_id))
         await session.exec(delete_stmt)
@@ -103,8 +153,8 @@ class MaterialRepository:
         return True
 
 
-    async def delete_material(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        material_delete = await self.get_material(condition, session)
+    async def delete_material(self, condition: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        material_delete = await self.get_material(session=session, where_conditions=condition)
 
         if material_delete is None:
             MaterialException.material_not_found()
@@ -113,10 +163,11 @@ class MaterialRepository:
         await session.commit()
 
         return str(material_delete.id)
-    
+
+
     async def delete_multiple_materials(self, data: DeleteMultipleMaterialsModel, session: AsyncSession):
         conditions = [Material.id.in_(data.material_ids), Material.deleted_at.is_(None)]
-        materials, _ = await self.get_all_material(conditions, session)
+        materials, _ = await self.get_all_material(session=session, where_conditions=conditions)
         existing_ids = {str(row.id) for row in materials}
         missing_ids = set(data.material_ids) - existing_ids
         if missing_ids:

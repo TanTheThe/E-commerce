@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement
 from sqlalchemy.orm import noload, load_only
 from src.database.models import Order, OrderStatusHistory
@@ -41,40 +41,94 @@ class OrderRepository:
         return new_order_history
 
 
-    async def get_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Order).options(
-            *joins if joins else []
-        ).where(conditions)
-
-        result = await session.exec(statement)
-
-        return result.one_or_none()
-
-
-    async def get_all_order(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession, order_by: list = None, skip: int = 0,
-                            limit: int = 10, joins: list = None, join_user: bool = False):
-        count_stmt = select(func.count(distinct(Order.id))).select_from(Order).where(*conditions)
-        if join_user:
-            count_stmt = count_stmt.join(Order.user)
-
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
-
-        statement = select(Order).distinct(Order.id).options(
-            *joins if joins else []
-        ).where(*conditions)
-
-        if order_by:
-            statement = statement.order_by(Order.id, *order_by)
+    async def get_all_order(self, session: AsyncSession,
+                            select_columns: Optional[List[Any]] = None,
+                            joins: Optional[List[Tuple[Any, dict]]] = None,
+                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            group_by_columns: Optional[List[Any]] = None,
+                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            order_by: Optional[Any] = None,
+                            skip: int = 0, limit: int = 10,
+                            options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Order)
         else:
-            statement = statement.order_by(Order.id)
+            query = select(*select_columns).select_from(Order)
 
-        statement = statement.offset(skip).limit(limit)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        result = await session.exec(statement)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         orders = result.all()
 
         return orders, total
+
+    async def get_order(self, session: AsyncSession,
+                        select_columns: Optional[List[Any]] = None,
+                        joins: Optional[List[Tuple[Any, dict]]] = None,
+                        where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        group_by_columns: Optional[List[Any]] = None,
+                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        order_by: Optional[Any] = None,
+                        options: Optional[List[Any]] = None):
+
+        if select_columns is None:
+            query = select(Order)
+        else:
+            query = select(*select_columns).select_from(Order)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        order = result.one_or_none()
+
+        return order
 
 
     async def count_orders(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
@@ -119,7 +173,6 @@ class OrderRepository:
                 setattr(data_need_update, k, v)
 
         data_need_update.updated_at = datetime.now()
-        await session.commit()
 
         return data_need_update
 
@@ -131,3 +184,17 @@ class OrderRepository:
             .values(**values)
         )
         await session.exec(stmt)
+
+    async def generate_ord_number(self, session: AsyncSession) -> str:
+        today = datetime.now().strftime("%Y%m%d")
+        prefix = f"ORD{today}"
+
+        statement = select(func.count(Order.id)).where(
+            Order.code.like(f"{prefix}%")
+        )
+        result = await session.exec(statement)
+
+        count = result.one_or_none()
+
+        sequence = str(count + 1).zfill(3)
+        return f"{prefix}{sequence}"

@@ -1,10 +1,14 @@
-from typing import Optional
-from datetime import datetime, timedelta
-from fastapi import APIRouter, status, Depends, Query
+from typing import Optional, Literal
+from datetime import datetime
+from fastapi import APIRouter, status, Depends, Query, Path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from starlette.requests import Request
-from src.crud.order.services.cancel_order import CancelOrderService
+from src.crud.order.services.cancel_order.cancel_order import CancelOrderService
+from src.crud.order.services.cancel_order.get_cancellation_requests import GetCancellationRequestService
+from src.crud.order.services.cancel_order.process_cancellation import ProcessCancellationService
 from src.crud.order.services.confirm_order_received import ConfirmOrderReceivedService
-from src.crud.order.services.create_order import CreateOrderService
+from src.crud.order.services.create_order.create_order import CreateOrderService
 from src.crud.order.services.get_all_orders import GetAllOrdersService
 from src.crud.order.services.get_detail_order import GetDetailOrderService
 from src.crud.order.services.statistics_order import StatisticsOrderService
@@ -14,77 +18,59 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.schemas.order import OrderCreateModel, StatusUpdateModel, OrderFilterModel, CancelOrderRequest, \
-    ProcessCancellationRequest
+    ProcessCancellationRequest, StatisticsPeriod, DateRangeCalculator
 from src.dependencies import admin_role_middleware, customer_role_middleware
 
 order_admin_router = APIRouter(prefix="/order")
 order_customer_router = APIRouter(prefix="/order")
 order_staff_router = APIRouter(prefix="/order")
 
+limiter = Limiter(key_func=get_remote_address)
+
 get_all_order_service = GetAllOrdersService()
-cancel_order_service = CancelOrderService()
 create_order_service = CreateOrderService()
 get_detail_order_service = GetDetailOrderService()
 update_status_order_service = UpdateStatusOrderService()
 confirm_order_received_service = ConfirmOrderReceivedService()
 statistics_order_service = StatisticsOrderService()
+cancel_order_service = CancelOrderService()
+process_cancellation_service = ProcessCancellationService()
+get_cancellation_requests_service = GetCancellationRequestService()
 access_token_bearer = AccessTokenBearer()
 
 
-@order_admin_router.get("/statistics/count-orders", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def count_new_orders(from_date: Optional[datetime] = Query(default=None),
-                           to_date: Optional[datetime] = Query(default=None),
-                           token_details: dict = Depends(access_token_bearer),
-                           session: AsyncSession = Depends(get_session)):
-    to_date = to_date or datetime.utcnow()
-    from_date = from_date or (to_date - timedelta(days=7))
-    count_orders = await statistics_order_service.count_new_orders(to_date, from_date, session)
+@order_admin_router.get("/statistics/overview", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
+async def get_statistics_overview(from_date: Optional[datetime] = Query(None, description="Start date (inclusive)"),
+                                  to_date: Optional[datetime] = Query(None, description="End date (inclusive)"),
+                                  period: StatisticsPeriod = Query(
+                                      StatisticsPeriod.LAST_7_DAYS,
+                                      description="Predefined period (ignored if dates provided)"
+                                  ),
+                                  token_details: dict = Depends(access_token_bearer),
+                                  session: AsyncSession = Depends(get_session)):
+    calculated_from, calculated_to = DateRangeCalculator.get_date_range(
+        from_date, to_date, period
+    )
+
+    stats = await statistics_order_service.get_comprehensive_statistics(
+        session=session,
+        from_date=calculated_from,
+        to_date=calculated_to
+    )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thống kê số lượng",
+            "message": "Thống kê tổng quan",
             "content": {
-                "count_orders": str(count_orders)
+                    "period": period.value if not (from_date and to_date) else "custom",
+                    "from_date": calculated_from.isoformat(),
+                    "to_date": calculated_to.isoformat(),
+                    **stats
             }
         }
     )
 
-@order_admin_router.get("/statistics/sales", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_total_sales(token_details: dict = Depends(access_token_bearer),
-                           session: AsyncSession = Depends(get_session)):
-    today = datetime.utcnow()
-    seven_days_ago = today - timedelta(days=7)
-
-    total_sales = await statistics_order_service.get_total_sales(today, seven_days_ago, session)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thống kê tổng doanh số",
-            "content": {
-                "total_sales": total_sales
-            }
-        }
-    )
-
-@order_admin_router.get("/statistics/revenue", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_total_revenue(token_details: dict = Depends(access_token_bearer),
-                           session: AsyncSession = Depends(get_session)):
-    today = datetime.utcnow()
-    seven_days_ago = today - timedelta(days=7)
-
-    total_revenue = await statistics_order_service.get_total_revenue(today, seven_days_ago, session)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thống kê tổng doanh số",
-            "content": {
-                "total_revenue": total_revenue
-            }
-        }
-    )
 
 @order_admin_router.get("/cancellation-requests", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def get_cancellation_requests(skip: int = 0, limit: int = 20,
@@ -92,9 +78,9 @@ async def get_cancellation_requests(skip: int = 0, limit: int = 20,
                                     token_details: dict = Depends(access_token_bearer),
                                     session: AsyncSession = Depends(get_session)):
     if status_filter == "pending":
-        orders, total = await cancel_order_service.get_cancellation_requests(session, skip=skip, limit=limit)
+        orders, total = await get_cancellation_requests_service.get_cancellation_requests(session, skip=skip, limit=limit)
     else:
-        orders, total = await cancel_order_service.get_orders_by_status(session, "cancelled", skip, limit)
+        orders, total = await get_cancellation_requests_service.get_orders_by_status(session, "cancelled", skip, limit)
 
     orders_data = []
     for order in orders:
@@ -123,22 +109,25 @@ async def get_cancellation_requests(skip: int = 0, limit: int = 20,
     )
 
 @order_customer_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(customer_role_middleware)])
-async def create_order(order_data: OrderCreateModel,
+@limiter.limit("3/minute")
+@limiter.limit("10/hour")
+async def create_order(request: Request, order_data: OrderCreateModel,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
     order_dict = await create_order_service.create_order(customer_id, order_data, session)
 
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_201_CREATED,
         content={
-            "message": "Sản phẩm mới vừa được thêm vào",
+            "message": "Đơn hàng đã được tạo thành công",
             "content": order_dict,
         }
     )
 
 @order_customer_router.get("/status/{status_order}", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
-async def get_all_order_customer(status_order: str, skip: int = 0, limit: int = 10,
+async def get_all_order_customer(status_order: str, skip: int = Query(0, ge=0),
+                                 limit: int = Query(10, ge=1, le=100),
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
@@ -154,7 +143,11 @@ async def get_all_order_customer(status_order: str, skip: int = 0, limit: int = 
 
 @order_customer_router.get("/{order_id}", status_code=status.HTTP_200_OK,
                            dependencies=[Depends(customer_role_middleware)])
-async def get_detail_order_customer(order_id: str,
+async def get_detail_order_customer(order_id: str = Path(
+                                        ...,
+                                        min_length=36,
+                                        max_length=36,
+                                    ),
                                     token_details: dict = Depends(access_token_bearer),
                                     session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
@@ -170,7 +163,11 @@ async def get_detail_order_customer(order_id: str,
 
 
 @order_admin_router.get("/{order_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_detail_order_admin(order_id: str,
+async def get_detail_order_admin(order_id: str = Path(
+                                        ...,
+                                        min_length=36,
+                                        max_length=36,
+                                 ),
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     order_dict = await get_detail_order_service.get_detail_order_admin(order_id, session)
@@ -184,11 +181,26 @@ async def get_detail_order_admin(order_id: str,
     )
 
 @order_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_all_order_admin(skip: int = 0, limit: int = 10,
-                              search: Optional[str] = None,
-                              sort_by_total_price: Optional[str] = None,
-                              sort_by_created_at: Optional[str] = None,
-                              status_filter: Optional[str] = None,
+async def get_all_order_admin(skip: int = Query(0, ge=0),
+                              limit: int = Query(10, ge=1, le=100),
+                              search: Optional[str] = Query(
+                                  None,
+                                  max_length=100,
+                                  description="Tìm kiếm theo order code, customer name",
+                                  examples=["ORD123", "Nguyễn Văn A"]
+                              ),
+                              status_filter: Optional[Literal[
+                                  "pending", "confirmed", "shipping",
+                                  "delivered", "received", "cancelled", "returned"
+                              ]] = Query(None, description="Filter theo status"),
+                              sort_by_total_price: Optional[Literal["cheapest", "most_expensive"]] = Query(
+                                  None,
+                                  description="Sắp xếp theo giá"
+                              ),
+                              sort_by_created_at: Optional[Literal["newest", "oldest"]] = Query(
+                                  None,
+                                  description="Sắp xếp theo thời gian tạo"
+                              ),
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
     filter_data = OrderFilterModel(
@@ -207,13 +219,14 @@ async def get_all_order_admin(skip: int = 0, limit: int = 10,
         }
     )
 
+
 @order_admin_router.post("/{order_id}/process-cancellation", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def process_cancellation_request(order_id: str,
                                        data: ProcessCancellationRequest,
                                        request: Request,
                                        token_details: dict = Depends(access_token_bearer),
                                        session: AsyncSession = Depends(get_session)):
-    message, order = await cancel_order_service.process_cancellation_general(order_id, data, request, session)
+    message, order = await process_cancellation_service.process_cancellation_by_admin(order_id, data, request, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -229,7 +242,7 @@ async def cancel_order(order_id: str, request: CancelOrderRequest,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
-    message, result = await cancel_order_service.cancel_order_general(order_id, user_id, request, session)
+    message, result = await cancel_order_service.cancel_order_by_customer(order_id, user_id, request, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -239,37 +252,42 @@ async def cancel_order(order_id: str, request: CancelOrderRequest,
         }
     )
 
-@order_admin_router.put("/status/{order_id}", status_code=status.HTTP_200_OK,
+@order_admin_router.put("/{order_id}/status", status_code=status.HTTP_200_OK,
                         dependencies=[Depends(admin_role_middleware)])
 async def update_status(order_id: str,
-                        status_update: StatusUpdateModel,
+                        request: StatusUpdateModel,
                         token_details: dict = Depends(access_token_bearer),
                         session: AsyncSession = Depends(get_session)):
-    order_after_update = await update_status_order_service.update_status(order_id, status_update, session)
+    order_updated, old_status = await update_status_order_service.update_status(order_id, request, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Cập nhật trạng thái đơn hàng thành công",
-            "content": order_after_update.status
+            "content": {
+                "order_id": str(order_updated.id),
+                "current_status": order_updated.status,
+                "previous_status": old_status,
+            }
         }
     )
 
-@order_customer_router.put("/confirm-received/{order_id}", status_code=status.HTTP_200_OK,
+@order_customer_router.put("/{order_id}/confirm-received", status_code=status.HTTP_200_OK,
                         dependencies=[Depends(customer_role_middleware)])
 async def confirm_order_received(order_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    order_after_confirm = await confirm_order_received_service.confirm_order_received_service(order_id, session)
+    user_id = token_details['user']['id']
+    order_updated = await confirm_order_received_service.confirm_order_received_service(order_id, user_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Xác nhận đã nhận hàng thành công",
             "content": {
-                "order_id": str(order_after_confirm.id),
-                "status": order_after_confirm.status,
-                "received_at": str(order_after_confirm.received_at)
+                "order_id": str(order_updated.id),
+                "status": order_updated.status,
+                "received_at": order_updated.received_at.isoformat(),
             }
         }
     )

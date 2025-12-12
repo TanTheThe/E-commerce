@@ -1,14 +1,11 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, update
-from sqlalchemy.orm import noload
-
 from src.crud.product.repositories import ProductRepository
-from src.database.models import Evaluate, Order_Detail, Product
+from src.database.models import Evaluate, Product
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, distinct
+from sqlmodel import select, and_, func
 from datetime import datetime
 from src.errors.evaluate import EvaluateException
-from src.schemas.evaluate import SupplementEvaluateModel, ReplyEvaluateModel
 
 product_repository = ProductRepository()
 
@@ -25,59 +22,109 @@ class EvaluateRepository:
 
         return new_evaluate
 
-    async def get_all_evaluate(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                               order_by: list = None, joins: list = None,
-                               skip: int = 0, limit: int = 10, need_join: bool = False):
-        count_stmt = select(func.count(distinct(Evaluate.id))).select_from(Evaluate).where(*conditions)
-        if need_join:
-            count_stmt = (count_stmt
-                          .join(Evaluate.product)
-                          .join(Evaluate.user)
-                          .join(Evaluate.order_detail)
-                          .join(Order_Detail.order))
 
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
-
-        statement = select(Evaluate).distinct(Evaluate.id).options(
-            *joins if joins else []
-        ).where(*conditions)
-
-        if order_by:
-            statement = statement.order_by(Evaluate.id, *order_by)
+    async def get_all_evaluate(self, session: AsyncSession,
+                            select_columns: Optional[List[Any]] = None,
+                            joins: Optional[List[Tuple[Any, dict]]] = None,
+                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            group_by_columns: Optional[List[Any]] = None,
+                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            order_by: Optional[Any] = None,
+                            skip: int = 0, limit: int = 10,
+                            options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Evaluate)
         else:
-            statement = statement.order_by(Evaluate.id)
+            query = select(*select_columns).select_from(Evaluate)
 
-        statement = statement.offset(skip).limit(limit)
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
         evaluates = result.all()
+
         return evaluates, total
 
 
-    async def get_evaluate(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Evaluate).options(
-            *joins if joins else []
-        ).where(conditions)
+    async def get_evaluate(self, session: AsyncSession,
+                        select_columns: Optional[List[Any]] = None,
+                        joins: Optional[List[Tuple[Any, dict]]] = None,
+                        where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        group_by_columns: Optional[List[Any]] = None,
+                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        order_by: Optional[Any] = None,
+                        options: Optional[List[Any]] = None):
 
-        result = await session.exec(statement)
+        if select_columns is None:
+            query = select(Evaluate)
+        else:
+            query = select(*select_columns).select_from(Evaluate)
 
-        return result.one_or_none()
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
 
-    async def get_by_order_detail_id(self, order_detail_id: str, session: AsyncSession, joins: list = None):
-        statement = select(Evaluate).options(
-            *joins if joins else []
-        ).where(Evaluate.order_detail_id == order_detail_id)
-        result = await session.exec(statement)
-        return result.one_or_none()
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        evaluate = result.one_or_none()
+
+        return evaluate
 
     async def update_evaluate_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
         stmt = (
             update(Evaluate)
             .where(condition)
             .values(**values)
+            .returning(Evaluate)
         )
-        await session.exec(stmt)
+        result = await session.exec(stmt)
+        await session.flush()
         await session.commit()
+
+        return result.one_or_none()
 
     async def get_average_rate(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         statement = select(func.avg(Evaluate.rate)).where(condition)
@@ -86,8 +133,8 @@ class EvaluateRepository:
 
         return average
 
-    async def delete_evaluate(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        evaluate_delete = await self.get_evaluate(condition, session)
+    async def delete_evaluate(self, condition: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        evaluate_delete = await self.get_evaluate(session=session, where_conditions=condition)
 
         if evaluate_delete is None:
             EvaluateException.review_not_found_to_delete()

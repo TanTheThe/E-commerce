@@ -44,6 +44,7 @@ class ProductRepository:
 
         return new_product
 
+
     async def get_all_product(self, session: AsyncSession,
                              select_columns: Optional[List[Any]] = None,
                              joins: Optional[List[Tuple[Any, dict]]] = None,
@@ -92,14 +93,48 @@ class ProductRepository:
         return products, total
 
 
-    async def get_product(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Product).options(
-            *joins if joins else []
-        ).where(conditions)
+    async def get_product(self, session: AsyncSession,
+                        select_columns: Optional[List[Any]] = None,
+                        joins: Optional[List[Tuple[Any, dict]]] = None,
+                        where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        group_by_columns: Optional[List[Any]] = None,
+                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        order_by: Optional[Any] = None,
+                        options: Optional[List[Any]] = None):
 
-        result = await session.exec(statement)
+        if select_columns is None:
+            query = select(Product)
+        else:
+            query = select(*select_columns).select_from(Product)
 
-        return result.one_or_none()
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        product = result.one_or_none()
+
+        return product
+
 
     async def update_product(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():

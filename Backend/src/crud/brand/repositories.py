@@ -1,12 +1,11 @@
 from typing import Optional, List, Any, Tuple
 from sqlalchemy import ColumnElement
-from src.crud import brand
 from src.database.models import Brand
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func, update
 from datetime import datetime
 from src.errors.brand import BrandException
-from src.schemas.brand import DeleteMultipleBrandsModel, BrandUpdateModel
+from src.schemas.brand import DeleteMultipleBrandsModel
 
 
 class BrandRepository:
@@ -112,18 +111,10 @@ class BrandRepository:
         return brand
 
 
-    async def update_brand(self, condition: Optional[ColumnElement[bool]], brand_data: BrandUpdateModel,
+    async def update_brand(self, condition: Optional[ColumnElement[bool]], update_data,
                            new_slug: Optional[str], session: AsyncSession):
-        update_data = {}
-
-        if brand_data.name is not None:
-            update_data['name'] = brand_data.name
-        if brand_data.logo is not None:
-            update_data['logo'] = brand_data.logo
         if new_slug:
             update_data['slug'] = new_slug
-        if brand_data.is_active is not None:
-            update_data['is_active'] = brand_data.is_active
 
         update_data['updated_at'] = datetime.now()
 
@@ -134,8 +125,6 @@ class BrandRepository:
             .returning(Brand)
         )
         result = await session.exec(stmt)
-        await session.flush()
-        await session.commit()
 
         return result.one_or_none()
 
@@ -155,8 +144,10 @@ class BrandRepository:
     async def delete_multiple_brand(self, data: DeleteMultipleBrandsModel, session: AsyncSession):
         conditions = [Brand.id.in_(data.brand_ids), Brand.deleted_at.is_(None)]
         brands, _ = await self.get_all_brand(session=session, where_conditions=conditions)
+
         existing_ids = {str(row.id) for row in brands}
         missing_ids = set(data.brand_ids) - existing_ids
+
         if missing_ids:
             BrandException.brand_not_found()
 

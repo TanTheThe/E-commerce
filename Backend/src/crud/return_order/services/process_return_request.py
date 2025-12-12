@@ -1,9 +1,7 @@
 from sqlalchemy.orm import selectinload
 from datetime import datetime
 from starlette.requests import Request
-
 from src.celery_tasks.auto_complete_return import auto_complete_return_order_task
-from src.crud.notification.services.services import NotificationService
 from src.crud.order.repositories import OrderRepository
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
@@ -21,7 +19,6 @@ import logging
 order_repository = OrderRepository()
 return_order_repository = ReturnOrderRepository()
 order_detail_repository = OrderDetailRepository()
-notification_service = NotificationService()
 vnpay_repository = VNPayRepository()
 payment_refund_service = PaymentRefundService()
 payment_refund_repository = PaymentRefundRepository()

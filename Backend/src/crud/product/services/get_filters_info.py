@@ -7,7 +7,6 @@ from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
 from src.database.models import Categories, Color, Size, Brand, Material
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
 from src.crud.categories_product.repositories import CategoriesProductRepository
@@ -31,8 +30,8 @@ material_repository = MaterialRepository()
 
 class GetFiltersInfoService:
     async def get_filters_info(self, category_id: str, session: AsyncSession):
-        condition_parent_category = and_(Categories.id == category_id, Categories.deleted_at.is_(None))
-        parent_category = await categories_repository.get_category(condition_parent_category, session)
+        condition_parent_category = [Categories.id == category_id, Categories.deleted_at.is_(None)]
+        parent_category = await categories_repository.get_category(session=session, where_conditions=condition_parent_category)
         if not parent_category:
             CategoriesException.not_found()
 

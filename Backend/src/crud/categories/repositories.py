@@ -9,12 +9,6 @@ from src.errors.categories import CategoriesException
 
 class CategoriesRepository:
     async def create_categories(self, categories_data_dict, session: AsyncSession):
-        if "image" in categories_data_dict and categories_data_dict["image"]:
-            base64_image = categories_data_dict["image"]
-
-            if base64_image.startswith('data:image'):
-                categories_data_dict["image"] = base64_image
-
         new_categories = Categories(
             **categories_data_dict,
             created_at=datetime.now()
@@ -74,19 +68,47 @@ class CategoriesRepository:
         return categories, total
 
 
-    async def get_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        base_condition = Categories.deleted_at.is_(None)
-        if conditions is not None:
-            combined_condition = and_(base_condition, conditions)
+    async def get_category(self, session: AsyncSession,
+                        select_columns: Optional[List[Any]] = None,
+                        joins: Optional[List[Tuple[Any, dict]]] = None,
+                        where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        group_by_columns: Optional[List[Any]] = None,
+                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                        order_by: Optional[Any] = None,
+                        options: Optional[List[Any]] = None):
+
+        if select_columns is None:
+            query = select(Categories)
         else:
-            combined_condition = base_condition
+            query = select(*select_columns).select_from(Categories)
 
-        statement = select(Categories).options(
-            *joins if joins else []
-        ).where(combined_condition)
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
 
-        return result.one_or_none()
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        result = await session.exec(query)
+
+        category = result.one_or_none()
+
+        return category
 
     async def update_categories(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
@@ -97,16 +119,16 @@ class CategoriesRepository:
 
         return data_need_update
 
-    async def delete_categories(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        categories_to_delete = await self.get_category(condition, session)
+    async def delete_categories(self, condition: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        categories_to_delete = await self.get_category(session, where_conditions=condition)
 
         if categories_to_delete is None:
             CategoriesException.not_found_to_delete()
 
         categories_to_delete.deleted_at = datetime.now()
 
-    async def delete_sub_categories(self, condition: List[Optional[ColumnElement[bool]]], session: AsyncSession):
-        sub_categories, total = await self.get_all_categories(condition, session, 0, 1000)
+    async def delete_sub_categories(self, condition: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        sub_categories, total = await self.get_all_categories(session=session, where_conditions=condition, skip=0, limit=1000)
 
         if sub_categories is None:
             CategoriesException.not_found_to_delete()

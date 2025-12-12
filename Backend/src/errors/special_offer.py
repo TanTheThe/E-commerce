@@ -120,3 +120,34 @@ class SpecialOfferException:
                 "error_code": "voucher_012"
             }
         )
+
+    @staticmethod
+    def offer_has_not_started(code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Mã giảm giá {code} chưa bắt đầu",
+                "error_code": "voucher_012"
+            }
+        )
+
+    @staticmethod
+    def offer_has_expired(code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Mã giảm giá {code} đã hết hạn",
+                "error_code": "voucher_012"
+            }
+        )
+
+    @staticmethod
+    def offer_remaining_is_insufficient(code, remaining_quantity, quantity_needed):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Mã giảm giá sản phẩm '{code}', "
+                           f"chỉ còn {remaining_quantity} lượt, không đủ cho {quantity_needed} sản phẩm",
+                "error_code": "voucher_012"
+            }
+        )

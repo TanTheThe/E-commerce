@@ -1,7 +1,10 @@
-from fastapi import APIRouter, status, Depends
-from src.crud.categories.services import CategoriesService
+from fastapi import APIRouter, status, Depends, Query
+from src.crud.categories.services.create_category import CreateCategoryService
+from src.crud.categories.services.get_all_categories import GetAllCategoriesService
+from src.crud.categories.services.remaining_services import RemainingCategoriesService
+from src.crud.categories.services.update_categories import UpdateCategoryService
 from src.dependencies import AccessTokenBearer
-from src.schemas.categories import CategoriesCreateModel, CategoriesUpdateModel, CategoriesFilterModel
+from src.schemas.categories import CategoriesCreateModel, CategoriesFilterModel, CategoryUpdateModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -12,7 +15,10 @@ categories_admin_router = APIRouter(prefix="/categories")
 categories_customer_router = APIRouter(prefix="/categories")
 categories_staff_router = APIRouter(prefix="/categories")
 
-categories_service = CategoriesService()
+create_category_service = CreateCategoryService()
+get_all_categories_service = GetAllCategoriesService()
+update_category_service = UpdateCategoryService()
+remaining_categories_service = RemainingCategoriesService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -20,7 +26,7 @@ access_token_bearer = AccessTokenBearer()
 async def create_categories(categories_data: CategoriesCreateModel,
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
-    new_categories_dict = await categories_service.create_categories_service(categories_data, session)
+    new_categories_dict = await create_category_service.create_category(categories_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -32,11 +38,12 @@ async def create_categories(categories_data: CategoriesCreateModel,
 
 
 @categories_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_categories_admin(search: Optional[str] = None,
-                                   parent_id: Optional[str] = None,
-                                   type_size: Optional[str] = None,
+async def get_all_categories_admin(search: Optional[str] = Query(None, description="Tìm kiếm theo tên", max_length=255),
+                                   parent_id: Optional[str] = Query(None, description="Lọc theo ID danh mục cha"),
+                                   type_size: Optional[str] = Query(None, description="Lọc theo loại size", max_length=50),
+                                   skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                   limit: int = Query(5, ge=1, le=100, description="Số bản ghi mỗi trang"),
                                    session: AsyncSession = Depends(get_session),
-                                   skip: int = 0, limit: int = 5,
                                    token_details: dict = Depends(access_token_bearer)):
     filter_data = CategoriesFilterModel(
         search=search,
@@ -44,7 +51,7 @@ async def get_all_categories_admin(search: Optional[str] = None,
         type_size=type_size
     )
 
-    categories = await categories_service.get_all_categories_service(filter_data, session, skip, limit)
+    categories = await get_all_categories_service.get_all_categories(filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -56,13 +63,17 @@ async def get_all_categories_admin(search: Optional[str] = None,
 
 
 @categories_customer_router.get('/all')
-async def get_all_categories_customer(search: Optional[str] = None, session: AsyncSession = Depends(get_session),
-                                      skip: int = 0, limit: int = 10):
+async def get_all_categories_customer(search: Optional[str] = Query(None, description="Tìm kiếm theo tên", max_length=255),
+                                      skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                      limit: int = Query(10, ge=1, le=100, description="Số bản ghi mỗi trang"),
+                                      session: AsyncSession = Depends(get_session)):
     filter_data = CategoriesFilterModel(
-        search=search
+        search=search,
+        parent_id=None,
+        type_size=None
     )
 
-    categories = await categories_service.get_all_categories_service(filter_data, session, skip, limit)
+    categories = await get_all_categories_service.get_all_categories(filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -75,7 +86,7 @@ async def get_all_categories_customer(search: Optional[str] = None, session: Asy
 
 @categories_customer_router.get('/{category_identifier}/id')
 async def get_category_id(category_identifier: str, session: AsyncSession = Depends(get_session)):
-    category_id = await categories_service.resolve_category_id(category_identifier, session)
+    category_id = await remaining_categories_service.resolve_category_id(category_identifier, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -92,7 +103,7 @@ async def get_category_id(category_identifier: str, session: AsyncSession = Depe
 async def get_detail_category(id: str,
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
-    categories_dict = await categories_service.get_detail_category_service(id, session)
+    categories_dict = await remaining_categories_service.get_detail_category_service(id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -106,7 +117,7 @@ async def get_detail_category(id: str,
 @categories_admin_router.get('/all/select-box')
 async def get_categories_select_box(session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
-    categories = await categories_service.get_categories_select_box_service(session)
+    categories = await remaining_categories_service.get_categories_select_box_service(session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -118,11 +129,10 @@ async def get_categories_select_box(session: AsyncSession = Depends(get_session)
 
 
 @categories_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def update_categories(id: str,
-                            categories_update: CategoriesUpdateModel,
+async def update_categories(id: str, categories_update: CategoryUpdateModel,
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
-    categories_update_dict = await categories_service.update_categories_service(id, categories_update, session)
+    categories_update_dict = await update_category_service.update_category(id, categories_update, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -136,7 +146,7 @@ async def update_categories(id: str,
 @categories_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
 async def delete_categories(id: str, token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
-    categories_delete = await categories_service.delete_categories_service(id, session)
+    categories_delete = await remaining_categories_service.delete_categories_service(id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

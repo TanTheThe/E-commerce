@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class BrandCreateModel(BaseModel):
@@ -22,6 +22,8 @@ class BrandCreateModel(BaseModel):
         return v
     
 class BrandUpdateModel(BaseModel):
+    model_config = ConfigDict(use_enum_values=True)
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     logo: Optional[str] = None
     is_active: Optional[bool] = None

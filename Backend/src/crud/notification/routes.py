@@ -1,33 +1,39 @@
-from fastapi import APIRouter, status, Depends
-from typing import Optional
-from src.crud.notification.services.services import NotificationService
+from datetime import datetime
+from fastapi import APIRouter, status, Depends, Query
+from typing import Optional, Literal
+from src.crud.notification.services.get_notifications import GetNotificationsService
+from src.crud.notification.services.mark_as_processed import MarkAsProcessedService
+from src.crud.notification.services.mark_as_read import MarkAsReadService
+
 from src.dependencies import AccessTokenBearer, customer_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
-from src.schemas.notification import MarkAsReadRequest, MarkAsProcessedRequest
+from src.errors.notification import NotificationException
+from src.schemas.notification import MarkAsReadRequest, MarkAsProcessedRequest, NotificationType, SenderType
 
 notification_admin_router = APIRouter(prefix="/notification")
 notification_customer_router = APIRouter(prefix="/notification")
 notification_staff_router = APIRouter(prefix="/notification")
 
-notification_service = NotificationService()
+
+mark_as_processed_service = MarkAsProcessedService()
+mark_as_read_service = MarkAsReadService()
+get_notifications_service = GetNotificationsService()
 access_token_bearer = AccessTokenBearer()
 
 @notification_admin_router.post("/mark-read", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
 async def mark_admin_notifications_read(request: MarkAsReadRequest,
                                         token_details: dict = Depends(access_token_bearer),
                                         session: AsyncSession = Depends(get_session)):
-    count = await notification_service.mark_as_read(session, request.notification_ids)
+    result = await mark_as_read_service.mark_as_read_for_admin(session, request.notification_ids)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đã đánh dấu {count} thông báo đã đọc",
-            "content": {
-                "marked_count": count
-            }
+            "message": f"Đã đánh dấu {result['count']} thông báo đã đọc",
+            "content": result
         }
     )
 
@@ -35,23 +41,61 @@ async def mark_admin_notifications_read(request: MarkAsReadRequest,
 async def mark_notification_processed(request: MarkAsProcessedRequest,
                                       token_details: dict = Depends(access_token_bearer),
                                       session: AsyncSession = Depends(get_session)):
-    success = await notification_service.mark_as_processed(session, request.notification_id)
+    user_id = token_details['user']['id']
+    user_email = token_details['user']['email']
+    result = await mark_as_processed_service.mark_as_processed(session, request.notification_id, user_id, user_email)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Đã đánh dấu thông báo đã xử lý",
-            "content": {"notification_id": request.notification_id}
+            "content": result
         }
     )
 
 @notification_admin_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_admin_notifications(unread_only: bool = False,
-                                  action_required: bool = False,
-                                  skip: int = 0, limit: int = 30,
-                                  token_details: dict = Depends(access_token_bearer),
-                                  session: AsyncSession = Depends(get_session)):
-    notis_dict = await notification_service.get_notifications_admin_service(session, unread_only, action_required, skip, limit)
+async def get_admin_notifications(unread_only: bool = Query(False, description="Chỉ lấy thông báo chưa đọc"),
+                                action_required: bool = Query(False, description="Chỉ lấy thông báo cần action"),
+                                is_processed: Optional[bool] = Query(None, description="Lọc theo trạng thái xử lý"),
+                                notification_type: Optional[str] = Query(None, description="Lọc theo loại thông báo"),
+                                sender_type: Optional[str] = Query(None, description="Lọc theo loại người gửi"),
+                                from_date: Optional[datetime] = Query(None, description="Lọc từ ngày"),
+                                to_date: Optional[datetime] = Query(None, description="Lọc đến ngày"),
+                                sort_by: Literal["created_at", "read_at"] = Query("created_at", description="Sắp xếp theo"),
+                                sort_order: Literal["asc", "desc"] = Query("desc", description="Thứ tự"),
+                                skip: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100),
+                                token_details: dict = Depends(access_token_bearer),
+                                session: AsyncSession = Depends(get_session)):
+    if from_date and to_date and from_date > to_date:
+        NotificationException.invalid_date_filter()
+
+    if notification_type:
+        valid_types = [
+            NotificationType.ORDER_STATUS,
+            NotificationType.ORDER_CANCELLATION_REQUEST,
+            NotificationType.RETURN_ORDER_REQUEST,
+            NotificationType.SPECIAL_OFFER,
+        ]
+        if notification_type not in valid_types:
+            NotificationException.notification_type_invalid(valid_types)
+
+    if sender_type:
+        valid_sender_types = [SenderType.ADMIN, SenderType.CUSTOMER]
+        if sender_type not in valid_sender_types:
+            NotificationException.notification_type_invalid(valid_sender_types)
+
+    notis_dict = await get_notifications_service.get_notifications_admin(session=session,
+                                                                        unread_only=unread_only,
+                                                                        action_required=action_required,
+                                                                        is_processed=is_processed,
+                                                                        notification_type=notification_type,
+                                                                        sender_type=sender_type,
+                                                                        from_date=from_date,
+                                                                        to_date=to_date,
+                                                                        sort_by=sort_by,
+                                                                        sort_order=sort_order,
+                                                                        skip=skip,
+                                                                        limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -61,45 +105,42 @@ async def get_admin_notifications(unread_only: bool = False,
         }
     )
 
-@notification_admin_router.get("/unread-count", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_admin_unread_count(token_details: dict = Depends(access_token_bearer),
-                                 session: AsyncSession = Depends(get_session)):
-    count = await notification_service.get_unread_count_service(session, recipient_type="admin")
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin toàn bộ thông báo",
-            "content": {
-                "unread_count": count
-            }
-        }
-    )
-
-@notification_admin_router.get("/pending-actions-count", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_pending_actions_count(action_type: Optional[str] = None,
-                                    token_details: dict = Depends(access_token_bearer),
-                                    session: AsyncSession = Depends(get_session)):
-    count = await notification_service.get_pending_actions_count(session, action_type)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Số lượng thông báo cần xử lý",
-            "content": {
-                "pending_actions_count": count,
-                "action_type": action_type
-            }
-        }
-    )
 
 @notification_customer_router.get("/", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
-async def get_customer_notifications(unread_only: bool = False,
-                                     skip: int = 0, limit: int = 30,
-                                     token_details: dict = Depends(access_token_bearer),
-                                     session: AsyncSession = Depends(get_session)):
+async def get_customer_notifications(unread_only: bool = Query(False, description="Chỉ lấy thông báo chưa đọc"),
+                                    notification_type: Optional[str] = Query(None, description="Lọc theo loại thông báo"),
+                                    from_date: Optional[datetime] = Query(None, description="Lọc từ ngày"),
+                                    to_date: Optional[datetime] = Query(None, description="Lọc đến ngày"),
+                                    sort_by: Literal["created_at", "read_at"] = Query("created_at", description="Sắp xếp theo"),
+                                    sort_order: Literal["asc", "desc"] = Query("desc", description="Thứ tự"),
+                                    skip: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=100),
+                                    token_details: dict = Depends(access_token_bearer),
+                                    session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
-    notis_dict = await notification_service.get_notifications_customer_service(session, user_id, unread_only, skip, limit)
+
+    if from_date and to_date and from_date > to_date:
+        NotificationException.invalid_date_filter()
+
+    if notification_type:
+        valid_types = [
+            NotificationType.ORDER_STATUS,
+            NotificationType.ORDER_CANCELLATION_REQUEST,
+            NotificationType.RETURN_ORDER_REQUEST,
+            NotificationType.SPECIAL_OFFER,
+        ]
+        if notification_type not in valid_types:
+            NotificationException.notification_type_invalid(valid_types)
+
+    notis_dict = await get_notifications_service.get_notifications_customer(session=session,
+                                                                            user_id=user_id,
+                                                                            unread_only=unread_only,
+                                                                            notification_type=notification_type,
+                                                                            from_date=from_date,
+                                                                            to_date=to_date,
+                                                                            sort_by=sort_by,
+                                                                            sort_order=sort_order,
+                                                                            skip=skip,
+                                                                            limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -109,36 +150,19 @@ async def get_customer_notifications(unread_only: bool = False,
         }
     )
 
-@notification_customer_router.get("/unread-count", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
-async def get_customer_unread_count(token_details: dict = Depends(access_token_bearer),
-                                    session: AsyncSession = Depends(get_session)):
-    user_id = token_details['user']['id']
-    count = await notification_service.get_unread_count_service(session, recipient_type="customer", user_id=user_id)
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "message": "Thông tin toàn bộ thông báo",
-            "content": {
-                "unread_count": count
-            }
-        }
-    )
 
 @notification_customer_router.post("/mark-read", status_code=status.HTTP_200_OK, dependencies=[Depends(customer_role_middleware)])
 async def mark_customer_notifications_read(request: MarkAsReadRequest,
                                         token_details: dict = Depends(access_token_bearer),
                                         session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
-    count = await notification_service.mark_as_read(session, request.notification_ids, user_id)
+    result = await mark_as_read_service.mark_as_read_for_customer(session, request.notification_ids, user_id)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đã đánh dấu {count} thông báo đã đọc",
-            "content": {
-                "marked_count": count
-            }
+            "message": f"Đã đánh dấu {result['count']} thông báo đã đọc",
+            "content": result
         }
     )
 
@@ -146,7 +170,7 @@ async def mark_customer_notifications_read(request: MarkAsReadRequest,
 async def mark_all_customer_notifications_read(token_details: dict = Depends(access_token_bearer),
                                              session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
-    count = await notification_service.mark_all_as_read(session, user_id)
+    count = await mark_as_read_service.mark_all_as_read_for_customer(session, user_id)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

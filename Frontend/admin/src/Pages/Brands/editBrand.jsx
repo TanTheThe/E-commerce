@@ -16,16 +16,16 @@ import {
 } from '@mui/material';
 import { IoMdClose } from "react-icons/io";
 import { IoCopyOutline } from "react-icons/io5";
-import { putDataApi } from '../../utils/api';
+import { deleteDataApi, postDataApi, putDataApi, uploadFileApi } from '../../utils/api';
 import { FaPlus } from 'react-icons/fa';
 
 const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit }) => {
     const [brandName, setBrandName] = useState('');
-    const [logoBase64, setLogoBase64] = useState('');
     const [isActive, setIsActive] = useState(true);
     const [loading, setLoading] = useState(false);
     const [nameError, setNameError] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
+    const [oldLogoPath, setOldLogoPath] = useState(null);
 
     useEffect(() => {
         if (brandToEdit && open) {
@@ -37,25 +37,20 @@ const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit })
                     url: brandToEdit.logo,
                     isExisting: true
                 });
+
+                const urlParts = brandToEdit.logo.split('/Images/');
+                if (urlParts.length > 1) {
+                    setOldLogoPath(urlParts[1]);
+                }
             }
         }
     }, [brandToEdit, open]);
-
-    const convertToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = error => reject(error);
-        });
-    };
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (file) {
             try {
                 const previewUrl = URL.createObjectURL(file);
-                const base64 = await convertToBase64(file);
 
                 if (imagePreview && !imagePreview.isExisting) {
                     URL.revokeObjectURL(imagePreview.url);
@@ -67,10 +62,9 @@ const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit })
                     name: file.name,
                     isExisting: false
                 });
-                setLogoBase64(base64);
             } catch (error) {
-                console.error("Error uploading image:", error);
-                context.openAlertBox("error", "Có lỗi xảy ra trong quá trình upload ảnh");
+                console.error("Error selecting image:", error);
+                context.openAlertBox("error", "Có lỗi xảy ra khi chọn ảnh");
             }
         }
     };
@@ -81,7 +75,6 @@ const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit })
                 URL.revokeObjectURL(imagePreview.url);
             }
             setImagePreview(null);
-            setLogoBase64('');
         }
     };
 
@@ -100,20 +93,65 @@ const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit })
 
         setLoading(true);
         try {
+            let finalLogoUrl = null;
+
+            if (imagePreview?.file && !imagePreview.isExisting) {
+                if (oldLogoPath) {
+                    try {
+                        await deleteDataApi(`/admin/image?file_path=${encodeURIComponent(oldLogoPath)}`);
+                    } catch (deleteError) {
+                        console.error('Error deleting old logo:', deleteError);
+                    }
+                }
+
+                const formData = new FormData();
+                formData.append('file', imagePreview.file);
+                formData.append('type', 'brands');
+
+                const slug = brandName.trim().toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-');
+
+                formData.append('slug', slug);
+
+                const uploadResponse = await uploadFileApi('/admin/image/upload', formData);
+
+                if (uploadResponse.success) {
+                    finalLogoUrl = uploadResponse.data.url;
+                } else {
+                    throw new Error(uploadResponse.message || 'Upload ảnh thất bại');
+                }
+            }
+
+            // Case 2: User giữ nguyên ảnh cũ
+            else if (imagePreview?.isExisting) {
+                finalLogoUrl = imagePreview.url;
+            }
+
+            // Case 3: User xóa ảnh (imagePreview = null)
+            else {
+                if (oldLogoPath) {
+                    try {
+                        await deleteDataApi(`/admin/image?file_path=${encodeURIComponent(oldLogoPath)}`);
+                    } catch (deleteError) {
+                        console.error('Error deleting old logo:', deleteError);
+                    }
+                }
+                finalLogoUrl = null;
+            }
+
             const requestData = {
                 name: brandName.trim(),
+                logo: finalLogoUrl,
                 is_active: isActive
             };
 
-            if (logoBase64) {
-                requestData.logo = logoBase64;
-            }
-
             const response = await putDataApi(`/admin/brand/${brandToEdit.id}`, requestData);
+            console.log(response.data);
 
             if (response.success) {
                 context.openAlertBox('success', response.message || 'Cập nhật thương hiệu thành công!');
-                onBrandUpdated();
+                onBrandUpdated(response.data);
                 handleClose();
             } else {
                 context.openAlertBox('error', response.data.detail.message || 'Có lỗi xảy ra khi cập nhật thương hiệu');
@@ -128,9 +166,9 @@ const EditBrandModal = ({ open, onClose, onBrandUpdated, context, brandToEdit })
 
     const handleClose = () => {
         setBrandName('');
-        setLogoBase64('');
         setIsActive(true);
         setNameError('');
+        setOldLogoPath(null);
 
         if (imagePreview && !imagePreview.isExisting) {
             URL.revokeObjectURL(imagePreview.url);

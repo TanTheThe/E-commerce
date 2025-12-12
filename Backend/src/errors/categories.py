@@ -61,4 +61,84 @@ class CategoriesException:
             }
         )
 
+    @staticmethod
+    def slug_exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Danh mục với tên này đã tồn tại",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def skip_cant_be_negative():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Skip không được là số âm",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def limit_must_be_1_to_100():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Limit phải từ 1 đến 100",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def type_size_not_exist():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Type size không tồn tại",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def no_fields_update():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không có trường nào được cập nhật",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def error_loop_category():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể tạo vòng lặp trong cây danh mục",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def category_tree_so_deep():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Cây danh mục quá sâu (tối đa 10 cấp)",
+                "error_code": "cate_006"
+            }
+        )
+
+    @staticmethod
+    def cant_set_child_to_parent():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể đặt danh mục con làm danh mục cha",
+                "error_code": "cate_006"
+            }
+        )
+
 

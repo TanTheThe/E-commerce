@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import HTTPException, status
 
 class OrderException:
@@ -297,6 +299,26 @@ class OrderException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": "Không thể nhận đơn hàng đang có yêu cầu hoàn trả",
+                "error_code": "order_017",
+            },
+        )
+
+    @staticmethod
+    def invalid_price():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Lỗi tính toán: tổng tiền không hợp lệ",
+                "error_code": "order_017",
+            },
+        )
+
+    @staticmethod
+    def invalid_status(valid_statuses: List):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Status không hợp lệ. Chỉ chấp nhận: {', '.join(valid_statuses)}",
                 "error_code": "order_017",
             },
         )

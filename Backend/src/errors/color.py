@@ -31,3 +31,23 @@ class ColorException:
                 "error_code": "color_002",
             },
         )
+
+    @staticmethod
+    def name_already_exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Tên màu đã tồn tại",
+                "error_code": "color_002",
+            },
+        )
+
+    @staticmethod
+    def code_already_exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Mã màu đã tồn tại",
+                "error_code": "color_002",
+            },
+        )

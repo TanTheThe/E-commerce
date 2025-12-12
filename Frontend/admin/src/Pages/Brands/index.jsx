@@ -135,6 +135,16 @@ const Brands = () => {
         }
     };
 
+    const handleBrandUpdated = (updatedBrand) => {
+        setBrands(prevBrands =>
+            prevBrands.map(brand =>
+                brand.id === updatedBrand.id
+                    ? { ...brand, ...updatedBrand }
+                    : brand
+            )
+        );
+    };
+
     const openDeleteDialog = (brand) => {
         handleDeleteBrand(brand.id);
     };
@@ -309,8 +319,8 @@ const Brands = () => {
 
                                                 <TableCell>
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${brand.is_active
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : 'bg-red-100 text-red-800'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-red-100 text-red-800'
                                                         }`}>
                                                         {brand.is_active ? 'Hoạt động' : 'Không hoạt động'}
                                                     </span>
@@ -383,7 +393,7 @@ const Brands = () => {
                     setEditDialogOpen(false);
                     setBrandToEdit(null);
                 }}
-                onBrandUpdated={fetchBrands}
+                onBrandUpdated={handleBrandUpdated}
                 context={context}
                 brandToEdit={brandToEdit}
             />

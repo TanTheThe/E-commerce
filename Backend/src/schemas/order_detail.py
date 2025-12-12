@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uuid
 
 class OrderDetailModel(BaseModel):
@@ -12,5 +12,5 @@ class OrderDetailModel(BaseModel):
     order_id: uuid.UUID
 
 class OrderDetailCreateModel(BaseModel):
-    quantity: int
-    product_variant_id: str
+    quantity: int = Field(gt=0, le=100, description="Số lượng phải > 0 và <= 100")
+    product_variant_id: str = Field(min_length=1, max_length=36)

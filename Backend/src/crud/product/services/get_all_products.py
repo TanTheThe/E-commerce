@@ -178,11 +178,11 @@ class GetAllProductsService:
             is_uuid = False
 
         if is_uuid:
-            condition = and_(Categories.id == identifier, Categories.deleted_at.is_(None))
+            condition = [Categories.id == identifier, Categories.deleted_at.is_(None)]
         else:
-            condition = and_(Categories.slug == identifier, Categories.deleted_at.is_(None))
+            condition = [Categories.slug == identifier, Categories.deleted_at.is_(None)]
 
-        return await categories_repository.get_category(condition, session)
+        return await categories_repository.get_category(session=session, where_conditions=condition)
 
     def _is_offer_valid(self, offer: Special_Offer) -> bool:
         if not offer:

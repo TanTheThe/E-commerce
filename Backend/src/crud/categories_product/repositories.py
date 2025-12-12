@@ -86,13 +86,6 @@ class CategoriesProductRepository:
 
         return cate_products, total
 
-
-    async def get_cate_product(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        statement = select(Categories_Product).where(conditions)
-        result = await session.exec(statement)
-
-        return result.all()
-
     async def update_cate_product(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
             if v is not None:

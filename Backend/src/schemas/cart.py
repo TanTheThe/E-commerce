@@ -10,7 +10,7 @@ class CartCreateModel(BaseModel):
 
     @field_validator('quantity')
     @classmethod
-    def validate_quantity(cls, v: str):
+    def validate_quantity(cls, v):
         if v <= 0:
             raise ValueError('Số lượng sản phẩm phải lớn hơn bằng 0')
         if v > MAX_QUANTITY_PER_ITEM:
@@ -26,13 +26,11 @@ class CartItemCreateModel(BaseModel):
 
 class CartItemsDeleteModel(BaseModel):
     item_ids: List[str] = Field(
-        min_items=1,
-        max_items=100,
         description="List of cart item IDs to delete"
     )
     @field_validator('item_ids')
     @classmethod
-    def validate_item_ids(cls, v: str):
+    def validate_item_ids(cls, v):
         if not v:
             raise ValueError('item_ids cannot be empty')
         

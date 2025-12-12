@@ -1,6 +1,5 @@
 from sqlalchemy.orm import selectinload
 from datetime import datetime
-from src.crud.notification.services.services import NotificationService
 from src.crud.order.repositories import OrderRepository
 from src.crud.return_order.repositories import ReturnOrderRepository
 from src.crud.return_order.services.complete_return_order import CompleteReturnOrderService
@@ -12,7 +11,6 @@ import logging
 order_repository = OrderRepository()
 return_order_repository = ReturnOrderRepository()
 complete_return_order_service = CompleteReturnOrderService()
-notification_service = NotificationService()
 
 logger = logging.getLogger(__name__)
 

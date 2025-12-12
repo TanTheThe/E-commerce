@@ -137,7 +137,7 @@ class CreateCartService:
             ),
         ]
 
-        cart = await cart_repository.get_cart(condition_user_id, session, joins_user_id)
+        cart = await cart_repository.get_cart(session=session, where_conditions=condition_user_id, options=joins_user_id)
 
         if not cart:
             try:
@@ -148,7 +148,7 @@ class CreateCartService:
                 logger.info(f"Race condition detected when creating cart for user {user_id}, retrying...")
                 await session.rollback()
                 
-                cart = await cart_repository.get_cart(condition_user_id, session, joins_user_id)
+                cart = await cart_repository.get_cart(session=session, where_conditions=condition_user_id, options=joins_user_id)
                 if not cart:
                     raise CartException.fail_create_cart()
         
@@ -195,7 +195,7 @@ class CreateCartService:
             Cart_Item.deleted_at.is_(None)
         ]
         
-        existing_cart_item = await cart_repository.get_cart_item(condition_check_variant_cart, session)
+        existing_cart_item = await cart_repository.get_cart_item(session=session, where_conditions=condition_check_variant_cart)
 
         if existing_cart_item:
             new_quantity = existing_cart_item.quantity + cart_data.quantity
@@ -265,9 +265,9 @@ class CreateCartService:
         ]
 
         return await cart_repository.get_cart(
-            condition_cart_response, 
-            session, 
-            joins_cart_response
+            session=session,
+            where_conditions=condition_cart_response,
+            options=joins_cart_response
         )
     
     async def format_cart_response(self, cart: Cart, session: AsyncSession):

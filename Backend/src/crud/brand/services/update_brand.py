@@ -1,3 +1,4 @@
+from src.celery_tasks.delete_image import delete_old_image_task
 from src.crud.brand.repositories import BrandRepository
 from src.database.models import Brand
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,34 +15,48 @@ class UpdateBrandService:
     async def update_brand(self, id: str, brand_update: BrandUpdateModel, session: AsyncSession):
         condition = [Brand.id == id, Brand.deleted_at.is_(None)]
         existing_brand = await brand_repository.get_brand(session=session, where_conditions=condition)
-
         if not existing_brand:
             BrandException.brand_not_found()
+
+        old_logo = existing_brand.logo if existing_brand.logo else None
 
         if brand_update.name and brand_update.name != existing_brand.name:
             condition_check_name = [Brand.name == brand_update.name, Brand.deleted_at.is_(None), Brand.id != id]
             duplicate_brand = await brand_repository.get_brand(session=session, where_conditions=condition_check_name)
-
             if duplicate_brand:
                 BrandException.brand_name_exists()
 
         new_slug = None
         if brand_update.name and brand_update.name != existing_brand.name:
             base_slug = generate_slug(brand_update.name)
-
             new_slug = await self.generate_unique_slug_for_update(base_slug, id, session)
 
+        updated_brand = None
         try:
             condition = and_(Brand.id == id, Brand.deleted_at.is_(None))
-            updated_brand_tuple = await brand_repository.update_brand(condition, brand_update, new_slug, session)
+
+            update_data = brand_update.model_dump(exclude_unset=False)
+
+            updated_brand_tuple = await brand_repository.update_brand(condition, update_data, new_slug, session)
+            updated_brand = updated_brand_tuple[0]
 
             if not updated_brand_tuple:
                 BrandException.brand_update_failed()
 
-            updated_brand = updated_brand_tuple[0]
+            await session.commit()
+            await session.refresh(updated_brand)
+
+            if brand_update.logo and old_logo and brand_update.logo != old_logo:
+                delete_old_image_task.apply_async(
+                    args=[old_logo],
+                    countdown=300  # 5 phút
+                )
+                logger.info(f"Scheduled deletion of old logo: {old_logo}")
+
         except Exception as e:
             await session.rollback()
             logger.error("Error create new brand: ", e)
+            raise e
 
         return {
             "id": str(updated_brand.id),

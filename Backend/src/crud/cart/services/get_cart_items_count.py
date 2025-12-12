@@ -23,7 +23,7 @@ class GetCartItemCountService:
             Cart.user_id == user_id,
             Cart.deleted_at.is_(None)
         ]
-        cart = await cart_repository.get_cart(condition_check_user_cart, session)
+        cart = await cart_repository.get_cart(session=session, where_conditions=condition_check_user_cart)
 
         if not cart:
             CartException.cart_not_found()

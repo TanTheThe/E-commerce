@@ -17,40 +17,28 @@ import {
 import { IoMdClose } from "react-icons/io";
 import { FaPlus } from "react-icons/fa";
 import { IoCopyOutline } from "react-icons/io5";
-import { postDataApi } from '../../utils/api';
+import { postDataApi, uploadFileApi } from '../../utils/api';
 
 const AddBrandModal = ({ open, onClose, onBrandAdded, context }) => {
     const [brandName, setBrandName] = useState('');
-    const [logoBase64, setLogoBase64] = useState('');
     const [isActive, setIsActive] = useState(true);
     const [loading, setLoading] = useState(false);
     const [nameError, setNameError] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
-
-    const convertToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = error => reject(error);
-        });
-    };
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (file) {
             try {
                 const previewUrl = URL.createObjectURL(file);
-                const base64 = await convertToBase64(file);
                 setImagePreview({
                     url: previewUrl,
                     file: file,
                     name: file.name
                 });
-                setLogoBase64(base64);
             } catch (error) {
-                console.error("Error uploading image:", error);
-                context.openAlertBox("error", "Có lỗi xảy ra trong quá trình upload ảnh");
+                console.error("Error selecting image:", error);
+                context.openAlertBox("error", "Có lỗi xảy ra khi chọn ảnh");
             }
         }
     };
@@ -59,7 +47,6 @@ const AddBrandModal = ({ open, onClose, onBrandAdded, context }) => {
         if (imagePreview) {
             URL.revokeObjectURL(imagePreview.url);
             setImagePreview(null);
-            setLogoBase64('');
         }
     };
 
@@ -73,9 +60,31 @@ const AddBrandModal = ({ open, onClose, onBrandAdded, context }) => {
 
         setLoading(true);
         try {
+            let uploadedLogoUrl = null;
+
+            if (imagePreview?.file) {
+                const formData = new FormData();
+                formData.append('file', imagePreview.file);
+                formData.append('type', 'brands');
+
+                const slug = brandName.trim().toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-');
+
+                formData.append('slug', slug);
+
+                const uploadResponse = await uploadFileApi('/admin/image/upload', formData);
+
+                if (uploadResponse.success) {
+                    uploadedLogoUrl = uploadResponse.data.url;
+                } else {
+                    throw new Error(uploadResponse.message || 'Upload ảnh thất bại');
+                }
+            }
+
             const requestData = {
                 name: brandName.trim(),
-                logo: logoBase64 || null,
+                logo: uploadedLogoUrl,
                 is_active: isActive
             };
 
@@ -98,7 +107,6 @@ const AddBrandModal = ({ open, onClose, onBrandAdded, context }) => {
 
     const handleClose = () => {
         setBrandName('');
-        setLogoBase64('');
         setIsActive(true);
         setNameError('');
         if (imagePreview) {

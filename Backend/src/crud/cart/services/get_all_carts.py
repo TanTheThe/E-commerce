@@ -28,7 +28,7 @@ class GetAllCartsService:
             cart = await self.get_user_cart(user_id, session)
             
             if not cart or not cart.id:
-                return await self.get_empty_cart_response(user_id, session, skip, limit)
+                return await self.get_empty_cart_response(user_id, skip, limit)
             
             cart_items, total_count = await self.get_paginated_cart_items(
                 cart.id, 
@@ -40,9 +40,15 @@ class GetAllCartsService:
             if not cart_items:
                 return await self.get_empty_cart_response(user_id, skip, limit)
             
-            await self.check_and_update_cart_prices(cart.items, session)
+            await self.check_and_update_cart_prices(cart_items, session)
         
-            return await self.format_grouped_cart_response(cart, session)
+            return await self.format_grouped_cart_response(cart=cart,
+                cart_items=cart_items,
+                total_count=total_count,
+                skip=skip,
+                limit=limit,
+                session=session
+            )
         
         except Exception as e:
             logger.error(f"Failed to get cart for user {user_id}: {str(e)}")
@@ -55,7 +61,7 @@ class GetAllCartsService:
             Cart.deleted_at.is_(None)
         ]
 
-        cart = await cart_repository.get_cart(condition_get_cart, session)
+        cart = await cart_repository.get_cart(session=session, where_conditions=condition_get_cart)
         return cart 
     
     
@@ -158,7 +164,7 @@ class GetAllCartsService:
                 logger.error(f"Failed to bulk update cart items: {str(e)}")
 
 
-    async def calculate_current_price(self, product: Product, product_variant: Product_Variant) -> float:
+    async def calculate_current_price(self, product: Product, product_variant: Product_Variant) -> int:
         original_price = product_variant.price
         
         if original_price is None or original_price <= 0:
@@ -249,7 +255,7 @@ class GetAllCartsService:
                                            total_count: int, skip: int, limit: int, session: AsyncSession):
         products_dict = {}
 
-        for cart_item in cart.items:
+        for cart_item in cart_items:
             if cart_item.deleted_at is not None:
                 continue
 
@@ -301,7 +307,7 @@ class GetAllCartsService:
             "total_items_in_cart": total_count,
         }
 
-    async def get_empty_cart_response(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
+    async def get_empty_cart_response(self, user_id: str, skip: int = 0, limit: int = 10):
         current_page = skip // limit + 1 if limit > 0 else 1
 
         return {
