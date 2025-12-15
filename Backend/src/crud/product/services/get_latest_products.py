@@ -1,9 +1,11 @@
 from datetime import datetime
 
+from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product.services.get_detail_product import GetDetailProductService
+from src.crud.product.services.utils import UtilProductsService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer, Size
@@ -26,31 +28,48 @@ product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()
 color_service = ColorService()
 
+utils_service = UtilProductsService()
+
 
 class GetLatestProductsService:
+    MAX_LIMIT = 50
+    
     async def get_latest_products(self, session: AsyncSession, limit_per_category: int = 12):
-        condition = [Product.deleted_at.is_(None), Product.status == "active"]
+        limit = min(limit_per_category, self.MAX_LIMIT)
+
+        condition = [
+            Product.deleted_at.is_(None),
+            Product.status == "active",
+
+            exists().where(
+                and_(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0
+                )
+            )
+        ]
         order_by = desc(Product.created_at)
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
+                Categories.slug,
                 Categories.parent_id,
                 Categories.deleted_at
             ),
-
             selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.quantity,
                 Product_Variant.deleted_at
             ),
-
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
+                Special_Offer.name,
                 Special_Offer.discount,
                 Special_Offer.type,
                 Special_Offer.used_quantity,
@@ -61,81 +80,94 @@ class GetLatestProductsService:
             ),
         ]
 
-        products, _ = await product_repository.get_all_product(
+        products, total = await product_repository.get_all_product(
             session=session,
-            where_conditions=condition, options=joins, skip=0,
-            limit=limit_per_category,
+            where_conditions=condition,
+            options=options,
+            skip=0,
+            limit=limit,
             order_by=order_by
         )
 
         product_list = []
-        for product in products:
-            valid_categories = [cat for cat in product[0].categories if cat.deleted_at is None]
+        for product_tuple in products:
+            product = product_tuple[0]
+            
+            valid_categories = [
+                cat for cat in product.categories 
+                if cat.deleted_at is None
+            ]
 
             if not valid_categories:
                 continue
 
             active_variants = [
-                variant for variant in product[0].product_variant
+                variant for variant in product.product_variant
                 if variant.deleted_at is None and variant.quantity > 0
             ]
 
             if not active_variants:
                 continue
 
-            prices = [variant.price for variant in active_variants if variant.price is not None]
-            price_min = min(prices) if prices else 0
+            prices = [v.price for v in active_variants if v.price is not None]
+            if not prices:
+                continue
+            
+            price_min = min(prices)
 
-            offer = product[0].special_offer
-            valid_offer = self._is_offer_valid(offer)
-            offer_discount = offer.discount if valid_offer else None
-            offer_type = offer.type if valid_offer else None
-
+            offer = product.special_offer
+            offer_status = utils_service.get_offer_status(offer)
+            
             original_price = price_min
             discounted_price = original_price
 
-            if offer_type and offer_discount is not None:
-                if offer_type == "percent":
-                    raw_discounted_price = original_price * (1 - offer_discount / 100)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
-                elif offer_type == "fixed":
-                    raw_discounted_price = max(0, original_price - offer_discount)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+            if offer_status["is_valid"] and offer:
+                if offer.type == "percent":
+                    raw_discounted = original_price * (1 - offer.discount / 100)
+                    discounted_price = int(round(raw_discounted / 1000) * 1000)
+                elif offer.type == "fixed":
+                    raw_discounted = max(0, original_price - offer.discount)
+                    discounted_price = int(round(raw_discounted / 1000) * 1000)
 
             product_data = {
-                "id": str(product[0].id),
-                "name": product[0].name,
-                "images": product[0].images,
-                "total_sold": product[0].total_sold,
-                "slug": product[0].slug,
+                "id": str(product.id),
+                "name": product.name,
+                "slug": product.slug,
+                "images": product.images if product.images else [],
+                "description": product.short_description,
                 "categories": [
                     {
-                        "id": str(category.id),
-                        "name": category.name,
+                        "id": str(cat.id),
+                        "name": cat.name,
+                        "slug": cat.slug if hasattr(cat, 'slug') else None
                     }
-                    for category in valid_categories
+                    for cat in valid_categories
                 ],
                 "original_price": original_price,
                 "discounted_price": discounted_price,
-                "avg_rating": product[0].avg_rating
+                "discount_percentage": round(
+                    ((original_price - discounted_price) / original_price * 100), 2
+                ) if original_price > 0 else 0,
+                "avg_rating": float(product.avg_rating) if product.avg_rating else 0.0,
+                "total_sold": product.total_sold if product.total_sold else 0,
+                "in_stock": True,
+                "created_at": product.created_at.isoformat() if product.created_at else None,
+                "is_new": self.is_new_product(product.created_at) if product.created_at else False
             }
 
             product_list.append(product_data)
 
-        return product_list
-
-    def _is_offer_valid(self, offer: Special_Offer) -> bool:
-        if not offer:
+        return {
+            "products": product_list,
+            "total": len(product_list),
+        }
+        
+        
+    def is_new_product(self, created_at: datetime) -> bool:
+        if not created_at:
             return False
-
-        if offer.deleted_at is not None:
-            return False
-
+        
         now = datetime.now()
-        if offer.start_time > now or offer.end_time < now:
-            return False
-
-        if offer.used_quantity >= offer.total_quantity:
-            return False
-
-        return True
+        days_old = (now - created_at).days
+        
+        return days_old <= 30

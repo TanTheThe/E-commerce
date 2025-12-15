@@ -17,30 +17,15 @@ from src.schemas.product import DeleteMultipleProductModel
 
 class ProductRepository:
     async def create_product(self, product_data, session: AsyncSession):
-        product_data_dict = product_data.model_dump(exclude={"categories_id", "product_variant", "materials", "tags_id"})
-
-        new_product = Product(
-            **product_data_dict
+        product_data_dict = product_data.model_dump(
+        exclude={"categories_id", "product_variant", "materials", "tags_id"}
         )
-
+        new_product = Product(**product_data_dict)
         new_product.status = "active"
         new_product.created_at = datetime.now()
 
         session.add(new_product)
         await session.flush()
-
-        if product_data.product_variant:
-            skus = [variant.sku for variant in product_data.product_variant if variant.sku]
-            if skus:
-                stmt = select(Product_Variant.sku).where(
-                    Product_Variant.sku.in_(skus),
-                    Product_Variant.deleted_at.is_(None)
-                )
-                existing_skus_result = await session.exec(stmt)
-                existing_skus = set(existing_skus_result.all())
-
-                if existing_skus:
-                    ProductException.sku_exists(existing_skus)
 
         return new_product
 

@@ -67,5 +67,5 @@ class ProductMaterialAssignmentModel(BaseModel):
 
 
 class ProductMaterialCreateModel(BaseModel):
-    material_id: uuid.UUID
-    percentage: float
+    material_id: str
+    percentage: float = Field(..., gt=0, le=100, description="Phần trăm từ 0-100")

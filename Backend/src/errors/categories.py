@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import HTTPException, status
 
 class CategoriesException:
@@ -32,11 +33,11 @@ class CategoriesException:
         )
 
     @staticmethod
-    def categories_not_exist():
+    def categories_not_exist(missing_ids: List):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": "Một hoặc nhiều danh mục không tồn tại",
+                "message": f"Các danh mục này {missing_ids} không tồn tại",
                 "error_code": "cate_004"
             }
         )
@@ -141,4 +142,22 @@ class CategoriesException:
             }
         )
 
-
+    @staticmethod
+    def list_exceed_max_length(max_length: int):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Danh sách vượt quá độ dài tối đa cho phép là {max_length}",
+                "error_code": "cate_007"
+            }
+        )
+        
+    @staticmethod
+    def duplicate_ids_in_list():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Danh sách chứa các ID trùng lặp",
+                "error_code": "cate_008"
+            }
+        )

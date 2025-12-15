@@ -8,6 +8,9 @@ from datetime import datetime
 
 class CategoriesProductRepository:
     async def create_cate_product(self, cate_product_data_list, product_id, session: AsyncSession):
+        if not cate_product_data_list:
+            return
+        
         new_objects = [
             Categories_Product(
                 product_id=product_id,
@@ -17,6 +20,7 @@ class CategoriesProductRepository:
             for category in cate_product_data_list
         ]
         session.add_all(new_objects)
+        await session.flush()
 
     async def get_all_cate_product(self, session: AsyncSession,
                                    select_columns: Optional[List[Any]] = None,

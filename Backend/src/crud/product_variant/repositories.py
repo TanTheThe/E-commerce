@@ -11,42 +11,46 @@ from src.errors.product import ProductException
 
 class ProductVariantRepository:
     async def create_product_variant(self, product_variant_data, product_id, session: AsyncSession):
-        if product_variant_data and isinstance(product_variant_data[0] if product_variant_data else None, dict):
-            product_variant_data = [ProductVariantCreateModel(**item) for item in product_variant_data]
+        if not product_variant_data:
+            return
+        
+        if product_variant_data and isinstance(product_variant_data[0], dict):
+            product_variant_data = [
+                ProductVariantCreateModel(**item) for item in product_variant_data
+            ]
 
         new_objects = []
+        generated_skus = set()
+        
         for item in product_variant_data:
-            sku = item.sku or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
-            if item.color_id:
-                new_variant = Product_Variant(
-                    product_id=product_id,
-                    size=item.size,
-                    image=item.image,
-                    color_id=item.color_id,
-                    price=item.price,
-                    quantity=item.quantity,
-                    sku=sku,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                new_objects.append(new_variant)
-
-            elif item.color_name and item.color_code:
-                new_variant = Product_Variant(
-                    product_id=product_id,
-                    size=item.size,
-                    image=item.image,
-                    color_name=item.color_name,
-                    color_code=item.color_code,
-                    price=item.price,
-                    quantity=item.quantity,
-                    sku=sku,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                new_objects.append(new_variant)
+            if item.sku:
+                sku = item.sku
+            else:
+                while True:
+                    sku = f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
+                    if sku not in generated_skus:
+                        break
+                    
+                generated_skus.add(sku)
+                
+            new_variant = Product_Variant(
+                product_id=product_id,
+                size=item.size,
+                image=item.image,
+                color_id=item.color_id if item.color_id else None,
+                color_name=item.color_name if item.color_name else None,
+                color_code=item.color_code if item.color_code else None,
+                price=item.price,
+                quantity=item.quantity,
+                sku=sku,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            new_objects.append(new_variant)
 
         session.add_all(new_objects)
+        await session.flush()
+
 
     async def get_all_product_variant(self, session: AsyncSession,
                                       select_columns: Optional[List[Any]] = None,

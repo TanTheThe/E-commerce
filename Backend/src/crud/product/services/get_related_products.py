@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
@@ -14,6 +15,7 @@ from src.crud.categories.repositories import CategoriesRepository
 from src.crud.categories_product.repositories import CategoriesProductRepository
 from src.crud.product_variant.services import ProductVariantService
 from src.crud.categories_product.services import CategoriesProductService
+from src.errors.product import ProductException
 
 product_repository = ProductRepository()
 categories_repository = CategoriesRepository()
@@ -28,12 +30,27 @@ color_service = ColorService()
 
 
 class GetRelatedProductsService:
-    async def get_related_products(self, product_id: str, session: AsyncSession, limit_per_category: int = 12,
-                                           price_range: float = 0.4):
-        condition_product = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
-        joins_product = [
+    MAX_LIMIT = 50
+    DEFAULT_PRICE_RANGE = 0.4  
+    MIN_PRICE_RANGE = 0.1      
+    MAX_PRICE_RANGE = 1.0
+    
+    async def get_related_products(self, product_id: str, session: AsyncSession, limit: int = 12, price_range: float = 0.4):
+        limit = min(limit, self.MAX_LIMIT)
+        price_range = max(self.MIN_PRICE_RANGE, min(price_range, self.MAX_PRICE_RANGE))
+        
+        condition = [
+            Product.id == product_id,
+            Product.deleted_at.is_(None),
+            Product.status == "active"
+        ]
+        
+        options = [
             selectinload(Product.categories).load_only(
                 Categories.id,
+                Categories.name,
+                Categories.slug,
+                Categories.parent_id,
                 Categories.deleted_at
             ),
             selectinload(Product.product_variant).load_only(
@@ -43,63 +60,72 @@ class GetRelatedProductsService:
                 Product_Variant.deleted_at
             )
         ]
-        current_product_tuple = await product_repository.get_product(condition_product, session, joins_product)
+
+        current_product_tuple = await product_repository.get_product(session=session, condition=condition, options=options)
         current_product = current_product_tuple[0]
 
         if not current_product:
-            return []
+            ProductException.not_found()
+            
+        product_info = await self.extract_product_info(current_product)
 
-        valid_current_categories = [cat for cat in current_product.categories if cat.deleted_at is None]
-        if not valid_current_categories:
-            return []
+        if not product_info:
+            return {
+                "products": [],
+                "total": 0,
+                "limit": limit,
+                "reference_product": {
+                    "id": str(current_product.id),
+                    "name": current_product.name,
+                    "price": None
+                },
+                "filters_applied": {
+                    "price_range_percent": price_range * 100,
+                    "categories": []
+                }
+            }
 
-        active_variants = [
-            variant for variant in current_product.product_variant
-            if variant.deleted_at is None and variant.quantity > 0
-        ]
-
-        if not active_variants:
-            return []
-
-        prices = [variant.price for variant in active_variants if variant.price is not None]
-        if not prices:
-            return []
-
-        current_price = min(prices)
-
-        if current_price <= 0:
-            return []
-
-        min_price = current_price * (1 - price_range)
-        max_price = current_price * (1 + price_range)
-
-        condition = [
+        conditions = [
             Product.deleted_at.is_(None),
             Product.status == "active",
             Product.id != product_id,
-            Product.categories.any(Categories.id.in_([c.id for c in valid_current_categories]))
+            Product.categories.any(
+                and_(
+                    Categories.id.in_(product_info["category_ids"]),
+                    Categories.deleted_at.is_(None)
+                )
+            ),
+            exists().where(
+                and_(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0,
+                    Product_Variant.price >= product_info["min_price"],
+                    Product_Variant.price <= product_info["max_price"]
+                )
+            )
         ]
         order_by = desc(Product.created_at)
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
+                Categories.slug,
                 Categories.parent_id,
                 Categories.deleted_at
             ),
-
             selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.quantity,
                 Product_Variant.deleted_at
             ),
-
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
+                Special_Offer.name,
                 Special_Offer.discount,
                 Special_Offer.type,
                 Special_Offer.used_quantity,
@@ -108,6 +134,12 @@ class GetRelatedProductsService:
                 Special_Offer.end_time,
                 Special_Offer.deleted_at
             ),
+            selectinload(Product.brand).load_only(
+                Brand.id,
+                Brand.name,
+                Brand.slug,
+                Brand.deleted_at
+            )
         ]
 
         products, _ = await product_repository.get_all_product(session=session, where_conditions=condition,
@@ -180,18 +212,46 @@ class GetRelatedProductsService:
 
         return product_list
 
-    def _is_offer_valid(self, offer: Special_Offer) -> bool:
-        if not offer:
-            return False
 
-        if offer.deleted_at is not None:
-            return False
-
-        now = datetime.now()
-        if offer.start_time > now or offer.end_time < now:
-            return False
-
-        if offer.used_quantity >= offer.total_quantity:
-            return False
-
-        return True
+    async def extract_product_info(self, product: Product):
+        valid_categories = [
+            cat for cat in product.categories 
+            if cat.deleted_at is None
+        ]
+        
+        if not valid_categories:
+            return None
+        
+        active_variants = [
+            variant for variant in product.product_variant
+            if variant.deleted_at is None and variant.quantity > 0
+        ]
+        
+        if not active_variants:
+            return None
+        
+        prices = [v.price for v in active_variants if v.price is not None and v.price > 0]
+        
+        if not prices:
+            return None
+        
+        current_price = min(prices)
+        
+        price_range = self.DEFAULT_PRICE_RANGE
+        min_price = current_price * (1 - price_range)
+        max_price = current_price * (1 + price_range)
+        
+        return {
+            "current_price": current_price,
+            "min_price": min_price,
+            "max_price": max_price,
+            "category_ids": [cat.id for cat in valid_categories],
+            "categories": [
+                {
+                    "id": str(cat.id),
+                    "name": cat.name,
+                    "slug": cat.slug if hasattr(cat, 'slug') else None
+                }
+                for cat in valid_categories
+            ]
+        }

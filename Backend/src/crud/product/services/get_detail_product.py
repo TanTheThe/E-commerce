@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
+from src.crud.product.services.utils import UtilProductsService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer, Brand, \
@@ -26,6 +27,7 @@ size_repository = SizeRepository()
 product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()
 color_service = ColorService()
+utils_service = UtilProductsService()
 
 
 class GetDetailProductService:
@@ -90,7 +92,7 @@ class GetDetailProductService:
         product_dict["tags"] = valid_tags
 
         offer = product.special_offer
-        valid_offer = self._is_offer_valid(offer)
+        valid_offer = utils_service.is_offer_valid(offer)
 
         offer_type = offer.type if valid_offer else None
         offer_discount = offer.discount if valid_offer else None
@@ -118,11 +120,15 @@ class GetDetailProductService:
 
             if offer_type and offer_discount is not None:
                 if offer_type == "percent":
-                    raw_discounted_price = original_price * (1 - offer_discount / 100)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+                    raw_discounted_price = original_price * \
+                        (1 - offer_discount / 100)
+                    discounted_price = int(
+                        round(raw_discounted_price / 1000) * 1000)
                 elif offer_type == "fixed":
-                    raw_discounted_price = max(0, original_price - offer_discount)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
+                    raw_discounted_price = max(
+                        0, original_price - offer_discount)
+                    discounted_price = int(
+                        round(raw_discounted_price / 1000) * 1000)
 
             if discounted_price < 0:
                 discounted_price = 0
@@ -160,32 +166,37 @@ class GetDetailProductService:
         return product_dict
 
     async def find_product_by_identifier(self, identifier: str, session: AsyncSession):
-        try:
-            uuid.UUID(identifier)
-            is_uuid = True
-        except ValueError:
-            is_uuid = False
+        is_uuid = utils_service.is_valid_uuid(identifier)
 
         if is_uuid:
-            condition = and_(Product.id == identifier, Product.deleted_at.is_(None), Product.status == "active")
+            condition = [
+                Product.id == identifier,
+                Product.deleted_at.is_(None),
+                Product.status == "active"
+            ]
         else:
-            condition = and_(Product.slug == identifier, Product.deleted_at.is_(None), Product.status == "active")
+            condition = [
+                Product.slug == identifier,
+                Product.deleted_at.is_(None),
+                Product.status == "active"
+            ]
 
         joins = [
             selectinload(Product.categories_product).options(
                 joinedload(Categories_Product.categories).load_only(
                     Categories.id,
                     Categories.name,
+                    Categories.slug,
                     Categories.parent_id,
                     Categories.deleted_at
                 )
             ),
-
             selectinload(Product.product_variant).options(
                 joinedload(Product_Variant.color).load_only(
                     Color.id,
                     Color.name,
                     Color.code,
+                    Color.deleted_at
                 )
             ).load_only(
                 Product_Variant.id,
@@ -198,19 +209,17 @@ class GetDetailProductService:
                 Product_Variant.color_code,
                 Product_Variant.deleted_at
             ),
-
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
+                Special_Offer.name,
                 Special_Offer.discount,
                 Special_Offer.type,
-                Special_Offer.name,
                 Special_Offer.used_quantity,
                 Special_Offer.total_quantity,
                 Special_Offer.start_time,
                 Special_Offer.end_time,
                 Special_Offer.deleted_at
             ),
-
             selectinload(Product.brand).load_only(
                 Brand.id,
                 Brand.name,
@@ -219,7 +228,6 @@ class GetDetailProductService:
                 Brand.is_active,
                 Brand.deleted_at
             ),
-
             selectinload(Product.product_materials).options(
                 joinedload(Product_Material.material).load_only(
                     Material.id,
@@ -233,7 +241,6 @@ class GetDetailProductService:
                 Product_Material.percentage,
                 Product_Material.deleted_at
             ),
-
             selectinload(Product.product_tags).options(
                 joinedload(Product_Tag.tag).load_only(
                     Tag.id,
@@ -250,21 +257,6 @@ class GetDetailProductService:
 
         return await product_repository.get_product(condition, session, joins)
 
-    def _is_offer_valid(self, offer: Special_Offer) -> bool:
-        if not offer:
-            return False
-
-        if offer.deleted_at is not None:
-            return False
-
-        now = datetime.now()
-        if offer.start_time > now or offer.end_time < now:
-            return False
-
-        if offer.used_quantity >= offer.total_quantity:
-            return False
-
-        return True
 
     async def get_detail_product_admin(self, product_identifier: str, session: AsyncSession):
         product = await self.get_detail_product(product_identifier, session)
@@ -274,7 +266,7 @@ class GetDetailProductService:
 
         product_variant = [
             {
-                "id": str(item["id"]),
+                "id": item["id"],
                 "size": item["size"],
                 "color_id": item.get("color_id"),
                 "color_name": item.get("color_name"),
@@ -282,6 +274,8 @@ class GetDetailProductService:
                 "image": item["image"],
                 "original_price": item["original_price"],
                 "discounted_price": item["discounted_price"],
+                "discount_amount": item["discount_amount"],
+                "discount_percentage": item["discount_percentage"],
                 "quantity": item["quantity"],
                 "sku": item["sku"]
             }
@@ -289,18 +283,29 @@ class GetDetailProductService:
         ]
 
         product_dict = {
-            "id": str(product["id"]),
+            "id": product["id"],
             "name": product["name"],
+            "slug": product["slug"],
             "images": product["images"],
             "description": product["description"],
             "short_description": product["short_description"],
+            "status": product["status"],
+            "avg_rating": product["avg_rating"],
+            "total_sold": product["total_sold"],
+            "created_at": product["created_at"],
+            "updated_at": product["updated_at"],
             "categories": product["categories"],
             "brand": product["brand"],
             "materials": product["materials"],
             "tags": product["tags"],
             "offer": product["offer"],
-            "status": product["status"],
-            "product_variant": product_variant
+            "product_variant": product_variant,
+            "total_stock": sum(v["quantity"] for v in product_variant),
+            "variant_count": len(product_variant),
+            "price_range": {
+                "min": min(v["original_price"] for v in product_variant),
+                "max": max(v["original_price"] for v in product_variant)
+            } if product_variant else None
         }
 
         return product_dict
@@ -313,7 +318,7 @@ class GetDetailProductService:
 
         product_variant = [
             {
-                "id": str(item["id"]),
+                "id": item["id"],
                 "size": item["size"],
                 "image": item["image"],
                 "color_id": item.get("color_id"),
@@ -321,25 +326,34 @@ class GetDetailProductService:
                 "color_code": item.get("color_code"),
                 "original_price": item["original_price"],
                 "discounted_price": item["discounted_price"],
+                "discount_amount": item["discount_amount"],
+                "discount_percentage": item["discount_percentage"],
                 "quantity": item["quantity"],
+                "in_stock": item["quantity"] > 0
             }
             for item in product["product_variant"]
         ]
 
         product_dict = {
-            "id": str(product["id"]),
+            "id": product["id"],
             "name": product["name"],
+            "slug": product["slug"],
             "images": product["images"],
             "description": product["description"],
             "short_description": product["short_description"],
+            "avg_rating": product["avg_rating"],
+            "total_sold": product["total_sold"],
             "categories": product["categories"],
             "brand": product["brand"],
             "materials": product["materials"],
             "tags": product["tags"],
             "offer": product["offer"],
-            "status": product["status"],
-            "slug": product["slug"],
-            "product_variant": product_variant
+            "product_variant": product_variant,
+            "total_reviews": 0,
+            "price_range": {
+                "min": min(v["discounted_price"] for v in product_variant),
+                "max": max(v["discounted_price"] for v in product_variant)
+            } if product_variant else None
         }
 
         return product_dict

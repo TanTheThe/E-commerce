@@ -23,6 +23,16 @@ class MaterialException:
                 "error_code": "mate_002",
             },
         )
+        
+    @staticmethod
+    def materials_not_found(missing_material_ids: List):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Không tìm thấy thông tin về các chất liệu: {missing_material_ids}",
+                "error_code": "mate_002",
+            },
+        )
 
     @staticmethod
     def some_materials_not_found():

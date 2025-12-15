@@ -1,3 +1,4 @@
+from typing import List, Optional
 from fastapi import HTTPException, status
 
 
@@ -17,7 +18,17 @@ class TagException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
-                "message": "Không tìm thấy thông tin về tag này",
+                "message": f"Không tìm thấy thông tin về tag này",
+                "error_code": "tag_002",
+            },
+        )
+        
+    @staticmethod
+    def tags_not_found(missing_tag_ids: List):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Không tìm thấy thông tin về tag: {missing_tag_ids}",
                 "error_code": "tag_002",
             },
         )

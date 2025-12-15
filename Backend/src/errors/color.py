@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import HTTPException, status
 
 
@@ -18,6 +19,16 @@ class ColorException:
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "message": "Màu đã chọn không tồn tại",
+                "error_code": "color_002",
+            },
+        )
+        
+    @staticmethod
+    def colors_not_found(missing_color_ids: List):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Không tim thấy các màu này: {missing_color_ids}",
                 "error_code": "color_002",
             },
         )

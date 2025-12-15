@@ -1,6 +1,8 @@
-from fastapi import APIRouter, status, Depends, Query
+from fastapi import APIRouter, Path, status, Depends, Query
 from src.crud.product.services.create_product import CreateProductService
 from src.crud.product.services.get_all_products import GetAllProductsService
+from src.crud.product.services.get_all_products_admin import GetAllProductsAdminService
+from src.crud.product.services.get_all_products_customer import GetAllProductsCustomerService
 from src.crud.product.services.get_all_products_for_offer import GetAllProductsOfferService
 from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product.services.get_filters_info import GetFiltersInfoService
@@ -17,17 +19,24 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.errors.categories import CategoriesException
-from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel, ProductStatusUpdateModel, BulkUpdateStatusModel
+from src.errors.product import ProductException
+from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel, ProductStatusUpdateModel, BulkUpdateStatusModel, SortBy
 from src.dependencies import admin_role_middleware
 from typing import Optional, List
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 product_admin_router = APIRouter(prefix="/product")
 product_customer_router = APIRouter(prefix="/product")
 product_staff_router = APIRouter(prefix="/product")
 
+limiter = Limiter(key_func=get_remote_address)
+
 product_service = ProductService()
 create_product_service = CreateProductService()
 get_all_products_service = GetAllProductsService()
+get_all_products_customer_service = GetAllProductsCustomerService()
+get_all_products_admin_service = GetAllProductsAdminService()
 access_token_bearer = AccessTokenBearer()
 search_product_service = SearchProductService()
 get_detail_product_service = GetDetailProductService()
@@ -41,6 +50,7 @@ update_product_service = UpdateProductService()
 update_product_status_service = UpdateProductStatusService()
 
 
+@limiter.limit("30/minute")
 @product_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
 async def create_product(product_data: ProductCreateModel,
                          token_details: dict = Depends(access_token_bearer),
@@ -54,36 +64,47 @@ async def create_product(product_data: ProductCreateModel,
         }
     )
 
-@product_customer_router.get('/category')
-async def get_all_products_customer(category_identifier: str,
-                                    search: Optional[str] = None,
-                                    category_ids: Optional[List[str]] = Query(default=[]),
-                                    category_slugs: Optional[List[str]] = Query(default=[]),
-                                    min_price: Optional[int] = None,
-                                    max_price: Optional[int] = None,
-                                    sort_by: Optional[str] = None,
-                                    colors: Optional[List[str]] = Query(default=[]),
-                                    sizes: Optional[List[str]] = Query(default=[]),
-                                    rating: Optional[List[int]] = Query(default=[]),
-                                    brand_id: Optional[str] = None,
-                                    material_ids: Optional[List[str]] = Query(default=[]),
-                                    skip: int = 0, limit: int = 16,
+
+@product_customer_router.get('/category/{category_identifier}')
+async def get_all_products_customer(category_identifier: str = Path(..., description="Category ID hoặc slug"),
+                                    search: Optional[str] = Query(None, max_length=200),
+                                    category_ids: Optional[List[str]] = Query(default=None, max_items=20),
+                                    category_slugs: Optional[List[str]] = Query(default=None, max_items=20),
+                                    min_price: Optional[int] = Query(None, ge=0),
+                                    max_price: Optional[int] = Query(None, ge=0),
+                                    sort_by: Optional[str] = Query(
+                                        SortBy.NEWEST,
+                                        pattern="^(newest|oldest|price_asc|price_desc|name_asc|name_desc|best_seller|sale_desc|rating_desc)$"
+                                    ),
+                                    colors: Optional[List[str]] = Query(default=None, max_items=50),
+                                    sizes: Optional[List[str]] = Query(default=None, max_items=20),
+                                    rating: Optional[List[int]] = Query(default=None, ge=1, le=5, max_items=5),
+                                    brand_id: Optional[str] = Query(None),
+                                    material_ids: Optional[List[str]] = Query(default=None, max_items=20),
+                                    skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                    limit: int = Query(16, ge=1, le=100, description="Số bản ghi tối đa"),
                                     session: AsyncSession = Depends(get_session)):
+    if not category_identifier or not category_identifier.strip():
+        ProductException.category_identifier_must_not_be_empty()
+    
+    if min_price is not None and max_price is not None and min_price > max_price:
+        ProductException.min_price_greater_than_max_price()
+        
     filter_data = ProductFilterModel(
         search=search,
-        category_ids=category_ids,
-        category_slugs=category_slugs,
+        category_ids=category_ids or [],
+        category_slugs=category_slugs or [],
         min_price=min_price,
         max_price=max_price,
         sort_by=sort_by,
-        colors=colors,
-        sizes=sizes,
-        rating=rating,
+        colors=colors or [],
+        sizes=sizes or [],
+        rating=rating or [],
         brand_id=brand_id,
-        material_ids=material_ids
+        material_ids=material_ids or []
     )
 
-    products = await get_all_products_service.get_all_products_customer(category_identifier, filter_data, session, skip, limit)
+    products = await get_all_products_customer_service.get_all_products_customer(category_identifier, filter_data, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -94,7 +115,11 @@ async def get_all_products_customer(category_identifier: str,
     )
 
 @product_customer_router.get('/popular/{parent_category_id}')
-async def get_products_popular(parent_category_id: str, limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+async def get_products_popular(parent_category_id: str = Path(
+                                ..., min_length=1, max_length=255, description="Parent category ID"), 
+                               limit_per_category: int = Query(
+                                default=12, ge=1, le=50, description="Số sản phẩm tối đa cho mỗi category con"), 
+                               session: AsyncSession = Depends(get_session)):
     products = await get_products_popular_service.get_products_popular(parent_category_id, session, limit_per_category)
 
     return JSONResponse(
@@ -106,7 +131,22 @@ async def get_products_popular(parent_category_id: str, limit_per_category: int 
     )
 
 @product_customer_router.get('/search')
-async def search_product(search: str, session: AsyncSession = Depends(get_session), skip: int = 0, limit: int = 10):
+async def search_product(search: str = Query(
+                            ..., 
+                            min_length=1,
+                            max_length=200,
+                            description="Từ khóa tìm kiếm"
+                        ),
+                        skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                        limit: int = Query(10, ge=1, le=50, description="Số bản ghi tối đa"),
+                        session: AsyncSession = Depends(get_session)):
+    if not search or not search.strip():
+        ProductException.search_must_not_be_empty()
+        
+    search_stripped = search.strip()
+    if len(search_stripped) < 1:
+        ProductException.search_too_short()
+        
     products = await search_product_service.search_product(search, session, skip, limit)
 
     return JSONResponse(
@@ -118,10 +158,17 @@ async def search_product(search: str, session: AsyncSession = Depends(get_sessio
     )
 
 @product_admin_router.get('/offer')
-async def get_products_offer(categories_id: str, session: AsyncSession = Depends(get_session)):
+async def get_products_offer(categories_id: str = Query(..., description="Danh sách category IDs cách nhau bởi dấu phẩy"), 
+                             session: AsyncSession = Depends(get_session)):
     categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
     if not categories_list:
         CategoriesException.empty_list()
+        
+    if len(categories_list) > 20:
+        CategoriesException.list_exceed_max_length(20)
+        
+    if len(categories_list) != len(set(categories_list)):
+        CategoriesException.duplicate_ids_in_list()
 
     products = await get_all_products_offer_service.get_all_product_for_offer(categories_list, session)
 
@@ -133,8 +180,10 @@ async def get_products_offer(categories_id: str, session: AsyncSession = Depends
         }
     )
 
+
 @product_customer_router.get('/latest')
-async def get_products_latest(limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+async def get_products_latest(limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm mới nhất cần lấy"), 
+                              session: AsyncSession = Depends(get_session)):
     products = await get_latest_products_service.get_latest_products(session, limit_per_category)
 
     return JSONResponse(
@@ -145,8 +194,11 @@ async def get_products_latest(limit_per_category: int = 12, session: AsyncSessio
         }
     )
 
+
 @product_customer_router.get('/related')
-async def get_products_related(product_id: str, price_range: float = 0.4, limit_per_category: int = 12, session: AsyncSession = Depends(get_session)):
+async def get_products_related(product_id: str = Query(..., description="ID của sản phẩm cần tìm related products"), 
+                               price_range: float = Query(default=0.4, ge=0.1, le=1.0, description="Khoảng giá tương đối (0.4 = ±40%)"),
+                               limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm tối đa"), session: AsyncSession = Depends(get_session)):
     products = await get_related_products_service.get_related_products(product_id, session, limit_per_category, price_range)
 
     return JSONResponse(
@@ -202,52 +254,65 @@ async def count_new_products(token_details: dict = Depends(access_token_bearer),
 
 
 @product_admin_router.get('/all', dependencies=[Depends(admin_role_middleware)])
-async def get_all_product_admin(search: Optional[str] = None,
-                                category_ids: Optional[List[str]] = Query(default=[]),
-                                min_price: Optional[int] = None,
-                                max_price: Optional[int] = None,
-                                sort_by: Optional[str] = None,
-                                colors: Optional[List[str]] = None,
-                                sizes: Optional[List[str]] = None,
-                                rating: Optional[List[int]] = Query(None),
-                                brand_id: Optional[str] = None,
-                                material_ids: Optional[List[str]] = Query(default=[]),
+async def get_all_product_admin(search: Optional[str] = Query(None, max_length=200),
+                                category_ids: Optional[List[str]] = Query(default=None, max_items=20),
+                                category_slugs: Optional[List[str]] = Query(default=None, max_items=20),
+                                min_price: Optional[int] = Query(None, ge=0),
+                                max_price: Optional[int] = Query(None, ge=0),
+                                sort_by: Optional[str] = Query(
+                                    SortBy.NEWEST,
+                                    pattern="^(newest|oldest|price_asc|price_desc|name_asc|name_desc|best_seller|sale_desc|rating_desc)$"
+                                ),
+                                colors: Optional[List[str]] = Query(default=None, max_items=50),
+                                sizes: Optional[List[str]] = Query(default=None, max_items=20),
+                                rating: Optional[List[int]] = Query(default=None, ge=1, le=5, max_items=5),
+                                brand_id: Optional[str] = Query(None),
+                                material_ids: Optional[List[str]] = Query(default=None, max_items=20),
+                                skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                limit: int = Query(16, ge=1, le=100, description="Số bản ghi tối đa"),
                                 token_details: dict = Depends(access_token_bearer),
-                                skip: int = 0, limit: int = 10,
                                 session: AsyncSession = Depends(get_session)):
+    if min_price is not None and max_price is not None and min_price > max_price:
+        ProductException.min_price_greater_than_max_price()
+        
     filter_data = ProductFilterModel(
         search=search,
-        category_ids=category_ids,
+        category_ids=category_ids or [],
+        category_slugs=category_slugs or [],
         min_price=min_price,
         max_price=max_price,
         sort_by=sort_by,
-        colors=colors,
-        sizes=sizes,
-        rating=rating,
+        colors=colors or [],
+        sizes=sizes or [],
+        rating=rating or [],
         brand_id=brand_id,
-        material_ids=material_ids
+        material_ids=material_ids or []
     )
 
-    product_list_dict = await get_all_products_service.get_all_product_admin(filter_data, session, skip, limit,
-                                                                            include_status=True)
+    products = await get_all_products_admin_service.get_all_product_admin(filter_data, session, skip, limit,
+                                                                                   include_status=True)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thông tin của các sản phẩm",
-            "content": product_list_dict
+            "content": products
         }
     )
 
 
 @product_customer_router.get('/{identifier}')
-async def get_detail_product_customer(identifier: str, session: AsyncSession = Depends(get_session)):
-    product_dict = await get_detail_product_service.get_detail_product_customer(identifier, session)
+async def get_detail_product_customer(identifier: str = Path(..., min_length=1, max_length=255, description="Product ID hoặc slug"), 
+                                      session: AsyncSession = Depends(get_session)):
+    if not identifier or not identifier.strip():
+        ProductException.identifier_must_not_be_empty()
+        
+    product_dict = await get_detail_product_service.get_detail_product_customer(identifier.strip(), session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin chi tiết của sản phẩm",
+            "message": "Thông tin chi tiết của sản phẩm",
             "content": product_dict
         }
     )
@@ -268,11 +333,14 @@ async def get_product_id(product_identifier: str, session: AsyncSession = Depend
     )
 
 
-@product_admin_router.get('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def get_detail_product_admin(id: str,
+@product_admin_router.get('/{identifier}', dependencies=[Depends(admin_role_middleware)])
+async def get_detail_product_admin(identifier: str = Path(..., min_length=1, max_length=255, description="Product ID hoặc slug"),
                                    token_details: dict = Depends(access_token_bearer),
                                    session: AsyncSession = Depends(get_session)):
-    product_dict = await get_detail_product_service.get_detail_product_admin(id, session)
+    if not identifier or not identifier.strip():
+        ProductException.identifier_must_not_be_empty()
+        
+    product_dict = await get_detail_product_service.get_detail_product_admin(identifier.strip(), session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

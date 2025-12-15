@@ -201,3 +201,73 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
+        
+    @staticmethod
+    def duplicate_sku():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "SKU của biến thể bị trùng lặp",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def sku_already_exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "SKU này đã tồn tại trong hệ thống",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def category_identifier_must_not_be_empty():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "category_identifier không được để trống",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def identifier_must_not_be_empty():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "identifier không được để trống",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def min_price_greater_than_max_price():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "min_price không được lớn hơn max_price",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def search_must_not_be_empty():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Từ khóa tìm kiếm không được để trống",
+                "error_code": "product_018",
+            },
+        )
+        
+    @staticmethod
+    def search_too_short():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Từ khóa tìm kiếm quá ngắn",
+                "error_code": "product_018",
+            },
+        )
