@@ -53,3 +53,38 @@ class MaterialException:
                 "error_code": "mate_004",
             },
         )
+
+    @staticmethod
+    def materials_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sản phẩm phải có thông tin chất liệu"
+        )
+
+    @staticmethod
+    def invalid_material_percentage(total: float):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tổng phần trăm chất liệu phải bằng 100 (hiện tại: {total})"
+        )
+
+    @staticmethod
+    def material_id_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Material ID là bắt buộc"
+        )
+
+    @staticmethod
+    def duplicate_material(material_id: str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chất liệu bị trùng lặp: {material_id}"
+        )
+
+    @staticmethod
+    def invalid_percentage(material_id: str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Phần trăm không hợp lệ cho chất liệu {material_id} (phải từ 0-100)"
+        )

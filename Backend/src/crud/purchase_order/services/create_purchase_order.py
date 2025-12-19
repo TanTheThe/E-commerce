@@ -43,12 +43,12 @@ class CreatePurchaseOrderService:
         sub_total = 0
 
         for item in request.items:
-            condition = and_(Product_Variant.id == item.product_variant_id)
-            joins = [
+            condition = [Product_Variant.id == item.product_variant_id, Product_Variant.deleted_at.is_(None)]
+            options = [
                 selectinload(Product_Variant.product),
                 selectinload(Product_Variant.color)
             ]
-            variant = await product_variant_repository.get_product_variant(condition, session=session, joins=joins)
+            variant = await product_variant_repository.get_product_variant(session=session, where_conditions=condition, options=options)
             if not variant:
                 ProductException.not_found_variant()
 

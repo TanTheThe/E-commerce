@@ -1,32 +1,15 @@
-from datetime import datetime
-
+from typing import List, Dict, Any
 from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
-from src.crud.color.repositories import ColorRepository
-from src.crud.color.services import ColorService
-from src.crud.product.services.get_detail_product import GetDetailProductService
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories, Product_Variant, Special_Offer
+from src.crud.product.services.utils import UtilProductsService
+from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc
 from src.crud.product.repositories import ProductRepository
-from src.crud.categories.repositories import CategoriesRepository
-from src.crud.categories_product.repositories import CategoriesProductRepository
-from src.crud.product_variant.services import ProductVariantService
-from src.crud.categories_product.services import CategoriesProductService
 from src.errors.product import ProductException
 
 product_repository = ProductRepository()
-categories_repository = CategoriesRepository()
-cate_product_repository = CategoriesProductRepository()
-product_variant_repository = ProductVariantRepository()
-color_repository = ColorRepository()
-size_repository = SizeRepository()
-get_detail_product_service = GetDetailProductService()
-product_variant_service = ProductVariantService()
-categories_product_service = CategoriesProductService()
-color_service = ColorService()
+utils_service = UtilProductsService()
 
 
 class GetRelatedProductsService:
@@ -61,7 +44,7 @@ class GetRelatedProductsService:
             )
         ]
 
-        current_product_tuple = await product_repository.get_product(session=session, condition=condition, options=options)
+        current_product_tuple = await product_repository.get_product(session=session, where_conditions=condition, options=options)
         current_product = current_product_tuple[0]
 
         if not current_product:
@@ -142,75 +125,32 @@ class GetRelatedProductsService:
             )
         ]
 
-        products, _ = await product_repository.get_all_product(session=session, where_conditions=condition,
-                                                               options=joins, skip=0, limit=limit_per_category * 3,
-                                                               order_by=order_by)
+        products, total = await product_repository.get_all_product(session=session,
+            where_conditions=conditions,
+            options=options,
+            skip=0,
+            limit=limit * 3,
+            order_by=order_by
+        )
 
-        product_list = []
-        for product in products:
-            if len(product_list) >= limit_per_category:
-                break
+        related_products = await self.filter_and_rank_products(products, product_info, limit)
 
-            p = product[0]
-
-            valid_categories = [cat for cat in p.categories if cat.deleted_at is None]
-            if not valid_categories:
-                continue
-
-            active_variants = [
-                v for v in p.product_variant
-                if v.deleted_at is None and v.quantity > 0
-            ]
-
-            if not active_variants:
-                continue
-
-            prices = [v.price for v in active_variants if v.price is not None]
-            if not prices:
-                continue
-
-            price_min = min(prices)
-
-            if price_min <= 0 or price_min < min_price or price_min > max_price:
-                continue
-
-            offer = p.special_offer
-            valid_offer = self._is_offer_valid(offer)
-            offer_discount = offer.discount if valid_offer else None
-            offer_type = offer.type if valid_offer else None
-
-            original_price = price_min
-            discounted_price = original_price
-
-            if offer_type and offer_discount is not None:
-                if offer_type == "percent":
-                    raw_discounted_price = original_price * (1 - offer_discount / 100)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
-                elif offer_type == "fixed":
-                    raw_discounted_price = max(0, original_price - offer_discount)
-                    discounted_price = int(round(raw_discounted_price / 1000) * 1000)
-
-            if discounted_price < 0:
-                discounted_price = 0
-
-            product_data = {
-                "id": str(p.id),
-                "name": p.name,
-                "images": p.images,
-                "total_sold": p.total_sold,
-                "slug": p.slug,
-                "categories": [
-                    {"id": str(category.id), "name": category.name}
-                    for category in valid_categories
-                ],
-                "original_price": original_price,
-                "discounted_price": discounted_price,
-                "avg_rating": p.avg_rating,
+        return {
+            "products": related_products,
+            "total": len(related_products),
+            "limit": limit,
+            "reference_product": {
+                "id": str(current_product.id),
+                "name": current_product.name,
+                "price": product_info["current_price"]
+            },
+            "filters_applied": {
+                "price_range_percent": price_range * 100,
+                "min_price": product_info["min_price"],
+                "max_price": product_info["max_price"],
+                "categories": product_info["categories"]
             }
-
-            product_list.append(product_data)
-
-        return product_list
+        }
 
 
     async def extract_product_info(self, product: Product):
@@ -255,3 +195,101 @@ class GetRelatedProductsService:
                 for cat in valid_categories
             ]
         }
+
+
+    async def filter_and_rank_products(self, products: List, product_info: Dict[str, Any], limit: int):
+        related_products = []
+        min_price = product_info["min_price"]
+        max_price = product_info["max_price"]
+        current_category_ids = set(str(cat_id) for cat_id in product_info["category_ids"])
+
+        for product_tuple in products:
+            if len(related_products) >= limit:
+                break
+
+            p = product_tuple[0]
+
+            valid_categories = [
+                cat for cat in p.categories
+                if cat.deleted_at is None
+            ]
+
+            if not valid_categories:
+                continue
+
+            active_variants = [
+                v for v in p.product_variant
+                if v.deleted_at is None and v.quantity > 0
+            ]
+
+            if not active_variants:
+                continue
+
+            prices = [v.price for v in active_variants if v.price is not None and v.price > 0]
+
+            if not prices:
+                continue
+
+            price_min = min(prices)
+
+            if price_min < min_price or price_min > max_price:
+                continue
+
+            product_category_ids = set(str(cat.id) for cat in valid_categories)
+            matching_categories = current_category_ids.intersection(product_category_ids)
+            relevance_score = len(matching_categories)
+
+            offer = p.special_offer
+            offer_status = utils_service.get_offer_status(offer)
+
+            original_price = price_min
+            discounted_price = original_price
+
+            if offer_status["is_valid"] and offer:
+                if offer.type == "percent":
+                    raw_discounted = original_price * (1 - offer.discount / 100)
+                    discounted_price = int(round(raw_discounted / 1000) * 1000)
+                elif offer.type == "fixed":
+                    raw_discounted = max(0, original_price - offer.discount)
+                    discounted_price = int(round(raw_discounted / 1000) * 1000)
+
+            discounted_price = max(0, discounted_price)
+
+            product_data = {
+                "id": str(p.id),
+                "name": p.name,
+                "slug": p.slug,
+                "images": p.images if p.images else [],
+                "description": p.short_description,
+                "categories": [
+                    {
+                        "id": str(cat.id),
+                        "name": cat.name,
+                        "slug": cat.slug if hasattr(cat, 'slug') else None
+                    }
+                    for cat in valid_categories
+                ],
+                "brand": {
+                    "id": str(p.brand.id),
+                    "name": p.brand.name,
+                    "slug": p.brand.slug
+                } if p.brand and p.brand.deleted_at is None else None,
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "discount_percentage": round(
+                    ((original_price - discounted_price) / original_price * 100), 2
+                ) if original_price > 0 else 0,
+                "avg_rating": float(p.avg_rating) if p.avg_rating else 0.0,
+                "total_sold": p.total_sold if p.total_sold else 0,
+                "in_stock": True,
+                "relevance_score": relevance_score,
+                "price_difference_percent": round(
+                    abs((price_min - product_info["current_price"]) / product_info["current_price"] * 100), 2
+                )
+            }
+
+            related_products.append(product_data)
+
+        related_products.sort(key=lambda x: (-x["relevance_score"], -x["total_sold"], -x["avg_rating"]))
+
+        return related_products

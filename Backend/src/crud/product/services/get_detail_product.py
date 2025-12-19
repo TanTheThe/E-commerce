@@ -1,5 +1,3 @@
-import uuid
-from datetime import datetime
 from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
@@ -9,7 +7,6 @@ from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color, Special_Offer, Brand, \
     Product_Material, Material, Product_Tag, Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
 from src.crud.categories_product.repositories import CategoriesProductRepository
@@ -181,7 +178,7 @@ class GetDetailProductService:
                 Product.status == "active"
             ]
 
-        joins = [
+        options = [
             selectinload(Product.categories_product).options(
                 joinedload(Categories_Product.categories).load_only(
                     Categories.id,
@@ -255,7 +252,7 @@ class GetDetailProductService:
             ),
         ]
 
-        return await product_repository.get_product(condition, session, joins)
+        return await product_repository.get_product(session=session, where_conditions=condition, options=options)
 
 
     async def get_detail_product_admin(self, product_identifier: str, session: AsyncSession):

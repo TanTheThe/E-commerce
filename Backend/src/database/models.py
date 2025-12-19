@@ -633,6 +633,13 @@ class Special_Offer(SQLModel, table=True):
 
 class UserSpecialOffer(SQLModel, table=True):
     __tablename__ = 'user_special_offer'
+    __table_args__ = (
+        UniqueConstraint(
+            'special_offer_id',
+            'user_id',
+            name='uq_user_special_offer_offer_user'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(

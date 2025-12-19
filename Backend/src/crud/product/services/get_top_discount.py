@@ -1,59 +1,76 @@
-from datetime import datetime
+from sqlalchemy import exists, func
 from sqlalchemy.orm import selectinload, joinedload
-from sqlmodel import desc
-from src.crud.color.repositories import ColorRepository
-from src.crud.color.services import ColorService
-from src.crud.product.services.get_detail_product import GetDetailProductService
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.size.repositories import SizeRepository
+from sqlmodel import desc, and_, select
+from src.crud.product.services.utils import UtilProductsService
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.product.repositories import ProductRepository
-from src.crud.categories.repositories import CategoriesRepository
-from src.crud.categories_product.repositories import CategoriesProductRepository
-from src.crud.product_variant.services import ProductVariantService
-from src.crud.categories_product.services import CategoriesProductService
 from src.database.models import Product, Categories, Product_Variant, Special_Offer
 
 product_repository = ProductRepository()
-categories_repository = CategoriesRepository()
-cate_product_repository = CategoriesProductRepository()
-product_variant_repository = ProductVariantRepository()
-color_repository = ColorRepository()
-size_repository = SizeRepository()
-get_detail_product_service = GetDetailProductService()
-product_variant_service = ProductVariantService()
-categories_product_service = CategoriesProductService()
-color_service = ColorService()
+
+utils_service = UtilProductsService()
 
 
 class GetTopDiscountService:
+    MAX_LIMIT = 50
+
     async def get_top_discount(self, session: AsyncSession, limit: int = 12):
-        condition = [
+        limit = min(limit, self.MAX_LIMIT)
+
+        conditions = [
             Product.deleted_at.is_(None),
-            Product.status == "active"
+            Product.status == "active",
+            Product.special_offer_id.isnot(None),
+            exists().where(
+                and_(
+                    Special_Offer.id == Product.special_offer_id,
+                    Special_Offer.type == "percent",
+                    Special_Offer.discount > 0,
+                    Special_Offer.start_time <= func.now(),
+                    Special_Offer.end_time >= func.now(),
+                    Special_Offer.used_quantity < Special_Offer.total_quantity,
+                    Special_Offer.deleted_at.is_(None)
+                )
+            ),
+            exists().where(
+                and_(
+                    Product_Variant.product_id == Product.id,
+                    Product_Variant.deleted_at.is_(None),
+                    Product_Variant.quantity > 0,
+                    Product_Variant.price > 0
+                )
+            )
         ]
 
-        order_by = desc(Product.created_at)
+        order_by = [
+            desc(
+                select(Special_Offer.discount)
+                .where(Special_Offer.id == Product.special_offer_id)
+                .scalar_subquery()
+            ),
+            desc(Product.total_sold),
+            desc(Product.avg_rating)
+        ]
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
                 Categories.id,
                 Categories.name,
+                Categories.slug,
                 Categories.parent_id,
                 Categories.deleted_at
             ),
-
             selectinload(Product.product_variant).load_only(
                 Product_Variant.id,
                 Product_Variant.price,
                 Product_Variant.quantity,
                 Product_Variant.deleted_at
             ),
-
             selectinload(Product.special_offer).load_only(
                 Special_Offer.id,
+                Special_Offer.name,
                 Special_Offer.discount,
                 Special_Offer.type,
                 Special_Offer.used_quantity,
@@ -64,99 +81,110 @@ class GetTopDiscountService:
             ),
         ]
 
-        products, _ = await product_repository.get_all_product(
+        products, total = await product_repository.get_all_product(
             session=session,
-            where_conditions=condition, options=joins, skip=0,
-            limit=limit * 10,
+            where_conditions=conditions,
+            options=options,
+            skip=0,
+            limit=limit * 2,
             order_by=order_by
         )
 
-        products_with_discount = []
+        product_list = []
 
-        for product in products:
-            p = product[0]
+        for product_tuple in products:
+            if len(product_list) >= limit:
+                break
 
-            valid_categories = [cat for cat in p.categories if cat.deleted_at is None]
+            p = product_tuple[0]
+
+            valid_categories = [
+                cat for cat in p.categories
+                if cat.deleted_at is None
+            ]
+
             if not valid_categories:
                 continue
 
             active_variants = [
-                variant for variant in p.product_variant
-                if variant.deleted_at is None and variant.quantity > 0
+                v for v in p.product_variant
+                if v.deleted_at is None and v.quantity > 0
             ]
 
             if not active_variants:
                 continue
 
-            prices = [variant.price for variant in active_variants if variant.price is not None]
+            prices = [v.price for v in active_variants if v.price is not None and v.price > 0]
+
             if not prices:
                 continue
 
             price_min = min(prices)
 
-            if price_min <= 0:
-                continue
-
             offer = p.special_offer
-            valid_offer = self._is_offer_valid(offer)
 
-            if not valid_offer or not offer.discount or offer.type != "percent":
+            if not offer or offer.type != "percent" or offer.discount <= 0:
                 continue
 
-            if offer.discount <= 0:
+            offer_status = utils_service.get_offer_status(offer)
+
+            if not offer_status["is_valid"]:
                 continue
 
-            offer_discount = offer.discount
             original_price = price_min
+            raw_discounted = original_price * (1 - offer.discount / 100)
+            discounted_price = int(round(raw_discounted / 1000) * 1000)
 
-            raw_discounted_price = original_price * (1 - offer_discount / 100)
-            discounted_price = int(round(raw_discounted_price / 1000) * 1000)
-
-            if discounted_price < 0 or discounted_price >= original_price:
+            if discounted_price >= original_price:
                 continue
+
+            discounted_price = max(0, discounted_price)
+
+            discount_amount = original_price - discounted_price
 
             product_data = {
                 "id": str(p.id),
                 "name": p.name,
-                "images": p.images,
-                "avg_rating": p.avg_rating,
-                "total_sold": p.total_sold,
                 "slug": p.slug,
-                "original_price": original_price,
-                "discounted_price": discounted_price,
-                "discount_percent": offer_discount,
+                "images": p.images if p.images else [],
+                "description": p.short_description,
                 "categories": [
                     {
-                        "id": str(category.id),
-                        "name": category.name,
+                        "id": str(cat.id),
+                        "name": cat.name,
+                        "slug": cat.slug if hasattr(cat, 'slug') else None
                     }
-                    for category in valid_categories
-                ]
+                    for cat in valid_categories
+                ],
+                "original_price": original_price,
+                "discounted_price": discounted_price,
+                "discount_percentage": float(offer.discount),
+                "discount_amount": discount_amount,
+                "savings": discount_amount,
+                "avg_rating": float(p.avg_rating) if p.avg_rating else 0.0,
+                "total_sold": p.total_sold if p.total_sold else 0,
+                "in_stock": True,
+                "offer": {
+                    "id": str(offer.id),
+                    "name": offer.name,
+                    "type": offer.type,
+                    "discount": offer.discount,
+                    "start_time": offer.start_time.isoformat() if offer.start_time else None,
+                    "end_time": offer.end_time.isoformat() if offer.end_time else None,
+                    "remaining_quantity": offer.total_quantity - offer.used_quantity,
+                    "total_quantity": offer.total_quantity
+                }
             }
 
-            products_with_discount.append(product_data)
-
-        products_with_discount.sort(key=lambda x: x["discount_percent"], reverse=True)
-
-        product_list = []
-        for product_data in products_with_discount[:limit]:
-            product_data.pop("discount_percent", None)
             product_list.append(product_data)
 
-        return product_list
-
-    def _is_offer_valid(self, offer: Special_Offer) -> bool:
-        if not offer:
-            return False
-
-        if offer.deleted_at is not None:
-            return False
-
-        now = datetime.now()
-        if offer.start_time > now or offer.end_time < now:
-            return False
-
-        if offer.used_quantity >= offer.total_quantity:
-            return False
-
-        return True
+        return {
+            "products": product_list,
+            "total": len(product_list),
+            "limit": limit,
+            "highest_discount": product_list[0]["discount_percentage"] if product_list else 0,
+            "lowest_discount": product_list[-1]["discount_percentage"] if product_list else 0,
+            "average_discount": round(
+                sum(p["discount_percentage"] for p in product_list) / len(product_list), 2
+            ) if product_list else 0
+        }

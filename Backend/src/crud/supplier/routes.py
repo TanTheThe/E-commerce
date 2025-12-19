@@ -34,7 +34,7 @@ async def create_supplier(supplier_data: SupplierCreate,
     supplier = await create_supplier_service.create_supplier(supplier_data, session)
     
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_201_CREATED,
         content={
             "message": "Tạo thông tin nhà cung cấp thành công",
             "content": supplier

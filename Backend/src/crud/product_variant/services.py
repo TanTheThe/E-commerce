@@ -1,86 +1,97 @@
 from datetime import datetime
 import uuid
-from sqlalchemy.orm import noload
+from typing import List, Set, Dict
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, case
-from sqlalchemy import literal, text
+from sqlmodel import case
+from src.crud.color.repositories import ColorRepository
+from src.crud.order.repositories import OrderRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
-from src.database.models import Product_Variant
-from uuid import UUID
-
+from src.database.models import Product_Variant, Color, Order_Detail, Order
 from src.errors.color import ColorException
+from src.errors.product import ProductException
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 product_variant_repository = ProductVariantRepository()
+color_repository = ColorRepository()
+order_repository = OrderRepository()
 
 
 class ProductVariantService:
     async def update_product_variant(self, product_id: str, new_variants: list, session: AsyncSession):
-        condition = [Product_Variant.product_id == product_id]
-        existing_variants, _ = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition)
+        try:
+            if not new_variants:
+                ProductException.variants_required()
 
-        existing_dict = {str(v.id): v for v in existing_variants}
-        new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}
+            if len(new_variants) > 50:
+                ProductException.too_many_variants()
 
-        # VD: v1, v2, v3
-        old_ids = set(existing_dict.keys())
+            condition = [
+                Product_Variant.product_id == product_id,
+                Product_Variant.deleted_at.is_(None)
+            ]
+            existing_variants, _ = await product_variant_repository.get_all_product_variant(session=session, where_conditions=condition)
 
-        # VD: v2, v4
-        new_ids = set(new_dict.keys())
+            existing_dict = {str(v.id): v for v in existing_variants}
+            new_dict = {str(v["id"]): v for v in new_variants if v.get("id")}
 
-        # KQ: v1, v3 => Những cái cũ của product đó (ko có trong new_variants) nên cần đc loại bỏ
-        to_soft_delete_ids = old_ids - new_ids
+            invalid_ids = set(new_dict.keys()) - set(existing_dict.keys())
+            if invalid_ids:
+                raise ProductException.variant_not_belong_to_product(list(invalid_ids))
 
-        for variant_id in to_soft_delete_ids:
-            variant = existing_dict[variant_id]
-            if variant.deleted_at is None:
-                variant.deleted_at = datetime.now()
+            await self.validate_skus(new_variants, product_id, session)
 
-        to_update_data = {}
-        for variant_id in new_ids & old_ids:
-            data = new_dict[variant_id]
+            self.validate_variant_combinations(new_variants)
 
-            if data.get("color_id") and (data.get("color_name") or data.get("color_code")):
-                ColorException.invalid_color_format()
-            if not data.get("color_id") and (not data.get("color_name") or not data.get("color_code")):
-                ColorException.invalid_color_format()
+            await self.validate_colors(new_variants, session)
 
-            if data.get("color_id") and (not data.get("color_name") and not data.get("color_code")):
-                sku = data["sku"] or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
-                to_update_data[UUID(variant_id)] = {
-                    "size": data.get("size"),
-                    "image": data.get("image"),
-                    "color_id": UUID(data.get("color_id")),
-                    "price": data["price"],
-                    "quantity": data["quantity"],
-                    "sku": sku,
-                    "deleted_at": None,
-                    "updated_at": datetime.now()
-                }
+            old_ids = set(existing_dict.keys())
+            new_ids = set(new_dict.keys())
 
-            if not data.get("color_id") and (data.get("color_name") and data.get("color_code")):
-                sku = data["sku"] or f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
-                to_update_data[UUID(variant_id)] = {
-                    "size": data.get("size"),
-                    "image": data.get("image"),
-                    "color_name": data.get("color_name"),
-                    "color_code": data.get("color_code"),
-                    "price": data["price"],
-                    "quantity": data["quantity"],
-                    "sku": sku,
-                    "deleted_at": None,
-                    "updated_at": datetime.now()
-                }
+            to_soft_delete_ids = old_ids - new_ids
 
-        if to_update_data:
-            await self._bulk_update_variants(to_update_data, session)
+            to_update_ids = new_ids & old_ids
 
-        to_create = [v for v in new_variants if not v.get("id")]
-        if to_create:
-            await self._bulk_create_variants(to_create, product_id, session)
+            to_create = [v for v in new_variants if not v.get("id") or str(v.get("id")) not in old_ids]
 
-        await session.commit()
+            if to_soft_delete_ids:
+                conditions = [
+                    Order_Detail.product_variant_id.in_(to_soft_delete_ids),
+                    Order.status.in_(['pending', 'processing', 'confirmed']),
+                    Order_Detail.order_id == Order.id
+                ]
 
-    async def _bulk_update_variants(self, update_data: dict[UUID, dict], session: AsyncSession):
+                order_details = await order_repository.get_all_order(session=session, where_conditions=conditions)
+
+                if order_details:
+                    ProductException.cant_delete_variants_in_pending_orders()
+
+            if to_soft_delete_ids:
+                for variant_id in to_soft_delete_ids:
+                    variant = existing_dict[variant_id]
+                    if variant.deleted_at is None:
+                        variant.deleted_at = datetime.now()
+                        variant.updated_at = datetime.now()
+
+            if to_update_ids:
+                to_update_data = await self.prepare_update_data(to_update_ids, new_dict, product_id)
+                if to_update_data:
+                    await self.bulk_update_variants(to_update_data, session)
+
+            if to_create:
+                await self.bulk_create_variants(to_create, product_id, session)
+
+        except Exception as e:
+            logger.error(f"Error updating variants for product {product_id}: {str(e)}")
+            raise ProductException.variant_update_failed()
+
+
+    async def bulk_update_variants(self, update_data: Dict[str, dict], session: AsyncSession):
+        if not update_data:
+            return
+
         ids = list(update_data.keys())
 
         def build_case(field: str):
@@ -89,10 +100,7 @@ class ProductVariantService:
 
             for uid, data in update_data.items():
                 field_value = data.get(field)
-                if field_value is not None:
-                    cases.append((Product_Variant.id == uid, field_value))
-                else:
-                    cases.append((Product_Variant.id == uid, None))
+                cases.append((Product_Variant.id == uid, field_value))
 
             return case(*cases, else_=col)
 
@@ -109,7 +117,110 @@ class ProductVariantService:
             "deleted_at": build_case("deleted_at"),
             "updated_at": build_case("updated_at"),
         }
+
         await product_variant_repository.update_product_variant(values_dict, condition, session)
 
-    async def _bulk_create_variants(self, items: list[dict], product_id: str, session: AsyncSession):
+
+    async def bulk_create_variants(self, items: list[dict], product_id: str, session: AsyncSession):
         await product_variant_repository.create_product_variant(items, product_id, session)
+
+
+    async def validate_skus(self, variants: List[dict], product_id: str, session: AsyncSession):
+        skus = []
+        for variant in variants:
+            sku = variant.get("sku")
+            if sku:
+                sku = sku.strip().upper()
+
+                if sku in skus:
+                    raise ProductException.duplicate_sku()
+                skus.append(sku)
+
+                variant_id = variant.get("id")
+                conditions = [
+                    Product_Variant.sku == sku,
+                    Product_Variant.deleted_at.is_(None),
+                ]
+                if variant_id:
+                    conditions.append(Product_Variant.id != variant_id)
+                else:
+                    conditions.append(Product_Variant.product_id != product_id)
+
+                exists = await product_variant_repository.get_product_variant(
+                    session=session,
+                    select_columns=[Product_Variant.id],
+                    where_conditions=conditions,
+                )
+                if exists:
+                    ProductException.sku_already_exists()
+
+
+    def validate_variant_combinations(self, variants: List[dict]):
+        combinations = set()
+
+        color_key = ""
+        for idx, variant in enumerate(variants):
+            size = str(variant.get("size", "")).strip().upper()
+
+            if variant.get("color_id"):
+                color_key = str(variant["color_id"])
+            elif variant.get("color_name") and variant.get("color_code"):
+                color_key = f"{variant['color_name']}_{variant['color_code']}"
+            else:
+                ProductException.invalid_color_data(idx)
+
+            combo = f"{size}_{color_key}"
+
+            if combo in combinations:
+                ProductException.duplicate_variant_combination(size, color_key)
+
+            combinations.add(combo)
+
+
+    async def validate_colors(self, variants: List[dict], session: AsyncSession):
+        for idx, variant in enumerate(variants):
+            color_id = variant.get("color_id")
+
+            if color_id:
+                conditions = [Color.id == color_id, Color.deleted_at.is_(None)]
+                color_exists = await color_repository.get_color(session=session, where_conditions=conditions)
+                if not color_exists:
+                    raise ColorException.color_not_found()
+            else:
+                raise ProductException.invalid_color_data(idx)
+
+
+    async def prepare_update_data(self, variant_ids: Set[str], new_dict: Dict, product_id: str):
+        to_update_data = {}
+
+        for variant_id in variant_ids:
+            data = new_dict[variant_id]
+
+            sku = data.get("sku")
+            if not sku:
+                sku = f"{str(product_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
+            else:
+                sku = sku.strip().upper()
+
+            update_dict = {
+                "size": data.get("size", "").strip().upper() if data.get("size") else None,
+                "image": data.get("image", "").strip() if data.get("image") else None,
+                "price": data["price"],
+                "quantity": data["quantity"],
+                "sku": sku,
+                "deleted_at": None,
+                "updated_at": datetime.now()
+            }
+
+            if data.get("color_id"):
+                update_dict["color_id"] = data["color_id"]
+                update_dict["color_name"] = None
+                update_dict["color_code"] = None
+            elif data.get("color_name") and data.get("color_code"):
+                update_dict["color_id"] = None
+                update_dict["color_name"] = data["color_name"]
+                update_dict["color_code"] = data["color_code"]
+
+            to_update_data[variant_id] = update_dict
+
+        return to_update_data

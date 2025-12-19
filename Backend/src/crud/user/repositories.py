@@ -55,40 +55,49 @@ class UserRepository:
         return user
 
 
-    async def get_all_users(self, conditions: List[Optional[ColumnElement[bool]]], session: AsyncSession,
-                            skip: int = 0, limit: int = 10, order_by: list = None, joins: list = None,
-                            options: list = None):
-        count_stmt = select(func.count(User.id))
-        if joins:
-            for join_table, join_condition in joins:
-                count_stmt = count_stmt.outerjoin(join_table, join_condition)
-
-        if conditions:
-            count_stmt = count_stmt.where(*conditions)
-
-        total_result = await session.exec(count_stmt)
-        total = total_result.one()
-
-        statement = select(User)
+    async def get_all_users(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(User)
+        else:
+            query = select(*select_columns).select_from(User)
 
         if joins:
-            for join_table, join_condition in joins:
-                statement = statement.outerjoin(join_table, join_condition)
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        if conditions:
-            statement = statement.where(*conditions)
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
 
         if options:
-            statement = statement.options(*options)
+            query = query.options(*options)
 
-        if order_by:
-            statement = statement.order_by(*order_by, User.id)
-        else:
-            statement = statement.order_by(User.id)
+        if order_by is not None:
+            query = query.order_by(order_by)
 
-        statement = statement.offset(skip).limit(limit)
+        query = query.offset(skip).limit(limit)
 
-        result = await session.exec(statement)
+        result = await session.exec(query)
         users = result.all()
 
         return users, total

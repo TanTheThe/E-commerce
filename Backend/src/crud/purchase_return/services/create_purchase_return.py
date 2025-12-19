@@ -148,9 +148,9 @@ class CreatePurchaseReturnService:
             if return_quantity > max_returnable:
                 PurchaseReturnException.return_quantity_greater_than_max_returnable()
 
-            condition_variant = and_(Product_Variant.id == gr_detail.product_variant_id)
+            condition_variant = [Product_Variant.id == gr_detail.product_variant_id]
             options = [selectinload(Product_Variant.product), selectinload(Product_Variant.color)]
-            variant = await product_variant_repository.get_product_variant(condition_variant, session, options)
+            variant = await product_variant_repository.get_product_variant(session=session, where_conditions=condition_variant, options=options)
 
             validated_items.append({
                 "gr_detail_id": gr_detail_id,

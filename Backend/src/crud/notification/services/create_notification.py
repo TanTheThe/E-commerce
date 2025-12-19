@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from src.crud.notification.repositories import NotificationRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 import json
@@ -159,8 +159,11 @@ class CreateNotificationService:
 
         return await notification_repository.create_notification(notification_data, session)
 
-    async def create_assign_special_offer_notification(self, session: AsyncSession, special_offer_id: str, special_offer_name: str,
-                                                       customer_id: str, admin_note: Optional[str] = None, admin_id: Optional[str] = None):
+    async def bulk_create_assign_special_offer_notification(self, session: AsyncSession, special_offer_id: str, special_offer_name: str,
+                                                            customer_ids: List[str], admin_note: Optional[str] = None, admin_id: Optional[str] = None):
+        if not customer_ids:
+            return 0
+
         message = f"Bạn vừa nhận được khuyến mãi #{special_offer_name} từ cửa hàng."
         if admin_note:
             message += f" Ghi chú: {admin_note}"
@@ -171,21 +174,28 @@ class CreateNotificationService:
             "assigned_at": datetime.now().isoformat(),
             "admin_note": admin_note
         }
+        action_data_json = json.dumps(action_data)
 
-        notification_data = {
-            "recipient_type": RecipientType.CUSTOMER,
-            "recipient_id": customer_id,
-            "sender_type": RecipientType.ADMIN,
-            "sender_id": admin_id,
-            "type": NotificationType.SPECIAL_OFFER_ASSIGNED,
-            "title": f"Vừa nhận được khuyến mãi #{special_offer_name}",
-            "message": message,
-            "special_offer_id": special_offer_id,
-            "action_type": None,
-            "action_data": json.dumps(action_data)
-        }
+        title = f"Vừa nhận được khuyến mãi #{special_offer_name}"
 
-        return await notification_repository.create_notification(notification_data, session)
+        notifications = [
+            {
+                "recipient_type": RecipientType.CUSTOMER,
+                "recipient_id": customer_id,
+                "sender_type": RecipientType.ADMIN,
+                "sender_id": admin_id,
+                "type": NotificationType.SPECIAL_OFFER_ASSIGNED,
+                "title": title,
+                "message": message,
+                "special_offer_id": special_offer_id,
+                "action_type": None,
+                "action_data": action_data_json,
+                "created_at": datetime.now()
+            }
+            for customer_id in customer_ids
+        ]
+
+        return await notification_repository.bulk_create_notifications(notifications, session)
 
     # Gửi thông báo hoàn trả đơn hàng
     async def create_return_request_notification(self, session: AsyncSession, return_order_id: str, customer_id: str, order_code: str, order_id: str):

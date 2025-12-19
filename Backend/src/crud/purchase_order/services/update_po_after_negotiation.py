@@ -62,11 +62,11 @@ class UpdatePOAfterNegotiationService:
             sub_total = 0
 
             for item in request.items:
-                condition_variant = and_(
+                condition_variant = [
                     Product_Variant.id == item.product_variant_id,
                     Product_Variant.deleted_at.is_(None)
-                )
-                variant = await product_variant_repository.get_product_variant(condition_variant, session)
+                ]
+                variant = await product_variant_repository.get_product_variant(session=session, where_conditions=condition_variant)
                 if not variant:
                     ProductException.not_found_variant()
 

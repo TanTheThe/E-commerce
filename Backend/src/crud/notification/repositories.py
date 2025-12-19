@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import noload, load_only
 
 from src.database.models import Color, Notification
@@ -17,6 +18,13 @@ class NotificationRepository:
         )
         session.add(new_notification)
         return new_notification
+
+    async def bulk_create_notifications(self, notifications: List, session: AsyncSession):
+        stmt = insert(Notification).values(notifications)
+
+        result = await session.execute(stmt)
+
+        return len(notifications)
 
 
     async def get_all_notifications(self, session: AsyncSession,

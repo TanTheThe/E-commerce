@@ -1,3 +1,4 @@
+from src.database.models import Special_Offer
 from src.errors.special_offer import SpecialOfferException
 from src.schemas.special_offer import SpecialOfferCreateModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -35,13 +36,24 @@ class CreateSpecialOfferService:
 
         new_special_offer = await special_offer_repository.create_special_offer(create_data, session)
 
-        def serialize(obj: Any):
-            if isinstance(obj, datetime):
-                return obj.isoformat()
-            return obj
+        return self.serialize_special_offer(new_special_offer)
 
-        return {k: serialize(v) for k, v in create_data.items()}
 
+    def serialize_special_offer(self, special_offer: Special_Offer) -> dict:
+        return {
+            "id": str(special_offer.id),
+            "code": special_offer.code,
+            "name": special_offer.name,
+            "discount": special_offer.discount,
+            "condition": special_offer.condition,
+            "type": special_offer.type,
+            "scope": special_offer.scope,
+            "total_quantity": special_offer.total_quantity,
+            "used_quantity": special_offer.used_quantity,
+            "start_time": special_offer.start_time.isoformat(),
+            "end_time": special_offer.end_time.isoformat(),
+            "created_at": special_offer.created_at.isoformat(),
+        }
 
 
 

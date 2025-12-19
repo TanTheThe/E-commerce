@@ -1,28 +1,14 @@
-from datetime import datetime
-from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
-from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product.services.utils import UtilProductsService
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand, Material, Product_Material, \
-    Tag
+from src.database.models import Product, Categories, Product_Variant, Special_Offer, Brand, Material, Product_Material
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, desc, asc, or_, func, select, case
 from src.crud.product.repositories import ProductRepository
-from src.crud.categories.repositories import CategoriesRepository
-from src.crud.categories_product.repositories import CategoriesProductRepository
 from src.crud.product_variant.services import ProductVariantService
 from src.crud.categories_product.services import CategoriesProductService
-from src.schemas.product import ProductFilterModel, SortBy
+from src.schemas.product import ProductFilterModel
 
 product_repository = ProductRepository()
-categories_repository = CategoriesRepository()
-cate_product_repository = CategoriesProductRepository()
-product_variant_repository = ProductVariantRepository()
-color_repository = ColorRepository()
-size_repository = SizeRepository()
 
 product_variant_service = ProductVariantService()
 categories_product_service = CategoriesProductService()

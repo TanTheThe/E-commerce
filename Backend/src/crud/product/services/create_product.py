@@ -1,4 +1,3 @@
-from sqlmodel import and_
 from src.crud.brand.repositories import BrandRepository
 from src.crud.color.repositories import ColorRepository
 from src.crud.material.repositories import MaterialRepository
@@ -72,7 +71,7 @@ class CreateProductService:
             if product_data.materials:
                 material_ids = [material.material_id for material in product_data.materials]
                 condition = [Material.id.in_(material_ids), Material.deleted_at.is_(None), Material.is_active == True]
-                existing_materials, _ = await material_repository.get_all_material(condition, session, 0, 1000)
+                existing_materials, _ = await material_repository.get_all_material(session=session, where_conditions=condition, skip=0, limit=1000)
 
                 if len(existing_materials) != len(material_ids):
                     existing_material_ids = {m.id for m in existing_materials}
@@ -101,7 +100,7 @@ class CreateProductService:
                 if len(existing_colors) != len(set(color_ids)):
                     existing_color_ids = {str(c.id) for c in existing_colors}
                     missing_color_ids = set(color_ids) - existing_color_ids
-                    ColorException.color_not_exists(list(missing_color_ids))
+                    ColorException.colors_not_found(list(missing_color_ids))
 
             new_product = await product_repository.create_product(product_data, session)
 
@@ -179,7 +178,7 @@ class CreateProductService:
             condition = [
                 Product.slug == base_slug, Product.deleted_at.is_(None), Product.status == "active"
             ]
-            existing = await product_repository.get_product(condition, session)
+            existing = await product_repository.get_product(session=session, where_conditions=condition)
 
             if not existing:
                 return base_slug

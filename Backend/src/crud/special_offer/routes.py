@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Query, Path
 
 from src.crud.special_offer.services.assign_offer_to_users import AssignOfferToUsersService
 from src.crud.special_offer.services.create_special_offer import CreateSpecialOfferService
@@ -7,8 +7,9 @@ from src.crud.special_offer.services.get_all_special_offer import GetAllSpecialO
 from src.crud.special_offer.services.set_offers_to_product import SetOfferToProductService
 from src.crud.special_offer.services.update_special_offer import UpdateSpecialOfferService
 from src.dependencies import AccessTokenBearer
+from src.errors.special_offer import SpecialOfferException
 from src.schemas.special_offer import SpecialOfferCreateModel, SpecialOfferUpdateModel, SpecialOfferFilterModel, \
-    SetOfferToProduct, AssignOfferToUsers
+    SetOfferToProduct, AssignOfferToUsers, OfferTypeEnum, OfferScopeEnum, QuantityStatusEnum, TimeStatusEnum
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -45,16 +46,20 @@ async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
 
 
 @special_offer_admin_router.get('/', dependencies=[Depends(admin_role_middleware)])
-async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
-                                      search: Optional[str] = None,
-                                      type: Optional[str] = None,
-                                      scope: Optional[str] = None,
-                                      discount_min: Optional[int] = None,
-                                      discount_max: Optional[int] = None,
-                                      quantity_status: Optional[str] = None,
-                                      time_status: Optional[str] = None,
+async def get_all_special_offer_admin(skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                      limit: int = Query(10, ge=1, le=100, description="Số bản ghi trả về (tối đa 100)"),
+                                      search: Optional[str] = Query(None, max_length=255, description="Tìm kiếm theo code hoặc name"),
+                                      type: Optional[OfferTypeEnum] = Query(None, description="Lọc theo loại giảm giá"),
+                                      scope: Optional[OfferScopeEnum] = Query(None, description="Lọc theo phạm vi"),
+                                      discount_min: Optional[int] = Query(None, ge=0, le=100, description="Giảm giá tối thiểu"),
+                                      discount_max: Optional[int] = Query(None, ge=0, le=100, description="Giảm giá tối đa"),
+                                      quantity_status: Optional[QuantityStatusEnum] = Query(None, description="Trạng thái số lượng"),
+                                      time_status: Optional[TimeStatusEnum] = Query(None, description="Trạng thái thời gian"),
                                       session: AsyncSession = Depends(get_session),
                                       token_details: dict = Depends(access_token_bearer)):
+    if discount_min is not None and discount_max is not None and discount_min > discount_max:
+        SpecialOfferException.min_must_less_than_max()
+
     filter_data = SpecialOfferFilterModel(
         search=search,
         type=type,
@@ -65,7 +70,7 @@ async def get_all_special_offer_admin(skip: int = 0, limit: int = 10,
         time_status=time_status
     )
 
-    special_offers = await get_all_special_offer_service.get_all_special_offer(session, filter_data, skip=skip, limit=limit)
+    special_offers = await get_all_special_offer_service.get_all_special_offer_admin(session, filter_data, skip=skip, limit=limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -81,12 +86,13 @@ async def set_offer_to_product(data: SetOfferToProduct,
                                session: AsyncSession = Depends(get_session),
                                token_details: dict = Depends(access_token_bearer)):
 
-    await set_offer_to_product_service.set_offer_to_product(data, session)
+    result = await set_offer_to_product_service.set_offer_to_product(data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Gắn offer thành công",
+            "message": f"Đã gắn offer {result['special_offer_code']} vào {result['updated_count']} sản phẩm",
+            "content": result
         }
     )
 
@@ -94,8 +100,10 @@ async def set_offer_to_product(data: SetOfferToProduct,
 @special_offer_customer_router.get('/', dependencies=[Depends(customer_role_middleware)])
 async def get_all_special_offer_customer(session: AsyncSession = Depends(get_session),
                                          token_details: dict = Depends(access_token_bearer),
-                                         search: Optional[str] = None,
-                                         skip: int = 0, limit: int = 10):
+                                         search: Optional[str] = Query(None, max_length=255, description="Tìm kiếm theo code hoặc name"),
+                                         skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                         limit: int = Query(10, ge=1, le=100, description="Số bản ghi trả về (tối đa 100)")):
+
     user_id = token_details['user']['id']
     special_offers = await get_all_special_offer_service.get_all_special_offer_customer(user_id, session, search, skip, limit)
 
@@ -109,8 +117,8 @@ async def get_all_special_offer_customer(session: AsyncSession = Depends(get_ses
 
 
 @special_offer_admin_router.put('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def update_special_offer(id: str,
-                               special_offer_update: SpecialOfferUpdateModel,
+async def update_special_offer(id: str = Path(..., description="ID của special offer cần update"),
+                               special_offer_update: SpecialOfferUpdateModel = ...,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
     special_offer_update = await update_special_offer_service.update_special_offer(id, special_offer_update, session)
@@ -139,8 +147,9 @@ async def assign_offer_to_users(special_offer: AssignOfferToUsers,
 
 
 @special_offer_admin_router.delete('/{id}', dependencies=[Depends(admin_role_middleware)])
-async def delete_categories(id: str, token_details: dict = Depends(access_token_bearer),
-                            session: AsyncSession = Depends(get_session)):
+async def delete_special_offer(id: str = Path(..., description="UUID của special offer cần xóa"),
+                               token_details: dict = Depends(access_token_bearer),
+                               session: AsyncSession = Depends(get_session)):
     special_offer_delete = await delete_special_offer_service.delete_special_offer(id, session)
 
     return JSONResponse(

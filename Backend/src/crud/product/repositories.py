@@ -141,8 +141,8 @@ class ProductRepository:
         await session.exec(stmt)
 
 
-    async def delete_product(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        product_to_delete = await self.get_product(condition, session)
+    async def delete_product(self, condition: Optional[List[ColumnElement[bool]]], session: AsyncSession):
+        product_to_delete = await self.get_product(session=session, where_conditions=condition)
 
         if product_to_delete is None:
             raise HTTPException(
@@ -156,9 +156,10 @@ class ProductRepository:
 
         return {"deleted_id": str(product_to_delete.id)}
 
+
     async def delete_multiple_product(self, data: DeleteMultipleProductModel, session: AsyncSession):
         conditions = [Product.id.in_(data.product_ids), Product.deleted_at.is_(None)]
-        products = await self.get_all_product(conditions, session, None, 0, 1000)
+        products = await self.get_all_product(session=session, where_conditions=conditions, skip=0, limit=1000)
         existing_ids = {str(row.id) for row in products}
         missing_ids = set(data.product_ids) - existing_ids
         if missing_ids:
@@ -171,6 +172,7 @@ class ProductRepository:
         await session.commit()
 
         return data.product_ids
+
 
     async def count_products(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
         base_condition = Product.deleted_at.is_(None)
@@ -186,69 +188,3 @@ class ProductRepository:
 
         result = await session.exec(statement)
         return result.one_or_none() or 0
-
-    async def get_popular_products_by_category(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, limit_per_category: int = 12):
-        stmt = (
-            select(
-                Product.id.label("product_id"),
-                Product.name.label("product_name"),
-                Product.images.label("images"),
-                func.min(Product_Variant.price).label("min_price"),
-                func.array_agg(
-                    func.distinct(
-                        func.jsonb_build_object(
-                            "id", Categories.id,
-                            "name", Categories.name
-                        )
-                    )
-                ).label("categories"),
-                Special_Offer.discount.label("discount"),
-                Special_Offer.type.label("type_offer"),
-                Product.avg_rating.label("avg_rating"),
-                Product.total_sold.label("total_sold")
-            )
-            .join(Categories_Product, Categories_Product.product_id == Product.id)
-            .join(Categories, Categories_Product.categories_id == Categories.id)
-            .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
-            .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
-            .where(conditions)
-            .group_by(Product.id, Product.name, Product.images, Product.popularity_score, Special_Offer.discount, Special_Offer.type, Product.avg_rating, Product.total_sold)
-            .order_by(desc(Product.popularity_score))
-            .limit(limit_per_category)
-        )
-
-        result = await session.exec(stmt)
-        return result.all()
-
-
-    async def get_top_discount(self, session: AsyncSession, limit: int = 12):
-        stmt = (
-            select(
-                Product.id.label("product_id"),
-                Product.name.label("product_name"),
-                Product.images.label("images"),
-                func.min(Product_Variant.price).label("min_price"),
-                func.array_agg(
-                    func.distinct(
-                        func.jsonb_build_object(
-                            "id", Categories.id,
-                            "name", Categories.name
-                        )
-                    )
-                ).label("categories"),
-                Special_Offer.discount.label("discount"),
-                Product.avg_rating.label("avg_rating"),
-                Product.total_sold.label("total_sold")
-            )
-            .join(Categories_Product, Categories_Product.product_id == Product.id)
-            .join(Categories, Categories_Product.categories_id == Categories.id)
-            .outerjoin(Product_Variant, Product_Variant.product_id == Product.id)
-            .outerjoin(Special_Offer, Special_Offer.id == Product.special_offer_id)
-            .where(Special_Offer.discount.isnot(None), Special_Offer.type == "percent")
-            .group_by(Product.id, Product.name, Product.images, Special_Offer.discount, Product.avg_rating, Product.total_sold)
-            .order_by(desc(Special_Offer.discount))
-            .limit(limit)
-        )
-
-        result = await session.exec(stmt)
-        return result.all()

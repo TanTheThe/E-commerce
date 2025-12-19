@@ -33,7 +33,7 @@ class OfferService:
             SpecialOfferException.offer_has_not_started(order_offer.code)
 
         if order_offer.end_time and now > order_offer.end_time:
-            SpecialOfferException.offer_has_expired(order_offer.code)
+            SpecialOfferException.offer_has_expired()
 
         return order_offer
 

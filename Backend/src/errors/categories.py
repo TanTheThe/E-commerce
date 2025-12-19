@@ -161,3 +161,17 @@ class CategoriesException:
                 "error_code": "cate_008"
             }
         )
+
+    @staticmethod
+    def category_not_found(category_id: str):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy danh mục với ID: {category_id}"
+        )
+
+    @staticmethod
+    def duplicate_categories():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Danh sách danh mục có ID trùng lặp"
+        )

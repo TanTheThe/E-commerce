@@ -151,16 +151,16 @@ class CreateGoodsReceiptService:
         return parent_receipt, parent_details_map
 
     async def get_and_validate_variant(self, item, po_detail, session):
-        condition_variant = and_(Product_Variant.id == item.product_variant_id)
-        joins_variant = [
+        condition_variant = [Product_Variant.id == item.product_variant_id]
+        options = [
             selectinload(Product_Variant.product),
             selectinload(Product_Variant.color)
         ]
 
         variant = await product_variant_repository.get_product_variant(
-            condition_variant,
             session=session,
-            joins=joins_variant
+            where_conditions=condition_variant,
+            options=options
         )
 
         if not variant:

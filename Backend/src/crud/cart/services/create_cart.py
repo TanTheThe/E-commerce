@@ -57,12 +57,12 @@ class CreateCartService:
 
 
     async def validate_product_variant(self, variant_id: str, session: AsyncSession):
-        condition_variant = and_(
+        condition_variant = [
             Product_Variant.id == variant_id,
             Product_Variant.deleted_at.is_(None)
-        )
+        ]
 
-        joins_variant = [
+        options = [
             selectinload(Product_Variant.product).options(
                 selectinload(Product.special_offer).load_only(
                     Special_Offer.id,
@@ -84,8 +84,8 @@ class CreateCartService:
             ),
         ]
 
-        product_variant = await product_variant_repository.get_product_variant(condition_variant, session,
-                                                                               joins_variant)
+        product_variant = await product_variant_repository.get_product_variant(session=session, where_conditions=condition_variant,
+                                                                               options=options)
 
         if not product_variant:
             ProductException.not_found_variant()

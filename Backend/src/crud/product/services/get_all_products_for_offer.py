@@ -1,22 +1,12 @@
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
-
 from sqlalchemy import exists
 from sqlalchemy.orm import selectinload, joinedload
-from src.crud.color.repositories import ColorRepository
-from src.crud.color.services import ColorService
-from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product.services.utils import UtilProductsService
-from src.crud.product_variant.repositories import ProductVariantRepository
-from src.crud.size.repositories import SizeRepository
 from src.database.models import Product, Categories, Product_Variant, Special_Offer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import and_, desc
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
-from src.crud.categories_product.repositories import CategoriesProductRepository
-from src.crud.product_variant.services import ProductVariantService
-from src.crud.categories_product.services import CategoriesProductService
 from src.errors.categories import CategoriesException
 
 product_repository = ProductRepository()
@@ -265,7 +255,7 @@ class GetAllProductsOfferService:
                     }
                     for cat in valid_product_categories
                 ],
-                "current_offer": self._build_offer_info(offer, offer_status)
+                "current_offer": self.build_offer_info(offer, offer_status)
             }
 
             for cat in valid_product_categories:
@@ -310,7 +300,7 @@ class GetAllProductsOfferService:
             "end_time": offer.end_time.isoformat() if offer.end_time else None,
             "used_quantity": offer.used_quantity,
             "total_quantity": offer.total_quantity,
-            "can_apply_new_offer": not offer_status["is_valid"]  # Can replace if current is invalid
+            "can_apply_new_offer": not offer_status["is_valid"]
         }
         
         

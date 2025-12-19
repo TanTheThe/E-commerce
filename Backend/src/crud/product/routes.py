@@ -1,18 +1,18 @@
 from fastapi import APIRouter, Path, status, Depends, Query
 from src.crud.product.services.create_product import CreateProductService
-from src.crud.product.services.get_all_products import GetAllProductsService
 from src.crud.product.services.get_all_products_admin import GetAllProductsAdminService
 from src.crud.product.services.get_all_products_customer import GetAllProductsCustomerService
 from src.crud.product.services.get_all_products_for_offer import GetAllProductsOfferService
 from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product.services.get_filters_info import GetFiltersInfoService
 from src.crud.product.services.get_latest_products import GetLatestProductsService
+from src.crud.product.services.get_product_variant_select_box import GetProductVariantSelectBoxService
 from src.crud.product.services.get_products_popular import GetProductsPopularService
 from src.crud.product.services.get_related_products import GetRelatedProductsService
 from src.crud.product.services.get_top_discount import GetTopDiscountService
 from src.crud.product.services.search_product import SearchProductService
 from src.crud.product.services.services import ProductService
-from src.crud.product.services.update_product import UpdateProductService
+from src.crud.product.services.update_product.update_product import UpdateProductService
 from src.crud.product.services.update_product_status import UpdateProductStatusService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -34,7 +34,6 @@ limiter = Limiter(key_func=get_remote_address)
 
 product_service = ProductService()
 create_product_service = CreateProductService()
-get_all_products_service = GetAllProductsService()
 get_all_products_customer_service = GetAllProductsCustomerService()
 get_all_products_admin_service = GetAllProductsAdminService()
 access_token_bearer = AccessTokenBearer()
@@ -46,6 +45,7 @@ get_filters_info_service = GetFiltersInfoService()
 get_latest_products_service = GetLatestProductsService()
 get_related_products_service = GetRelatedProductsService()
 get_top_discount_service = GetTopDiscountService()
+get_product_variant_select_box_service = GetProductVariantSelectBoxService()
 update_product_service = UpdateProductService()
 update_product_status_service = UpdateProductStatusService()
 
@@ -73,7 +73,7 @@ async def get_all_products_customer(category_identifier: str = Path(..., descrip
                                     min_price: Optional[int] = Query(None, ge=0),
                                     max_price: Optional[int] = Query(None, ge=0),
                                     sort_by: Optional[str] = Query(
-                                        SortBy.NEWEST,
+                                        SortBy.newest,
                                         pattern="^(newest|oldest|price_asc|price_desc|name_asc|name_desc|best_seller|sale_desc|rating_desc)$"
                                     ),
                                     colors: Optional[List[str]] = Query(default=None, max_items=50),
@@ -211,7 +211,8 @@ async def get_products_related(product_id: str = Query(..., description="ID củ
 
 
 @product_customer_router.get('/top-discount')
-async def get_products_top_discount(limit: int = 12, session: AsyncSession = Depends(get_session)):
+async def get_products_top_discount(limit: int = Query(default=12, ge=1, le=50, description="Số sản phẩm giảm giá nhiều nhất"),
+                                    session: AsyncSession = Depends(get_session)):
     products = await get_top_discount_service.get_top_discount(session, limit)
 
     return JSONResponse(
@@ -260,7 +261,7 @@ async def get_all_product_admin(search: Optional[str] = Query(None, max_length=2
                                 min_price: Optional[int] = Query(None, ge=0),
                                 max_price: Optional[int] = Query(None, ge=0),
                                 sort_by: Optional[str] = Query(
-                                    SortBy.NEWEST,
+                                    SortBy.newest,
                                     pattern="^(newest|oldest|price_asc|price_desc|name_asc|name_desc|best_seller|sale_desc|rating_desc)$"
                                 ),
                                 colors: Optional[List[str]] = Query(default=None, max_items=50),
@@ -356,7 +357,7 @@ async def get_products_selectbox(category_id: Optional[str] = None,
                                  supplier_id: Optional[str] = None,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    product_dict = await get_all_products_service.get_products_select_box(session, category_id, supplier_id)
+    product_dict = await get_product_variant_select_box_service.get_products_select_box(session, category_id, supplier_id)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -371,7 +372,7 @@ async def get_products_selectbox(category_id: Optional[str] = None,
 async def get_variants_selectbox(product_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    variant_dict = await get_all_products_service.get_variants_select_box(product_id, session)
+    variant_dict = await get_product_variant_select_box_service.get_variants_select_box(product_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -407,6 +408,10 @@ async def update_product_status(id: str,
         status_code=status.HTTP_200_OK,
         content={
             "message": "Cập nhật trạng thái sản phẩm thành công",
+            "content": {
+                "product_id": id,
+                "status": status_data.status.value
+            }
         }
     )
 
@@ -420,6 +425,10 @@ async def bulk_update_product_status(bulk_data: BulkUpdateStatusModel,
         status_code=status.HTTP_200_OK,
         content={
             "message": "Cập nhật trạng thái các sản phẩm thành công",
+            "content": {
+                "product_ids": bulk_data.product_ids,
+                "status": bulk_data.status.value
+            }
         }
     )
 

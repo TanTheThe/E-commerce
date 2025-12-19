@@ -1,12 +1,11 @@
-from sqlalchemy.orm import selectinload, joinedload
 from src.crud.color.repositories import ColorRepository
 from src.crud.color.services import ColorService
 from src.crud.product.services.get_detail_product import GetDetailProductService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.size.repositories import SizeRepository
-from src.database.models import Product, Categories_Product, Categories, Product_Variant, Color
+from src.database.models import Product
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, case
+from sqlmodel import and_
 from datetime import datetime
 from src.crud.product.repositories import ProductRepository
 from src.crud.categories.repositories import CategoriesRepository
@@ -30,13 +29,27 @@ color_service = ColorService()
 
 class UpdateProductStatusService:
     async def update_product_status(self, product_id: str, status_data: ProductStatusUpdateModel, session: AsyncSession):
-        condition = and_(Product.id == product_id, Product.deleted_at.is_(None))
-        existing_product = await product_repository.get_product(condition, session)
-        if not existing_product:
-            ProductException.product_not_found()
+        condition = [
+            Product.id == product_id,
+            Product.deleted_at.is_(None)
+        ]
+        existing_product = await product_repository.get_product(session=session, where_conditions=condition)
 
-        await product_repository.update_product_some_field(condition, {"status": status_data.status.value}, session)
-        await session.commit() 
+        if not existing_product:
+            ProductException.not_found()
+
+        if existing_product.status == status_data.status.value:
+            ProductException.unchanged_status()
+
+        await product_repository.update_product_some_field(
+            and_(*condition),
+            {
+                "status": status_data.status.value,
+                "updated_at": datetime.now()
+            },
+            session
+        )
+        await session.commit()
 
     async def bulk_update_product_status(self, bulk_data: BulkUpdateStatusModel, session: AsyncSession):
         product_ids = bulk_data.product_ids
@@ -46,7 +59,7 @@ class UpdateProductStatusService:
             Product.deleted_at.is_(None)
         ]
         
-        existing_products, _ = await product_repository.get_all_product(conditions, session)
+        existing_products, _ = await product_repository.get_all_product(session=session, where_conditions=conditions)
         existing_ids = {str(product[0].id) for product in existing_products}
         
         not_found_ids = [str(pid) for pid in product_ids if pid not in existing_ids]

@@ -31,16 +31,16 @@ class ProductService:
     async def resolve_product_id(self, product_identifier: str, session: AsyncSession):
         try:
             uuid.UUID(product_identifier)
-            condition = and_(Product.id == product_identifier, Product.deleted_at.is_(None))
-            product = await product_repository.get_product(condition, session)
+            condition = [Product.id == product_identifier, Product.deleted_at.is_(None)]
+            product = await product_repository.get_product(session=session, where_conditions=condition)
             return str(product[0].id) if product else None
         except ValueError:
-            condition = and_(Product.slug == product_identifier, Product.deleted_at.is_(None))
-            product = await product_repository.get_product(condition, session)
+            condition = [Product.slug == product_identifier, Product.deleted_at.is_(None)]
+            product = await product_repository.get_product(session=session, where_conditions=condition)
             return str(product[0].id) if product else None
 
     async def delete_product(self, product_id: str, session: AsyncSession):
-        condition = and_(Product.id == product_id)
+        condition = [Product.id == product_id, Product.deleted_at.is_(None)]
         product_delete = await product_repository.delete_product(condition, session)
         await session.commit()
         return product_delete
