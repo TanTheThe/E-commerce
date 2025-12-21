@@ -9,6 +9,7 @@ from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
+from src.errors.supplier import SupplierException
 from src.errors.user import UserException
 from src.schemas.supplier import SupplierCreate, SupplierUpdate
 
@@ -44,8 +45,9 @@ async def create_supplier(supplier_data: SupplierCreate,
 
 @suppliers_admin_router.get("/")
 async def get_all_suppliers(is_active: Optional[bool] = Query(None, description="Lọc theo trạng thái"),
-                            search: Optional[str] = Query(None, description="Tìm kiếm theo tên, mã, người liên hệ"),
-                            skip: int = 0, limit: int = 10,
+                            search: Optional[str] = Query(None, description="Tìm kiếm theo tên, mã, người liên hệ", max_length=255),
+                            skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                            limit: int = Query(10, ge=1, le=100, description="Số bản ghi trả về"),
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
@@ -88,26 +90,42 @@ async def get_detail_supplier(supplier_id: str,
 async def update_supplier(supplier_id: str, supplier_data: SupplierUpdate,
                           token_details: dict = Depends(access_token_bearer),
                           session: AsyncSession = Depends(get_session)):
-    await update_supplier_service.update_supplier(supplier_id, supplier_data, session)
+    result = await update_supplier_service.update_supplier(supplier_id, supplier_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Cập nhật thông tin nhà cung cấp thành công",
+            "content": result
         }
     )
 
 
 @suppliers_admin_router.delete("/{supplier_id}", dependencies=[Depends(admin_role_middleware)])
 async def delete_supplier(supplier_id: str,
+                          force: bool = Query(False, description="Force delete (bỏ qua một số validation)"),
+                          permanent: bool = Query(False, description="Xóa vĩnh viễn thay vì soft delete"),
                           token_details: dict = Depends(access_token_bearer),
                           session: AsyncSession = Depends(get_session)):
-    await delete_supplier_service.delete_supplier(supplier_id, session)
+    if permanent:
+        role = token_details.get('role')
+        if role != 'admin':
+            SupplierException.only_admin_can_permanent_delete()
+            
+    result = await delete_supplier_service.delete_supplier(
+        supplier_id=supplier_id,
+        session=session,
+        force=force,
+        permanent=permanent
+    )
+    
+    message = "Xóa nhà cung cấp vĩnh viễn thành công" if permanent else "Vô hiệu hóa nhà cung cấp thành công"
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Vô hiệu hóa nhà cung cấp thành công",
+            "message": message,
+            "content": result
         }
     )
 

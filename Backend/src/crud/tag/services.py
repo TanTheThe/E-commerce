@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from sqlalchemy import func
 from src.crud.product.repositories import ProductRepository
 from src.crud.tag.repositories import TagRepository
 from src.database.models import Product, Tag
@@ -16,43 +18,51 @@ product_repository = ProductRepository()
 
 class TagService:
     async def create_tag_service(self, tag_data: TagCreateModel, session: AsyncSession):
-        condition = and_(Tag.name == tag_data.name, Tag.deleted_at.is_(None))
-        existing_tag = await tag_repository.get_tag(condition, session)
+        try:
+            normalized_name = tag_data.name.strip()
+        
+            condition = [
+                func.lower(Tag.name) == normalized_name.lower(),
+                Tag.deleted_at.is_(None)
+            ]
+            existing_tag = await tag_repository.get_tag(condition, session)
 
-        if existing_tag:
-            TagException.tag_name_exists()
+            if existing_tag:
+                TagException.tag_name_exists()
 
-        slug = generate_slug(tag_data.name)
+            base_slug = generate_slug(normalized_name)
 
-        condition_slug = and_(Tag.slug == slug, Tag.deleted_at.is_(None))
-        existing_slug = await tag_repository.get_tag(condition_slug, session)
-        if existing_slug:
-            counter = 1
-            new_slug = ""
-            while existing_slug:
-                new_slug = f"{slug}-{counter}"
-                condition_slug = and_(Tag.slug == new_slug, Tag.deleted_at.is_(None))
-                existing_slug = await tag_repository.get_tag(condition_slug, session)
-                counter += 1
-            slug = new_slug
+            condition_slug = and_(Tag.slug == slug, Tag.deleted_at.is_(None))
+            existing_slug = await tag_repository.get_tag(condition_slug, session)
+            if existing_slug:
+                counter = 1
+                new_slug = ""
+                while existing_slug:
+                    new_slug = f"{slug}-{counter}"
+                    condition_slug = and_(Tag.slug == new_slug, Tag.deleted_at.is_(None))
+                    existing_slug = await tag_repository.get_tag(condition_slug, session)
+                    counter += 1
+                slug = new_slug
 
-        new_tag_dict = {
-            "name": tag_data.name,
-            "slug": slug,
-            "is_active": tag_data.is_active
-        }
+            new_tag_dict = {
+                "name": tag_data.name,
+                "slug": slug,
+                "is_active": tag_data.is_active
+            }
 
-        tag = await tag_repository.create_tag(new_tag_dict, session)
+            tag = await tag_repository.create_tag(new_tag_dict, session)
 
-        await session.commit()
+            await session.commit()
 
-        return {
-            "id": str(tag.id),
-            "name": tag.name,
-            "slug": tag.slug,
-            "is_active": tag.is_active,
-            "created_at": str(tag.created_at) if tag.created_at else None
-        }
+            return {
+                "id": str(tag.id),
+                "name": tag.name,
+                "slug": tag.slug,
+                "is_active": tag.is_active,
+                "created_at": str(tag.created_at) if tag.created_at else None
+            }
+        except Exception as e:
+            raise e
 
     async def get_all_tags_admin(self, search: Optional[str], is_active: Optional[bool],
                                  sort_by: Optional[str], skip: int, limit: int, session: AsyncSession):

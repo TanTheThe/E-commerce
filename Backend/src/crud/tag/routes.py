@@ -1,25 +1,31 @@
 from fastapi import APIRouter, status, Depends
 from typing import Optional
-from src.crud.tag.services import TagService
+
+from pydantic import Field
+from src.crud.tag.services.assign_tags_to_product import AssignTagsToProductService
+from src.crud.tag.services.create_tag import CreateTagService
+from src.crud.tag.services.get_all_tags import GetAllTagsService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
-from src.schemas.tag import TagCreateModel, ProductTagAssignmentModel, TagUpdateModel, DeleteMultipleTagsModel
+from src.schemas.tag import TagAdminQueryParams, TagCreateModel, ProductTagAssignmentModel, TagQueryParams, TagUpdateModel, DeleteMultipleTagsModel
 
 tag_admin_router = APIRouter(prefix="/tag")
 tag_customer_router = APIRouter(prefix="/tag")
 tag_staff_router = APIRouter(prefix="/tag")
 
-tag_service = TagService()
+create_tag_service = CreateTagService()
+get_all_tags_service = GetAllTagsService()
+assign_tags_to_product_service = AssignTagsToProductService()
 access_token_bearer = AccessTokenBearer()
 
 @tag_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
 async def create_tag(tag_data: TagCreateModel,
                      token_details: dict = Depends(access_token_bearer),
                      session: AsyncSession = Depends(get_session)):
-    tag_dict = await tag_service.create_tag_service(tag_data, session)
+    tag_dict = await create_tag_service.create_tag_service(tag_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -30,13 +36,12 @@ async def create_tag(tag_data: TagCreateModel,
     )
 
 @tag_admin_router.get("/all", dependencies=[Depends(admin_role_middleware)])
-async def get_all_tags_admin(search: Optional[str] = None,
-                             is_active: Optional[bool] = None,
-                             sort_by: Optional[str] = None,
-                             skip: int = 0, limit: int = 10,
+async def get_all_tags_admin(params: TagAdminQueryParams = Depends(),
+                             skip: int = Field(0, ge=0, description="Số bản ghi bỏ qua"),
+                             limit: int = Field(10, ge=1, le=100, description="Số bản ghi trả về"),
                              token_details: dict = Depends(access_token_bearer),
                              session: AsyncSession = Depends(get_session)):
-    tags = await tag_service.get_all_tags_admin(search, is_active, sort_by, skip, limit, session)
+    tags = await get_all_tags_service.get_all_tags_admin(params, skip, limit, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -50,7 +55,7 @@ async def get_all_tags_admin(search: Optional[str] = None,
 async def assign_tags_to_product(assignment_data: ProductTagAssignmentModel,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    result = await tag_service.assign_tags_to_product(assignment_data, session)
+    result = await assign_tags_to_product_service.assign_tags_to_product(assignment_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -102,10 +107,11 @@ async def delete_multiple_tags(data: DeleteMultipleTagsModel,
     )
 
 @tag_customer_router.get("/all")
-async def get_all_tags_customer(search: Optional[str] = None,
-                                skip: int = 0, limit: int = 20,
+async def get_all_tags_customer(params: TagQueryParams = Depends(),
+                                skip: int = Field(0, ge=0, description="Số bản ghi bỏ qua"),
+                                limit: int = Field(20, ge=1, le=50, description="Số bản ghi trả về"),
                                 session: AsyncSession = Depends(get_session)):
-    tags = await tag_service.get_all_tags_customer(search, skip, limit, session)
+    tags = await get_all_tags_service.get_all_tags_customer(params, skip, limit, session)
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={

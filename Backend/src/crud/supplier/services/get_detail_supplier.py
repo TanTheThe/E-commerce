@@ -8,12 +8,17 @@ supplier_repository = SupplierRepository()
 
 
 class GetDetailSupplierService:
-    async def get_supplier_by_id(self, session: AsyncSession,
-                                supplier_id: str):
+    async def get_supplier_by_id(self, session: AsyncSession, supplier_id: str):
         conditions = [Supplier.id == supplier_id]
-        options = [selectinload(Supplier.supplier_products).selectinload(Supplier_Product.products)]
+        options = [
+            selectinload(Supplier.supplier_products).selectinload(Supplier_Product.products)
+        ]
 
-        sup = await supplier_repository.get_supplier(session=session, where_conditions=conditions, options=options)
+        sup = await supplier_repository.get_supplier(
+            session=session, 
+            where_conditions=conditions, 
+            options=options
+        )
 
         if not sup:
             SupplierException.supplier_not_found()

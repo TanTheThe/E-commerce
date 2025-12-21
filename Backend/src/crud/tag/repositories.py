@@ -1,5 +1,5 @@
-from typing import Optional, List, Dict, Any, Tuple
-from sqlalchemy import ColumnElement, delete
+from typing import Optional, List, Dict, Any, Set, Tuple
+from sqlalchemy import ColumnElement, delete, insert
 from src.database.models import Product, Tag, Product_Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func, update
@@ -17,6 +17,11 @@ class TagRepository:
         session.add(new_tag)
 
         return new_tag
+    
+    
+    async def bulk_insert_product_tags(self, product_tags_data: List[Dict[str, Any]], session: AsyncSession):
+        insert_stmt = insert(Product_Tag).values(product_tags_data)
+        await session.execute(insert_stmt)
 
     
     async def get_all_tag(self, session: AsyncSession,
@@ -108,14 +113,55 @@ class TagRepository:
         tag = result.one_or_none()
 
         return tag
+    
+    
+    async def get_product_tags(self, session: AsyncSession,
+                             select_columns: Optional[List[Any]] = None,
+                             joins: Optional[List[Tuple[Any, dict]]] = None,
+                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             group_by_columns: Optional[List[Any]] = None,
+                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                             order_by: Optional[Any] = None,
+                             skip: int = 0, limit: int = 10,
+                             options: Optional[list] = None):
+        if select_columns is None:
+            query = select(Product_Tag)
+        else:
+            query = select(*select_columns).select_from(Product_Tag)
 
-    async def get_product_tags(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Product_Tag).options(
-            *joins if joins else []
-        ).where(*conditions)
-        result = await session.exec(statement)
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
 
-        return result.all()
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
+        prod_tags = result.all()
+
+        return prod_tags, total
+
 
     async def update_tag(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
         stmt = (
@@ -139,36 +185,23 @@ class TagRepository:
         result = await session.exec(query)
         return result.one_or_none()
 
-
-    async def assign_tags_to_product(self, product_id: str, tag_ids: List[str], session: AsyncSession):
-        condition = and_(Product_Tag.product_id == product_id, Product_Tag.deleted_at.is_(None))
-        current_tags = await self.get_product_tags(condition, session)
-        current_tag_ids = [str(tag.id) for tag in current_tags]
-
-        removed_tags = set(current_tag_ids) - set(tag_ids)
-        added_tags = set(tag_ids) - set(current_tag_ids)
-
-        delete_stmt = delete(Product_Tag).where(and_(Product_Tag.product_id == product_id))
-        await session.exec(delete_stmt)
-
-        for tag_id in tag_ids:
-            product_tag = Product_Tag(
-                product_id=product_id,
-                tag_id=tag_id,
-                created_at=datetime.now()
+    
+    async def update_tag_counts(self, tag_ids: Set[str], increment: int, session: AsyncSession):
+        if increment > 0:
+            update_stmt = (
+                update(Tag)
+                .where(Tag.id.in_(tag_ids))
+                .values(products_count=Tag.products_count + increment)
             )
-            session.add(product_tag)
-
-        if removed_tags:
-            condition_increment = and_(Tag.id.in_(tag_ids))
-            await self.update_tag(condition_increment, {"products_count": Tag.products_count + 1}, session)
-        if added_tags:
-            condition_decrement = and_(Tag.id.in_(tag_ids))
-            await self.update_tag(condition_decrement, {"products_count": func.greatest(Tag.products_count - 1, 0)}, session)
-
-        await session.commit()
-        return True
-
+        else:
+            update_stmt = (
+                update(Tag)
+                .where(Tag.id.in_(tag_ids))
+                .values(products_count=func.greatest(Tag.products_count + increment, 0))
+            )
+        
+        await session.execute(update_stmt)
+    
 
     async def delete_tag(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
         tag_delete = await self.get_tag(condition, session)

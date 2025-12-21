@@ -1,11 +1,49 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+import re
+
+
+class TagSortEnum(str, Enum):
+    NAME_ASC = "name_asc"
+    NAME_DESC = "name_desc"
+    CREATED_ASC = "created_asc"
+    CREATED_DESC = "created_desc"
+    
+class TagQueryParams(BaseModel):
+    search: Optional[str] = Field(None, max_length=100, description="Tìm kiếm theo tên tag")
+
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            if any(char in v for char in ['%', '_', '\\']):
+                v = v.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            return v if v else None
+        return None
+    
+class TagAdminQueryParams(TagQueryParams):
+    is_active: Optional[bool] = None
+    sort_by: TagSortEnum = Field(TagSortEnum.CREATED_DESC, description="Sắp xếp theo")
 
 
 class TagCreateModel(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100, description="Tên tag")
     is_active: bool = True
+    
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        
+        if not v:
+            raise ValueError("Tên tag không được để trống")
+        
+        if not re.match(r'^[\w\s\-àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]+$', v):
+            raise ValueError("Tên tag chỉ được chứa chữ cái, số, dấu gạch ngang và khoảng trắng")
+        
+        return v
 
 class TagUpdateModel(BaseModel):
     name: Optional[str] = None
@@ -15,8 +53,19 @@ class DeleteMultipleTagsModel(BaseModel):
     tag_ids: List[str]
 
 class ProductTagAssignmentModel(BaseModel):
-    product_id: str
-    tag_ids: List[str]
+    product_id: str = Field(..., description="ID của sản phẩm")
+    tag_ids: List[str] = Field(..., min_length=0, max_length=50, description="Danh sách tag IDs")
+    
+    @field_validator('tag_ids')
+    @classmethod
+    def validate_tag_ids(cls, v: List[str]) -> List[str]:
+        if not v:
+            return v
+        
+        if len(v) != len(set(v)):
+            raise ValueError("Danh sách tag_ids không được chứa phần tử trùng lặp")
+        
+        return v
 
 class TagType(str, Enum):
     SUMMER = "Mùa hè"

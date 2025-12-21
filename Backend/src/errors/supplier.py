@@ -91,4 +91,34 @@ class SupplierException:
                 "error_code": "supp_002",
             },
         )
+        
+    @staticmethod
+    def products_not_linked_to_supplier(product_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Các sản phẩm: {product_ids} không được liên kết với nhà cung cấp",
+                "error_code": "supp_002",
+            },
+        )
+        
+    @staticmethod
+    def only_admin_can_permanent_delete():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có admin mới có thể xóa vĩnh viễn",
+                "error_code": "supp_002",
+            },
+        )
+        
+    @staticmethod
+    def cannot_delete_supplier(reasons):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xóa nhà cung cấp do các lý do sau: {', '.join(reasons)}",
+                "error_code": "supp_002",
+            },
+        )
 

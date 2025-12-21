@@ -42,3 +42,13 @@ class TagException:
                 "error_code": "tag_003",
             },
         )
+        
+    @staticmethod
+    def cant_create_unique_slug():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Không thể tạo slug duy nhất",
+                "error_code": "tag_003",
+            },
+        )
