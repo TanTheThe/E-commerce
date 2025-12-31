@@ -1,15 +1,11 @@
-from datetime import datetime
 from sqlalchemy import func
 from src.crud.product.repositories import ProductRepository
 from src.crud.tag.repositories import TagRepository
-from src.database.models import Product, Tag
+from src.database.models import Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, asc, desc
-from src.errors.product import ProductException
 from src.crud.tag.utils import generate_slug
-from typing import Optional
 from src.errors.tag import TagException
-from src.schemas.tag import TagCreateModel, ProductTagAssignmentModel, TagUpdateModel, DeleteMultipleTagsModel
+from src.schemas.tag import TagCreateModel
 import re
 import logging
 

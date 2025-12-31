@@ -112,3 +112,103 @@ class WareHouseException:
             },
         )
 
+    @staticmethod
+    def email_already_use_in_another_warehouse():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Email này đã được sử dụng cho kho khác",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def phone_already_use_in_another_warehouse():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số điện thoại này đã được sử dụng cho kho khác",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def manager_was_at_warehouse(existing_managed):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Người quản lý này đã đang quản lý kho '{existing_managed.name}'",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def some_staff_invalid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Một số nhân viên không hợp lệ",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def no_fields_updated():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không có thông tin nào được cập nhật",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def cant_disable_warehouse_with_remaining_inventory():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể vô hiệu hóa kho còn hàng tồn kho. Vui lòng chuyển hết hàng trước khi deactivate",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def managing_different_warehouse(other_warehouse):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Người này đang quản lý kho '{other_warehouse.name}'",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def already_managed_this_warehouse():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Người này đã là quản lý kho này rồi",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def webhook_processed_previously():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Webhook đã được xử lý trước đó",
+                "error_code": "warehouse_009",
+            },
+        )
+
+    @staticmethod
+    def order_processed_by_different_webhook():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng đang được xử lý bởi webhook khác",
+                "error_code": "warehouse_009",
+            },
+        )
+

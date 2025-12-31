@@ -1,5 +1,5 @@
-from fastapi import APIRouter, status, Depends
-from typing import Optional
+from fastapi import APIRouter, status, Depends, Query, Path
+from typing import Optional, Literal
 from src.crud.warehouse.services.assign_manager_to_warehouse import AssignManagerService
 from src.crud.warehouse.services.assign_staff_to_warehouse import AssignStaffService
 from src.crud.warehouse.services.create_warehouse import CreateWareHouseService
@@ -16,7 +16,8 @@ from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
 from src.schemas.user import StaffMultipleDeleteModel
-from src.schemas.warehouse import WarehouseCreateModel, WarehouseUpdate, AssignManagerModel, UpdateStaffRoleModel, AssignMultipleStaffModel, AssignStaffItemModel
+from src.schemas.warehouse import WarehouseCreateModel, WarehouseUpdate, AssignManagerModel, UpdateStaffRoleModel, \
+    AssignMultipleStaffModel, AssignStaffItemModel, WarehouseFilterParams
 
 warehouse_admin_router = APIRouter(prefix="/warehouse")
 warehouse_customer_router = APIRouter(prefix="/warehouse")
@@ -43,20 +44,30 @@ async def create_warehouse(warehouse_data: WarehouseCreateModel,
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={
-            "message": "Kho mới vừa được thêm vào",
+            "message": "Kho mới vừa được thêm vào thành công",
             "content": warehouse_dict
         }
     )
 
 
 @warehouse_admin_router.get("/all", dependencies=[Depends(admin_role_middleware)])
-async def get_all_warehouses(search: Optional[str] = None,
-                             is_active: Optional[bool] = None,
-                             sort_by: Optional[str] = None,
-                             skip: int = 0, limit: int = 10,
+async def get_all_warehouses(search: Optional[str] = Query(None, min_length=1, max_length=255,
+                                                           description="Tìm kiếm theo tên, mã kho, địa chỉ hoặc tên quản lý"),
+                             is_active: Optional[bool] = Query(None, description="Lọc theo trạng thái hoạt động"),
+                             sort_by: Optional[Literal["created_asc", "created_desc", "name_asc", "name_desc"]] = Query(
+                                 "created_desc",
+                                 description="Sắp xếp: created_asc, created_desc, name_asc, name_desc"),
+                             skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua (offset)"),
+                             limit: int = Query(10, ge=1, le=100, description="Số bản ghi tối đa trả về (1-100)"),
                              token_details: dict = Depends(access_token_bearer),
                              session: AsyncSession = Depends(get_session)):
-    warehouses = await get_all_warehouse_service.get_all_warehouses(search, is_active, sort_by, skip, limit, session)
+    filters = WarehouseFilterParams(
+        search=search,
+        is_active=is_active,
+        sort_by=sort_by or "created_desc",
+    )
+
+    warehouses = await get_all_warehouse_service.get_all_warehouses(filters, skip, limit, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -68,70 +79,79 @@ async def get_all_warehouses(search: Optional[str] = None,
 
 
 @warehouse_admin_router.get("/{warehouse_id}", dependencies=[Depends(admin_role_middleware)])
-async def get_warehouse_by_id(warehouse_id: str,
-                               token_details: dict = Depends(access_token_bearer),
-                               session: AsyncSession = Depends(get_session)):
+async def get_warehouse_by_id(warehouse_id: str = Path(..., description="ID của kho cần lấy thông tin"),
+                              token_details: dict = Depends(access_token_bearer),
+                              session: AsyncSession = Depends(get_session)):
     warehouse = await get_warehouse_by_id_service.get_warehouse_by_id(warehouse_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin kho",
+            "message": "Lấy thông tin kho thành công",
             "content": warehouse
         }
     )
 
 
 @warehouse_admin_router.post("/{warehouse_id}/set-default", dependencies=[Depends(admin_role_middleware)])
-async def set_default_warehouse(warehouse_id: str,
+async def set_default_warehouse(warehouse_id: str = Path(..., description="ID của kho cần set làm mặc định"),
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
-    await set_default_warehouse_service.set_default_warehouse(warehouse_id, session)
+    result = await set_default_warehouse_service.set_default_warehouse(warehouse_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Gán mặc định cho kho thành công",
+            "message": result["message"],
+            "content": {
+                "warehouse_id": result["warehouse_id"],
+                "warehouse_name": result["warehouse_name"],
+                "warehouse_code": result["warehouse_code"],
+                "is_default": result["is_default"]
+            }
         }
     )
 
 
 @warehouse_admin_router.post("/{warehouse_id}/assign-staff", dependencies=[Depends(admin_role_middleware)])
-async def assign_staff_to_warehouse(warehouse_id: str,
-                                      request_data: AssignStaffItemModel,
-                                      token_details: dict = Depends(access_token_bearer),
-                                      session: AsyncSession = Depends(get_session)):
-    staff_after_assigned = await assign_staff_service.assign_staff_to_warehouse(warehouse_id, request_data, session)
+async def assign_staff_to_warehouse(warehouse_id: str = Path(..., description="ID của kho cần assign nhân viên"),
+                                    request_data: AssignStaffItemModel = ...,
+                                    token_details: dict = Depends(access_token_bearer),
+                                    session: AsyncSession = Depends(get_session)):
+    result = await assign_staff_service.assign_staff_to_warehouse(warehouse_id, request_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Gán nhân viên kho thành công",
-            "content": staff_after_assigned
+            "message": "Gán nhân viên vào kho thành công",
+            "content": result
         }
     )
 
 
 @warehouse_admin_router.post("/{warehouse_id}/assign-staff/batch", dependencies=[Depends(admin_role_middleware)])
-async def assign_multiple_staff_to_warehouse(warehouse_id: str,
-                                             request_data: AssignMultipleStaffModel,
+async def assign_multiple_staff_to_warehouse(warehouse_id: str = Path(..., description="ID của kho cần assign nhân viên"),
+                                             request_data: AssignMultipleStaffModel = ...,
                                              token_details: dict = Depends(access_token_bearer),
                                              session: AsyncSession = Depends(get_session)):
     result = await assign_staff_service.assign_multiple_staff_to_warehouse(
         warehouse_id, request_data, session
     )
 
+    total = result["total_assigned"]
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Gán {len(request_data.staff_list)} nhân viên kho thành công",
+            "message": f"Gán {total} nhân viên vào kho thành công",
             "content": result
         }
     )
 
 
 @warehouse_admin_router.put("/{warehouse_id}", dependencies=[Depends(admin_role_middleware)])
-async def update_warehouse(warehouse_id: str, warehouse_update: WarehouseUpdate,
+async def update_warehouse(warehouse_id: str = Path(..., description="ID của kho cần cập nhật"),
+                           warehouse_update: WarehouseUpdate = ...,
                            token_details: dict = Depends(access_token_bearer),
                            session: AsyncSession = Depends(get_session)):
     warehouse = await update_warehouse_service.update_warehouse(warehouse_id, warehouse_update, session)
@@ -145,26 +165,33 @@ async def update_warehouse(warehouse_id: str, warehouse_update: WarehouseUpdate,
     )
 
 
-@warehouse_admin_router.put("/{warehouse_id}/change-status", dependencies=[Depends(admin_role_middleware)])
-async def toggle_warehouse_status(warehouse_id: str,
+@warehouse_admin_router.put("/{warehouse_id}/toggle-status", dependencies=[Depends(admin_role_middleware)])
+async def toggle_warehouse_status(warehouse_id: str = Path(..., description="ID của kho cần thay đổi trạng thái"),
                                   token_details: dict = Depends(access_token_bearer),
                                   session: AsyncSession = Depends(get_session)):
-    await toggle_warehouse_status_service.toggle_warehouse_status(warehouse_id, session)
+    result = await toggle_warehouse_status_service.toggle_warehouse_status(warehouse_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Cập nhật trạng thái thành công",
+            "message": result["message"],
+            "data": {
+                "warehouse_id": result["warehouse_id"],
+                "warehouse_name": result["warehouse_name"],
+                "warehouse_code": result["warehouse_code"],
+                "is_active": result["is_active"]
+            }
         }
     )
 
 
 @warehouse_admin_router.put("/{warehouse_id}/assign-manager", dependencies=[Depends(admin_role_middleware)])
-async def assign_manager_to_warehouse(warehouse_id: str,
-                                      request_data: AssignManagerModel,
+async def assign_manager_to_warehouse(warehouse_id: str = Path(..., description="ID của kho cần assign manager"),
+                                      request_data: AssignManagerModel = ...,
                                       token_details: dict = Depends(access_token_bearer),
                                       session: AsyncSession = Depends(get_session)):
-    await assign_manager_service.assign_manager_to_warehouse(warehouse_id, request_data.user_id,
+    result = await assign_manager_service.assign_manager_to_warehouse(warehouse_id,
+                                                             request_data.user_id,
                                                              request_data.new_role_for_old_manager,
                                                              session)
 
@@ -172,35 +199,37 @@ async def assign_manager_to_warehouse(warehouse_id: str,
         status_code=status.HTTP_200_OK,
         content={
             "message": f"Gán nhân viên làm quản lý kho thành công",
+            "content": result
         }
     )
 
 
 @warehouse_admin_router.put("/{warehouse_id}/staff/{user_id}/role", dependencies=[Depends(admin_role_middleware)])
-async def update_staff_role(warehouse_id: str,
-                            user_id: str,
-                            request: UpdateStaffRoleModel,
+async def update_staff_role(warehouse_id: str = Path(..., description="ID của kho"),
+                            user_id: str = Path(..., description="ID của nhân viên cần cập nhật role"),
+                            request: UpdateStaffRoleModel = ...,
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
-    staff_after_update_role = await update_staff_role_service.update_staff_role(warehouse_id, user_id, request, session)
+    result = await update_staff_role_service.update_staff_role(warehouse_id, user_id, request, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Cập nhật role cho nhân viên thành công",
-            "content": staff_after_update_role
+            "message": f"Cập nhật vai trò cho nhân viên thành công",
+            "content": result
         }
     )
 
 
 @warehouse_admin_router.put("/{warehouse_id}/staff/batch", dependencies=[Depends(admin_role_middleware)])
-async def remove_multiple_staff_from_warehouse(warehouse_id: str,
-                                               request: StaffMultipleDeleteModel,
+async def remove_multiple_staff_from_warehouse(warehouse_id: str = Path(..., description="ID của kho"),
+                                               request: StaffMultipleDeleteModel = ...,
                                                token_details: dict = Depends(access_token_bearer),
                                                session: AsyncSession = Depends(get_session)):
     result = await remove_staff_service.remove_multiple_staff_from_warehouse(
         warehouse_id, request.user_ids, session
     )
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -211,17 +240,17 @@ async def remove_multiple_staff_from_warehouse(warehouse_id: str,
 
 
 @warehouse_admin_router.delete("/{warehouse_id}/staff/{user_id}", dependencies=[Depends(admin_role_middleware)])
-async def remove_staff_from_warehouse(warehouse_id: str,
-                                    user_id: str,
-                                    token_details: dict = Depends(access_token_bearer),
-                                    session: AsyncSession = Depends(get_session)):
-    staff_after_removed = await remove_staff_service.remove_staff_from_warehouse(warehouse_id, user_id, session)
+async def remove_staff_from_warehouse(warehouse_id: str = Path(..., description="ID của kho"),
+                                      user_id: str = Path(..., description="ID của nhân viên cần remove"),
+                                      token_details: dict = Depends(access_token_bearer),
+                                      session: AsyncSession = Depends(get_session)):
+    result = await remove_staff_service.remove_staff_from_warehouse(warehouse_id, user_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": f"Gỡ nhân viên khỏi kho thành công",
-            "content": staff_after_removed
+            "content": result
         }
     )
 

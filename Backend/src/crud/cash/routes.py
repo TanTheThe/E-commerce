@@ -1,10 +1,14 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Depends, Header
+from redis import Redis
+
 from src.crud.cash.services.create_manual_refund_transaction import ManualRefundCashService
 from src.crud.cash.services.update_shipping_status import WebhookShippingService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
+
+from src.errors.return_order import ReturnOrderException
 from src.schemas.cash import CreateManualRefundRequest
 from src.schemas.webhook import ShippingWebhookRequest
 
@@ -18,8 +22,10 @@ access_token_bearer = AccessTokenBearer()
 
 @webhook_admin_router.post("/webhook-shipping", status_code=status.HTTP_200_OK)
 async def handle_shipping_webhook(webhook_data: ShippingWebhookRequest,
-                           token_details: dict = Depends(access_token_bearer),
-                           session: AsyncSession = Depends(get_session)):
+                                  x_webhook_signature: str = Header(..., description="Chữ ký webhook"),
+                                  token_details: dict = Depends(access_token_bearer),
+                                  session: AsyncSession = Depends(get_session),
+                                  redis_client: Redis = Depends(get_redis)):
     result = await webhook_shipping_service.update_shipping_status(webhook_data, session)
 
     return JSONResponse(
@@ -33,8 +39,13 @@ async def handle_shipping_webhook(webhook_data: ShippingWebhookRequest,
 
 @webhook_admin_router.post("/manual-refund-transaction", status_code=status.HTTP_200_OK)
 async def create_manual_refund_transaction(request_data: CreateManualRefundRequest,
-                                  token_details: dict = Depends(access_token_bearer),
-                                  session: AsyncSession = Depends(get_session)):
+                                           token_details: dict = Depends(access_token_bearer),
+                                           session: AsyncSession = Depends(get_session)):
+    user_role = token_details.get("role")
+    user_id = token_details.get('user', {}).get('id')
+
+    if user_role != "admin":
+        ReturnOrderException.unauthorized_create_refund_transaction()
 
     cash_transaction = await manual_refund_cash_service.create_manual_refund_transaction(
         return_order_id=request_data.return_order_id,
@@ -42,13 +53,15 @@ async def create_manual_refund_transaction(request_data: CreateManualRefundReque
         payment_method=request_data.payment_method,
         notes=request_data.notes,
         transaction_date=request_data.transaction_date,
+        idempotency_key=request_data.idempotency_key,
+        performed_by_id=user_id,
         session=session
     )
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={
-            "message": "Đã tạo giao dịch hoàn tiền thủ công",
+            "message": "Đã tạo giao dịch hoàn tiền thủ công thành công",
             "content": cash_transaction
         }
     )

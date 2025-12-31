@@ -1,7 +1,6 @@
 from src.crud.brand.repositories import BrandRepository
 from src.database.models import Brand
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_
 from src.errors.brand import BrandException
 from src.schemas.brand import BrandCreateModel
 from src.crud.brand.utils import generate_slug

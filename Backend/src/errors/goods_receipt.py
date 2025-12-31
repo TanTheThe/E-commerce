@@ -61,7 +61,7 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
-        
+
     @staticmethod
     def gr_detail_not_found():
         raise HTTPException(
@@ -101,7 +101,7 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
-        
+
     @staticmethod
     def cant_delete_receipt_have_child():
         raise HTTPException(
@@ -111,7 +111,7 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
-        
+
     @staticmethod
     def cant_delete_receipt_have_returns():
         raise HTTPException(
@@ -121,7 +121,7 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
-        
+
     @staticmethod
     def error_while_delete_gr():
         raise HTTPException(
@@ -222,3 +222,122 @@ class GoodsReceiptException:
             },
         )
 
+    @staticmethod
+    def duplicate_po_detail_in_items():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có po_detail_id bị trùng lặp trong danh sách items",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def rejection_reason_required():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Lý do từ chối là bắt buộc khi có số lượng từ chối lớn hơn 0",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def received_greater_than_ordered():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng nhận không được lớn hơn số lượng đặt",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def ordered_quantity_must_equal_expected_qty(expected_qty):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng đặt phải bằng {expected_qty}",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def invalid_parent_status():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ có thể tạo phiếu con từ phiếu cha đã được phê duyệt",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def no_items_available_for_child_receipt():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không còn hàng bị từ chối nào để tạo phiếu nhập con",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def gr_has_no_items():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Phiếu nhập kho không có sản phẩm nào",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def gr_has_no_accepted_items():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Phiếu nhập kho không có sản phẩm nào được chấp nhận (accepted_quantity > 0)",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def can_only_update_pending():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Chỉ có thể cập nhật phiếu nhập kho ở trạng thái 'pending'",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def cant_delete_stock_updated_gr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể xóa phiếu nhập kho đã được dùng để cập nhật tồn kho",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def cant_delete_gr_of_completed_po():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể xóa phiếu nhập kho của đơn hàng đã hoàn tất (PO completed)",
+                "error_code": "gr_001",
+            },
+        )
+
+    @staticmethod
+    def can_only_delete_pending(current_status: str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Chỉ có thể xóa phiếu nhập kho ở trạng thái 'pending'. Trạng thái hiện tại: '{current_status}'",
+                "error_code": "gr_001",
+            },
+        )

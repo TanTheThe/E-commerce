@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
 
@@ -9,7 +9,14 @@ class TagSortEnum(str, Enum):
     NAME_DESC = "name_desc"
     CREATED_ASC = "created_asc"
     CREATED_DESC = "created_desc"
-    
+
+
+class TagDeleteStrategy(str, Enum):
+    SOFT_DELETE = "soft_delete"
+    FORCE_DELETE = "force_delete"
+    REJECT = "reject"
+
+
 class TagQueryParams(BaseModel):
     search: Optional[str] = Field(None, max_length=100, description="Tìm kiếm theo tên tag")
 
@@ -22,7 +29,8 @@ class TagQueryParams(BaseModel):
                 v = v.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
             return v if v else None
         return None
-    
+
+
 class TagAdminQueryParams(TagQueryParams):
     is_active: Optional[bool] = None
     sort_by: TagSortEnum = Field(TagSortEnum.CREATED_DESC, description="Sắp xếp theo")
@@ -45,12 +53,51 @@ class TagCreateModel(BaseModel):
         
         return v
 
+
 class TagUpdateModel(BaseModel):
-    name: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Tên tag mới")
+    is_active: Optional[bool] = Field(None, description="Trạng thái active")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+
+        v = v.strip()
+
+        if not v:
+            raise ValueError("Tên tag không được để trống")
+
+        if not re.match(
+                r'^[\w\s\-àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ]+$',
+                v):
+            raise ValueError("Tên tag chỉ được chứa chữ cái, số, dấu gạch ngang và khoảng trắng")
+
+        return v
+
+    @model_validator(mode='after')
+    def check_at_least_one_field(self):
+        if self.name is None and self.is_active is None:
+            raise ValueError("Phải cung cấp ít nhất một trường để cập nhật (name hoặc is_active)")
+        return self
+
 
 class DeleteMultipleTagsModel(BaseModel):
-    tag_ids: List[str]
+    tag_ids: List[str] = Field(..., min_length=1, max_length=100, description="Danh sách tag IDs cần xóa")
+    strategy: TagDeleteStrategy = Field(
+        TagDeleteStrategy.SOFT_DELETE,
+        description="Chiến lược xóa: soft_delete, force_delete, hoặc reject"
+    )
+
+    @field_validator('tag_ids')
+    @classmethod
+    def validate_tag_ids(cls, v: List[str]) -> List[str]:
+        if len(v) != len(set(v)):
+            raise ValueError("Danh sách tag_ids không được chứa phần tử trùng lặp")
+
+        return v
+
 
 class ProductTagAssignmentModel(BaseModel):
     product_id: str = Field(..., description="ID của sản phẩm")
@@ -66,6 +113,7 @@ class ProductTagAssignmentModel(BaseModel):
             raise ValueError("Danh sách tag_ids không được chứa phần tử trùng lặp")
         
         return v
+
 
 class TagType(str, Enum):
     SUMMER = "Mùa hè"

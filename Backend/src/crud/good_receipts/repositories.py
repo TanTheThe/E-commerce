@@ -28,7 +28,8 @@ class GoodsReceiptRepository:
 
         for detail in receipt_details:
             detail.goods_receipt_id = goods_receipt.id
-            session.add(detail)
+
+        session.add_all(receipt_details)
 
         await session.commit()
         await session.refresh(goods_receipt)
@@ -220,18 +221,17 @@ class GoodsReceiptRepository:
 
     async def delete_goods_receipt(self, session: AsyncSession, goods_receipt_id: str):
         condition = [GoodsReceipt.id == goods_receipt_id]
-        pr = await self.get_goods_receipt(session=session, where_conditions=condition)
-        if not pr:
+        gr = await self.get_goods_receipt(session=session, where_conditions=condition)
+        if not gr:
             return False
 
-        detail_statement = select(GoodsReceiptDetail).where(
-            GoodsReceiptDetail.goods_receipt_id == goods_receipt_id
+        delete_details_stmt = delete(GoodsReceiptDetail).where(
+            and_(GoodsReceiptDetail.goods_receipt_id == goods_receipt_id)
         )
-        result = await session.exec(detail_statement)
-        details = result.all()
-        for detail in details:
-            await session.delete(detail)
+        await session.exec(delete_details_stmt)
 
-        await session.delete(pr)
+        await session.delete(gr)
+
         await session.commit()
+
         return True

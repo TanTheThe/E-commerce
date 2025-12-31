@@ -201,18 +201,32 @@ class TagRepository:
             )
         
         await session.execute(update_stmt)
+
+
+    async def delete_tag_relationships(self, tag_id: str, session: AsyncSession):
+        delete_stmt = delete(Product_Tag).where(
+            and_(Product_Tag.tag_id == tag_id)
+        )
+        await session.execute(delete_stmt)
+
+        update_count_stmt = (
+            update(Tag)
+            .where(and_(Tag.id == tag_id))
+            .values(products_count=0)
+        )
+        await session.execute(update_count_stmt)
     
 
-    async def delete_tag(self, condition: Optional[ColumnElement[bool]], session: AsyncSession):
-        tag_delete = await self.get_tag(condition, session)
-
-        if tag_delete is None:
-            TagException.tag_not_found()
-
-        tag_delete.deleted_at = datetime.now()
-        await session.commit()
-
-        return str(tag_delete.id)
+    async def soft_delete_tag(self, tag_id: str, session: AsyncSession):
+        stmt = (
+            update(Tag)
+            .where(and_(Tag.id == tag_id))
+            .values(
+                deleted_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+        )
+        await session.execute(stmt)
     
     async def delete_multiple_tags(self, data: DeleteMultipleTagsModel, session: AsyncSession):
         conditions = [Tag.id.in_(data.tag_ids), Tag.deleted_at.is_(None)]

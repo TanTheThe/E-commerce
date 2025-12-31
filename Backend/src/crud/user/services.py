@@ -4,6 +4,7 @@ from sqlalchemy.orm import selectinload
 from src.crud.warehouse.repositories import WareHouseRepository
 from src.database.models import User, UserSpecialOffer, Warehouse
 from src.errors.authentication import AuthException
+from src.errors.user import UserException
 from src.errors.warehouse import WareHouseException
 from src.schemas.user import UserDeleteModel, \
     FilterUserInputModel, UserRole, SortOrder
@@ -142,29 +143,39 @@ class UserService:
         return formatted_users
 
 
-    async def get_all_customer_for_offer_service(self, offer_id: str, search: Optional[str], session: AsyncSession, skip: int = 0,
-                                       limit: int = 10):
-        filters = [User.deleted_at.is_(None)]
+    async def get_all_customer_for_offer_service(self, offer_id: str, search: Optional[str], session: AsyncSession,
+                                                 skip: int = 0, limit: int = 10):
+        filters = [
+            User.deleted_at.is_(None),
+            User.is_customer == True,
+            User.customer_status == "active",
+            User.is_verified == True
+        ]
 
         if search:
-            search_term = f"%{search}%"
-            full_name_search = func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
-            filters.append(or_(
-                User.first_name.ilike(search_term),
-                User.last_name.ilike(search_term),
-                User.email.ilike(search_term),
-                full_name_search
-            ))
+            search = search.strip()
+            if search:  # Check not empty after strip
+                search_term = f"%{search}%"
+                filters.append(or_(
+                    User.first_name.ilike(search_term),
+                    User.last_name.ilike(search_term),
+                    User.email.ilike(search_term),
+                    func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
+                ))
 
         subquery = (
             select(UserSpecialOffer.user_id)
-            .where(UserSpecialOffer.special_offer_id == offer_id)
+            .where(
+                UserSpecialOffer.special_offer_id == offer_id,
+            )
+            .scalar_subquery()
         )
-        filters.append(User.id.notin_(subquery))
+        filters.append(~User.id.in_(subquery))
 
-        order_by = [desc(User.created_at)]
+        order_by = desc(User.created_at)
 
-        users, total = await user_repository.get_all_users(filters, session, skip, limit, order_by=order_by)
+        users, total = await user_repository.get_all_users(session=session, where_conditions=filters, skip=skip,
+                                                           limit=limit, order_by=order_by)
 
         filtered_users = [
             {
@@ -174,7 +185,8 @@ class UserService:
                 "email": user.email,
                 "phone": user.phone,
                 "customer_status": user.customer_status,
-                "created_at": str(user.created_at)
+                "is_verified": user.is_verified,
+                "created_at": user.created_at.isoformat() if user.created_at else None
             }
             for user in users
         ]
@@ -236,27 +248,43 @@ class UserService:
         user_block = await user_repository.change_status_user(condition, role, session)
         return user_block
 
-    async def get_profile_customer_service(self, id: str, session: AsyncSession):
-        condition = [User.id == id, User.deleted_at.is_(None)]
-        user = await user_repository.get_user(session=session, where_conditions=condition)
+    async def get_profile_customer_service(self, user_id: str, session: AsyncSession):
+        conditions = [
+            User.id == user_id,
+            User.deleted_at.is_(None),
+            User.is_customer == True
+        ]
+        user = await user_repository.get_user(
+            session=session,
+            where_conditions=conditions
+        )
 
         if not user:
             AuthException.user_not_found()
 
-        filtered_user = {
+        formatted_user = {
+            "id": str(user.id),
             "first_name": user.first_name,
             "last_name": user.last_name,
+            "full_name": f"{user.first_name} {user.last_name}",
             "email": user.email,
-            "phone": user.phone
+            "phone": user.phone,
+            "is_verified": user.is_verified,
+            "customer_status": user.customer_status,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None
         }
 
-        return filtered_user
+        return formatted_user
 
-    async def get_profile_admin_staff_service(self, id: str, session: AsyncSession):
-        condition = [User.id == id, User.deleted_at.is_(None)]
-        user = await user_repository.get_user(session=session, where_conditions=condition)
-        if not user:
-            AuthException.user_not_found()
+    async def get_profile_admin_staff_service(self, user_id: str, session: AsyncSession):
+        conditions = [
+            User.id == user_id,
+            User.deleted_at.is_(None),
+            or_(User.is_admin == True, User.is_staff == True)
+        ]
+
+        user = await user_repository.get_user(session=session, where_conditions=conditions)
 
         if not user:
             AuthException.user_not_found()
@@ -266,15 +294,24 @@ class UserService:
 
         role = "admin" if user.is_admin else "staff"
 
-        filtered_user = {
+        formatted_user = {
+            "id": str(user.id),
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
             "phone": user.phone,
             "role": role,
+            "is_verified": user.is_verified
         }
 
-        return filtered_user
+        if user.is_staff and not user.is_admin:
+            formatted_user.update({
+                "staff_status": user.staff_status,
+                "warehouse_id": str(user.warehouse_id) if user.warehouse_id else None,
+                "warehouse_role": user.warehouse_role
+            })
+
+        return formatted_user
 
     async def get_available_staffs_service(self, session: AsyncSession, skip: int = 0, limit: int = 10):
         filters = [
@@ -308,14 +345,38 @@ class UserService:
 
 
     async def update_profile_service(self, user_id: str, update_data, session: AsyncSession):
-        condition = and_(User.id == user_id)
-        user_need_update = await user_repository.get_user(condition, session)
+        conditions = [
+            User.id == user_id,
+            User.deleted_at.is_(None)
+        ]
+        user_need_update = await user_repository.get_user(session=session, where_conditions=conditions)
 
         if not user_need_update:
             AuthException.user_not_found()
 
-        user_after_update = await user_repository.update_user(user_need_update, update_data.model_dump(), session)
+        update_dict = update_data.model_dump(exclude_none=True)
+
+        if not update_dict:
+            raise ValueError("Không có dữ liệu để cập nhật")
+
+        if 'phone' in update_dict and update_dict['phone'] != user_need_update.phone:
+            conditions = [
+                User.phone == update_dict['phone'],
+                User.id != user_id,
+                User.deleted_at.is_(None)
+            ]
+            _, count = await user_repository.get_all_users(session=session, where_conditions=conditions)
+            if count > 0:
+                UserException.phone_already_in_use()
+
+        user_after_update = await user_repository.update_user(
+            user_need_update,
+            update_dict,
+            session
+        )
+
         await session.commit()
+        await session.refresh(user_after_update)
 
         return user_after_update
 

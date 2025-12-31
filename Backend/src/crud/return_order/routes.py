@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Depends, HTTPException
+from fastapi import APIRouter, status, Depends, Query, Path
 from typing import Optional
 from sqlmodel import and_
 from starlette.requests import Request
@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
 from src.errors.payment import PaymentException
 from src.schemas.return_order import CreateReturnRequest, ProcessReturnRequest, CompleteReturnRequest, \
-    UpdateRefundStatusRequest
+    UpdateRefundStatusRequest, ReturnOrderStatus, ReturnOrderSortBy
 
 return_order_admin_router = APIRouter(prefix="/return-order")
 return_order_customer_router = APIRouter(prefix="/return-order")
@@ -43,6 +43,7 @@ async def create_return_order(order_id: str,
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
+
     message, result = await create_return_order_service.create_return_request(
         order_id=order_id,
         user_id=user_id,
@@ -89,66 +90,73 @@ async def check_return_eligibility(order_id: str,
     )
 
 @return_order_customer_router.get("/my-returns", dependencies=[Depends(customer_role_middleware)])
-async def get_my_returns(skip: int = 0, limit: int = 20,
+async def get_my_returns(skip: int = Query(0, ge=0, description="Số lượng bỏ qua"),
+                         limit: int = Query(20, ge=1, le=100, description="Số lượng lấy (1-100)"),
+                         status_filter: Optional[ReturnOrderStatus] = Query(None, alias="status", description="Lọc theo trạng thái"),
+                         sort_by: ReturnOrderSortBy = Query(ReturnOrderSortBy.CREATED_DESC, description="Sắp xếp theo"),
                          token_details: dict = Depends(access_token_bearer),
                          session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
-    returns_dict, total = await get_customer_returns_service.get_customer_returns(
+
+    returns_data = await get_customer_returns_service.get_customer_returns(
         user_id=user_id,
         session=session,
         skip=skip,
-        limit=limit
+        limit=limit,
+        status_filter=status_filter,
+        sort_by=sort_by
     )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Danh sách yêu cầu hoàn trả",
-            "content": {
-                "data": returns_dict,
-                "total": total,
-            }
+            "message": "Lấy danh sách yêu cầu hoàn trả thành công",
+            "content": returns_data
         }
     )
 
 
 @return_order_admin_router.get("/requests", dependencies=[Depends(admin_role_middleware)])
-async def get_return_requests(status_return: Optional[str],
-                              skip: int = 0, limit: int = 20,
+async def get_return_requests(skip: int = Query(0, ge=0, description="Số lượng bỏ qua"),
+                              limit: int = Query(20, ge=1, le=100, description="Số lượng lấy (1-100)"),
+                              status_filter: Optional[ReturnOrderStatus] = Query(None, description="Lọc theo trạng thái"),
+                              sort_by: ReturnOrderSortBy = Query(ReturnOrderSortBy.CREATED_DESC, description="Sắp xếp theo"),
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
-    returns_dict, total = await get_return_requests_service.get_return_requests(
+    returns_data = await get_return_requests_service.get_return_requests(
         session=session,
-        status=status_return,
+        status=status_filter,
         skip=skip,
-        limit=limit
+        limit=limit,
+        sort_by=sort_by
     )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Danh sách yêu cầu hoàn trả",
-            "content": {
-                "data": returns_dict,
-                "total": total,
-            }
+            "content": returns_data
         }
     )
 
+
 @return_order_admin_router.post("/process/{return_order_id}", dependencies=[Depends(admin_role_middleware)])
-async def process_return_request(return_order_id: str,
-                                 request_data: ProcessReturnRequest,
-                                 request: Request,
+async def process_return_request(request: Request,
+                                 return_order_id: str = Path(..., description="ID của return order", min_length=36, max_length=36),
+                                 request_data: ProcessReturnRequest = ...,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    if request_data.action == "reject" and not request_data.reject_reason:
-        raise HTTPException(status_code=400, detail="Reject reason is required")
+    admin_id = token_details['user']['id']
+    admin_email = token_details['user'].get('email', 'unknown')
 
     message, result = await process_return_order_service.process_return_request(
         return_order_id=return_order_id,
         action=request_data.action,
-        admin_data=request_data.dict(),
-        request=request,
+        admin_note=request_data.admin_note,
+        reject_reason=request_data.reject_reason,
+        attempt_count=request_data.attempt_count,
+        admin_id=admin_id,
+        admin_email=admin_email,
         session=session
     )
 
@@ -161,9 +169,10 @@ async def process_return_request(return_order_id: str,
     )
 
 @return_order_admin_router.post("/complete/{return_order_id}", dependencies=[Depends(admin_role_middleware)])
-async def complete_return_order(return_order_id: str,
-                                request_data: CompleteReturnRequest,
-                                request: Request,
+async def complete_return_order(return_order_id: str = Path(..., description="ID của return order", min_length=36, max_length=36),
+                                request_data: CompleteReturnRequest = ...,
+                                request: Request = ...,
+                                background_tasks: BackgroundTasks = ...,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
     message, result = await complete_return_order_service.complete_return(
@@ -201,7 +210,7 @@ async def retry_refund(refund_id: str,
     )
 
 @return_order_admin_router.get("/{return_order_id}", dependencies=[Depends(admin_role_middleware)])
-async def get_return_detail(return_order_id: str,
+async def get_return_detail(return_order_id: str = Path(..., description="ID của return order", min_length=36, max_length=36),
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
     result = await get_detail_return_order_service.get_detail_return_order(return_order_id=return_order_id, session=session)

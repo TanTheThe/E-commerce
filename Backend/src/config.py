@@ -25,8 +25,29 @@ class Settings(BaseSettings):
     JWT_VERIFY_OTP_LOGIN_SECRET_STAFF: str
 
     JWT_ALGORITHM: str
+
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_DECODE_RESPONSES: bool = True
+    REDIS_MAX_CONNECTIONS: int = 50
+
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+
+    CACHE_TTL_SHORT: int = 300          # 5 phút
+    CACHE_TTL_MEDIUM: int = 1800        # 30 phút
+    CACHE_TTL_LONG: int = 3600          # 1 giờ
+    CACHE_TTL_VERY_LONG: int = 86400    # 24 giờ
+
+    RATE_LIMIT_LOGIN_MAX: int = 5       # Max login attempts
+    RATE_LIMIT_LOGIN_WINDOW: int = 300  # 5 phút
+    RATE_LIMIT_OTP_MAX: int = 3         # Max OTP requests
+    RATE_LIMIT_OTP_WINDOW: int = 900    # 15 phút
+
+    JWT_BLACKLIST_ENABLED: bool = True
+    JWT_BLACKLIST_TOKEN_CHECKS: list = ["access", "refresh"]
+
     DOMAIN: str
     CUSTOMER_DOMAIN_CLIENT: str
     ADMIN_DOMAIN_CLIENT: str

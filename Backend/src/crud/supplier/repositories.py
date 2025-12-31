@@ -129,17 +129,13 @@ class SupplierRepository:
         await session.commit()
         return True
 
-
     async def generate_supplier_code(self, session: AsyncSession) -> str:
         today = datetime.now().strftime("%Y%m%d")
         prefix = f"SUP-{today}"
 
-        statement = select(func.count(Supplier.id)).where(Supplier.code.like(f"{prefix}%"))
-        result = await session.exec(statement)
-        count = result.one() or 0
+        unique_suffix = uuid.uuid4().hex[:8].upper()
 
-        sequence = str(count + 1).zfill(4)
-        return f"{prefix}-{sequence}"
+        return f"{prefix}-{unique_suffix}"
 
 
     async def get_supplier_payment(self, session: AsyncSession,

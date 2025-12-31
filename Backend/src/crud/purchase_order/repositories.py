@@ -21,29 +21,29 @@ class PurchaseOrderRepository:
         sequence = str(count + 1).zfill(3)
         return f"{prefix}{sequence}"
 
-
-    async def create_purchase_order(self, po_data: PurchaseOrder, po_details: List[PurchaseOrderDetail], session: AsyncSession):
+    async def create_purchase_order(self, po_data: PurchaseOrder, po_details: List[PurchaseOrderDetail],
+                                    session: AsyncSession):
         session.add(po_data)
         await session.flush()
 
         for detail in po_details:
             detail.purchase_order_id = po_data.id
-            session.add(detail)
+
+        session.add_all(po_details)
 
         await session.commit()
         await session.refresh(po_data)
 
         return po_data
 
-
     async def get_purchase_order(self, session: AsyncSession,
-                            select_columns: Optional[List[Any]] = None,
-                            joins: Optional[List[Tuple[Any, dict]]] = None,
-                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                            group_by_columns: Optional[List[Any]] = None,
-                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                            order_by: Optional[Any] = None,
-                            options: Optional[list] = None):
+                                 select_columns: Optional[List[Any]] = None,
+                                 joins: Optional[List[Tuple[Any, dict]]] = None,
+                                 where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                 group_by_columns: Optional[List[Any]] = None,
+                                 having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                 order_by: Optional[Any] = None,
+                                 options: Optional[list] = None):
 
         if select_columns is None:
             query = select(PurchaseOrder)
@@ -77,16 +77,15 @@ class PurchaseOrderRepository:
 
         return po
 
-
     async def get_all_purchase_orders(self, session: AsyncSession,
-                             select_columns: Optional[List[Any]] = None,
-                             joins: Optional[List[Tuple[Any, dict]]] = None,
-                             where_conditions: Optional[List[ColumnElement[bool]]] = None,
-                             group_by_columns: Optional[List[Any]] = None,
-                             having_conditions: Optional[List[ColumnElement[bool]]] = None,
-                             order_by: Optional[Any] = None,
-                             skip: int = 0, limit: int = 10,
-                             options: Optional[list] = None):
+                                      select_columns: Optional[List[Any]] = None,
+                                      joins: Optional[List[Tuple[Any, dict]]] = None,
+                                      where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                      group_by_columns: Optional[List[Any]] = None,
+                                      having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                      order_by: Optional[Any] = None,
+                                      skip: int = 0, limit: int = 10,
+                                      options: Optional[list] = None):
 
         if select_columns is None:
             query = select(PurchaseOrder)
@@ -126,45 +125,48 @@ class PurchaseOrderRepository:
 
         return pos, total
 
-
     async def update_purchase_order(self, session: AsyncSession, po: PurchaseOrder,
                                     new_details: Optional[List[PurchaseOrderDetail]] = None):
-        if new_details is not None:
-            if po.po_details:
-                for detail in po.po_details:
-                    session.expunge(detail)
-                po.po_details.clear()
-
-            statement = delete(PurchaseOrderDetail).where(
-                PurchaseOrderDetail.purchase_order_id == po.id
-            )
-            await session.exec(statement)
-            await session.flush()
-
-            for d in new_details:
-                new_detail = PurchaseOrderDetail(
-                    purchase_order_id=po.id,
-                    product_variant_id=d.product_variant_id,
-                    quantity=d.quantity,
-                    received_quantity=0,
-                    unit_cost=d.unit_cost,
-                    total_cost=d.total_cost,
-                    product_snapshot=d.product_snapshot,
-                    created_at=datetime.now(),
-                    notes=d.notes,
+        try:
+            if new_details is not None:
+                delete_stmt = delete(PurchaseOrderDetail).where(
+                    and_(PurchaseOrderDetail.purchase_order_id == po.id)
                 )
-                session.add(new_detail)
+                await session.execute(delete_stmt)
 
-        po.updated_at = datetime.now()
-        session.add(po)
+                prepared_details = [
+                    PurchaseOrderDetail(
+                        purchase_order_id=po.id,
+                        product_variant_id=d.product_variant_id,
+                        quantity=d.quantity,
+                        received_quantity=0,
+                        unit_cost=d.unit_cost,
+                        total_cost=d.total_cost,
+                        product_snapshot=d.product_snapshot,
+                        notes=d.notes,
+                        created_at=datetime.now()
+                    )
+                    for d in new_details
+                ]
 
-        await session.commit()
-        await session.refresh(po)
+                if prepared_details:
+                    session.add_all(prepared_details)
 
-        return po
+            po.updated_at = datetime.now()
+            session.add(po)
+
+            await session.commit()
+
+            await session.refresh(po, ['supplier', 'warehouse', 'po_details'])
+
+            return po
+        except Exception as e:
+            await session.rollback()
+            raise e
 
 
-    async def update_po_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
+    async def update_po_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
+                                   session: AsyncSession):
         stmt = (
             update(PurchaseOrder)
             .where(condition)

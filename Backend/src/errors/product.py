@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 
+
 class ProductException:
     @staticmethod
     def not_found_to_delete():
@@ -90,7 +91,7 @@ class ProductException:
                 "error_code": "product_010",
             },
         )
-        
+
     @staticmethod
     def variant_sold_out():
         raise HTTPException(
@@ -100,7 +101,7 @@ class ProductException:
                 "error_code": "product_010",
             },
         )
-        
+
     @staticmethod
     def invalid_variant_price():
         raise HTTPException(
@@ -160,7 +161,7 @@ class ProductException:
                 "error_code": "product_015",
             },
         )
-    
+
     @staticmethod
     def invalid_product_ids():
         raise HTTPException(
@@ -170,7 +171,7 @@ class ProductException:
                 "error_code": "product_016",
             },
         )
-        
+
     @staticmethod
     def not_found_product_from_variant():
         raise HTTPException(
@@ -190,7 +191,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def duplicate_sku():
         raise HTTPException(
@@ -200,7 +201,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def sku_already_exists():
         raise HTTPException(
@@ -210,7 +211,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def category_identifier_must_not_be_empty():
         raise HTTPException(
@@ -220,7 +221,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def identifier_must_not_be_empty():
         raise HTTPException(
@@ -230,7 +231,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def min_price_greater_than_max_price():
         raise HTTPException(
@@ -240,7 +241,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def search_must_not_be_empty():
         raise HTTPException(
@@ -250,7 +251,7 @@ class ProductException:
                 "error_code": "product_018",
             },
         )
-        
+
     @staticmethod
     def search_too_short():
         raise HTTPException(
@@ -275,132 +276,199 @@ class ProductException:
     def variant_not_belong_to_product(variant_ids: list):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Các variant sau không thuộc sản phẩm này: {', '.join(variant_ids)}"
+            detail = {
+                "message": f"Các variant sau không thuộc sản phẩm này: {', '.join(variant_ids)}",
+                "error_code": "product_018",
+            },
         )
 
     @staticmethod
     def variant_in_pending_order(variant_id: str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Không thể xóa variant {variant_id} vì đang có trong đơn hàng đang xử lý"
+            detail = {
+                "message": f"Không thể xóa variant {variant_id} vì đang có trong đơn hàng đang xử lý",
+                "error_code": "product_018",
+            },
         )
 
     @staticmethod
     def cant_delete_variants_in_pending_orders():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Không thể xóa variants đang có trong đơn hàng chờ xử lý"
+            detail = {
+                "message": "Không thể xóa variants đang có trong đơn hàng chờ xử lý",
+                "error_code": "product_018",
+            },
         )
 
     @staticmethod
     def variants_required():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sản phẩm phải có ít nhất 1 variant"
+            detail = {
+                "message": "Sản phẩm phải có ít nhất 1 variant",
+                "error_code": "product_018",
+            },
         )
 
     @staticmethod
     def invalid_price(index: int):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Giá không hợp lệ tại variant thứ {index + 1}"
+            detail={
+                "message": f"Giá không hợp lệ tại variant thứ {index + 1}",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def invalid_quantity(index: int):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Số lượng không hợp lệ tại variant thứ {index + 1}"
+            detail={
+                "message": f"Số lượng không hợp lệ tại variant thứ {index + 1}",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def invalid_size(index: int):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Kích thước không hợp lệ tại variant thứ {index + 1}"
+            detail={
+                "message": f"Kích thước không hợp lệ tại variant thứ {index + 1}",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def categories_required():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sản phẩm phải có ít nhất 1 danh mục"
+            detail={
+                "message": "Sản phẩm phải có ít nhất 1 danh mục",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def name_too_long():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tên sản phẩm quá dài (tối đa 255 ký tự)"
+            detail={
+                "message": "Tên sản phẩm quá dài (tối đa 255 ký tự)",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def invalid_description():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mô tả không hợp lệ"
+            detail={
+                "message": "Mô tả không hợp lệ",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def invalid_images():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Danh sách ảnh không hợp lệ"
+            detail={
+                "message": "Danh sách ảnh không hợp lệ",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def too_many_images():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số lượng ảnh vượt quá giới hạn (tối đa 10 ảnh)"
+            detail={
+                "message": "Số lượng ảnh vượt quá giới hạn (tối đa 10 ảnh)",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def no_active_variants():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sản phẩm phải có ít nhất 1 variant hoạt động"
+            detail={
+                "message": "Sản phẩm phải có ít nhất 1 variant hoạt động",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def update_failed():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Cập nhật sản phẩm thất bại"
+            detail={
+                "message": "Cập nhật sản phẩm thất bại",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def too_many_variants():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số lượng variants vượt quá giới hạn (tối đa 50)"
+            detail={
+                "message": "Số lượng variants vượt quá giới hạn (tối đa 50)",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def invalid_color_data(index: int):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Dữ liệu màu sắc không hợp lệ tại variant thứ {index + 1}"
+            detail={
+                "message": f"Dữ liệu màu sắc không hợp lệ tại variant thứ {index + 1}",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def duplicate_variant_combination(size: str, color: str):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Đã tồn tại variant với size '{size}' và màu '{color}'"
+            detail={
+                "message": f"Đã tồn tại variant với size '{size}' và màu '{color}'",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def variant_update_failed():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Cập nhật variants thất bại"
+            detail={
+                "message": "Cập nhật variants thất bại",
+                "error_code": "product_018",
+            }
         )
 
     @staticmethod
     def too_many_categories():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Số lượng danh mục vượt quá giới hạn (tối đa 5)"
+            detail={
+                "message": "Số lượng danh mục vượt quá giới hạn (tối đa 5)",
+                "error_code": "product_018",
+            }
+        )
+
+    @staticmethod
+    def total_cost_exceeds_limit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Tổng giá trị đơn hàng vượt quá giới hạn cho phép",
+                "error_code": "product_018",
+            }
         )
 

@@ -6,7 +6,7 @@ from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.supplier.repositories import SupplierRepository
 from src.crud.warehouse.repositories import WareHouseRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.database.models import Product_Variant, PurchaseOrderDetail, PurchaseOrder
+from src.database.models import PurchaseOrder
 from src.errors.purchase_order import PurchaseOrderException
 
 supplier_repository = SupplierRepository()
@@ -18,14 +18,8 @@ purchase_order_repository = PurchaseOrderRepository()
 class ConfirmPurchaseOrderService:
     async def confirm_purchase_order(self, po_id: str, session: AsyncSession):
         condition_po = [PurchaseOrder.id == po_id]
-        options = [
-            selectinload(PurchaseOrder.supplier),
-            selectinload(PurchaseOrder.warehouse),
-            selectinload(PurchaseOrder.po_details).selectinload(PurchaseOrderDetail.product_variant).selectinload(
-                Product_Variant.product),
-            selectinload(PurchaseOrder.po_details).selectinload(PurchaseOrderDetail.product_variant).selectinload(
-                Product_Variant.color)
-        ]
+
+        options = [selectinload(PurchaseOrder.po_details)]
 
         po = await purchase_order_repository.get_purchase_order(
             session=session,
@@ -45,11 +39,17 @@ class ConfirmPurchaseOrderService:
         if not po.supplier_invoice_urls or len(po.supplier_invoice_urls) == 0:
             PurchaseOrderException.cant_confirm_po_without_invoice()
 
-        await purchase_order_repository.update_po_some_field(and_(*condition_po), {
-            "status": "confirmed",
-            "confirmed_at": datetime.now(),
-            "updated_at": datetime.now()
-        }, session)
+        now = datetime.now()
+
+        await purchase_order_repository.update_po_some_field(
+            and_(*condition_po),
+            {
+                "status": "confirmed",
+                "confirmed_at": now,
+                "updated_at": now
+            },
+            session
+        )
 
         await session.commit()
 

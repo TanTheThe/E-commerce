@@ -1,28 +1,27 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Query, status, Depends
-from src.crud.good_receipts.services.approve_goods_receipt import ApproveGoodsReceiptService
-from src.crud.good_receipts.services.create_goods_receipt import CreateGoodsReceiptService
-from src.crud.good_receipts.services.delete_goods_receipt import DeleteGoodsReceiptService
+from src.crud.good_receipts.services.approve_goods_receipt.approve_goods_receipt import ApproveGoodsReceiptService
+from src.crud.good_receipts.services.create_goods_receipt.create_goods_receipt import CreateGoodsReceiptService
+from src.crud.good_receipts.services.delete_goods_receipt.delete_goods_receipt import DeleteGoodsReceiptService
 from src.crud.good_receipts.services.get_all_goods_receipt import GetAllGoodsReceiptService
-from src.crud.good_receipts.services.get_approval_review import ApprovalPreviewService
+from src.crud.good_receipts.services.get_approval_preview.approval_preview import ApprovalPreviewService
 from src.crud.good_receipts.services.get_detail_goods_receipt import GetDetailGoodsReceiptService
 from src.crud.good_receipts.services.get_gr_for_create import GetGRForCreateService
 from src.crud.good_receipts.services.get_gr_tree_by_po import GetGRTreeByPOService
-from src.crud.good_receipts.services.update_goods_receipt import UpdateGoodsReceiptService
+from src.crud.good_receipts.services.update_goods_receipt.update_goods_receipt import UpdateGoodsReceiptService
 from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.errors.user import UserException
-from src.schemas.goods_receipt import CreateGoodsReceiptRequest
+from src.schemas.goods_receipt import CreateGoodsReceiptRequest, GetAllGoodsReceiptsQueryParams
 from src.schemas.goods_receipt import SortBy, UpdateGoodsReceiptRequest
 
 goods_receipt_admin_router = APIRouter(prefix="/goods-receipt")
 goods_receipt_customer_router = APIRouter(prefix="/goods-receipt")
 goods_receipt_staff_router = APIRouter(prefix="/goods-receipt")
 
-approval_preview_service = ApprovalPreviewService()
 create_goods_receipt_service = CreateGoodsReceiptService()
 approve_goods_receipt_service = ApproveGoodsReceiptService()
 get_all_goods_receipts_service = GetAllGoodsReceiptService()
@@ -32,6 +31,7 @@ delete_goods_receipt_service = DeleteGoodsReceiptService()
 get_gr_for_create_service = GetGRForCreateService()
 get_gr_tree_by_po_service = GetGRTreeByPOService()
 access_token_bearer = AccessTokenBearer()
+approval_review_service = ApprovalPreviewService()
 
 
 @goods_receipt_admin_router.post("/")
@@ -65,7 +65,7 @@ async def get_approval_preview(goods_receipt_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    preview = await approval_preview_service.get_approval_preview(goods_receipt_id, session)
+    preview = await approval_review_service.get_approval_preview(goods_receipt_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -77,15 +77,16 @@ async def get_approval_preview(goods_receipt_id: str,
 
 
 @goods_receipt_admin_router.get("/")
-async def get_all_goods_receipts(warehouse_id: str,
+async def get_all_goods_receipts(warehouse_id: str = Query(..., description="ID warehouse (bắt buộc)"),
                                  status_gr: Optional[str] = Query(None, description="Trạng thái phiếu"),
                                  purchase_order_id: Optional[str] = Query(None, description="ID đơn hàng"),
                                  supplier_id: Optional[str] = Query(None, description="ID nhà cung cấp"),
                                  from_date: Optional[datetime] = Query(None, description="Từ ngày"),
                                  to_date: Optional[datetime] = Query(None, description="Đến ngày"),
-                                 search: Optional[str] = Query(None, description="Tìm kiếm theo receipt_number"),
-                                 sort_by: Optional[SortBy] = None,
-                                 skip: int = 0, limit: int = 10,
+                                 search: Optional[str] = Query(None, description="Tìm kiếm theo receipt_number hoặc delivery_note_number"),
+                                 sort_by: Optional[SortBy] = Query(None, description="Sắp xếp theo"),
+                                 skip: int = Query(0, ge=0, description="Số record bỏ qua"),
+                                 limit: int = Query(10, ge=1, le=100, description="Số record tối đa (max 100)"),
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
@@ -93,8 +94,7 @@ async def get_all_goods_receipts(warehouse_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    goods_receipt = await get_all_goods_receipts_service.get_all_goods_receipts(
-        session=session,
+    params = GetAllGoodsReceiptsQueryParams(
         warehouse_id=warehouse_id,
         status_gr=status_gr,
         purchase_order_id=purchase_order_id,
@@ -102,7 +102,12 @@ async def get_all_goods_receipts(warehouse_id: str,
         from_date=from_date,
         to_date=to_date,
         search=search,
-        sort_by=sort_by,
+        sort_by=sort_by
+    )
+
+    goods_receipt = await get_all_goods_receipts_service.get_all_goods_receipts(
+        session=session,
+        params=params,
         skip=skip,
         limit=limit
     )
@@ -110,7 +115,7 @@ async def get_all_goods_receipts(warehouse_id: str,
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin toàn bộ các phiếu nhập hàng tại kho",
+            "message": "Lấy danh sách phiếu nhập kho thành công",
             "content": goods_receipt
         }
     )
@@ -118,8 +123,8 @@ async def get_all_goods_receipts(warehouse_id: str,
 
 @goods_receipt_admin_router.get("/{goods_receipt_id}")
 async def get_goods_receipt_detail(goods_receipt_id: str,
-                                 token_details: dict = Depends(access_token_bearer),
-                                 session: AsyncSession = Depends(get_session)):
+                                   token_details: dict = Depends(access_token_bearer),
+                                   session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
 
     if role not in ['admin', 'staff']:
@@ -163,7 +168,8 @@ async def get_goods_receipt_for_create(parent_goods_receipt_id: str,
 
 
 @goods_receipt_admin_router.get("/{purchase_order_id}/receipts-tree")
-async def get_gr_tree_by_po(purchase_order_id: str, warehouse_id: str,
+async def get_gr_tree_by_po(purchase_order_id: str,
+                            warehouse_id: str = Query(..., description="Warehouse ID to filter receipts"),
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
@@ -192,7 +198,7 @@ async def approve_goods_receipt(goods_receipt_id: str,
                                 session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
 
-    goods_receipt = await approve_goods_receipt_service.approve_goods_receipt(session, goods_receipt_id, user_id)
+    goods_receipt = await approve_goods_receipt_service.approve_goods_receipt(goods_receipt_id, user_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -214,7 +220,7 @@ async def update_goods_receipt(goods_receipt_id: str, request: UpdateGoodsReceip
         
     update_data = request.model_dump(exclude_none=True)
     
-    goods_receipt = await update_goods_receipt_service.update_goods_receipt(session, goods_receipt_id, update_data)
+    goods_receipt = await update_goods_receipt_service.update_goods_receipt(goods_receipt_id, update_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -234,11 +240,12 @@ async def delete_goods_receipt(goods_receipt_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
         
-    await delete_goods_receipt_service.delete_goods_receipt(session, goods_receipt_id)
+    result = await delete_goods_receipt_service.delete_goods_receipt(goods_receipt_id, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Xóa phiếu nhập hàng thành công"
+            "message": "Xóa phiếu nhập hàng thành công",
+            "content": result
         }
     )

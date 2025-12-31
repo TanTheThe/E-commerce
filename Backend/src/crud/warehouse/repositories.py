@@ -18,17 +18,12 @@ class WareHouseRepository:
         return warehouse
 
     async def generate_warehouse_code(self, session: AsyncSession) -> str:
-        result = await session.exec(
-            select(func.max(Warehouse.code))
-        )
-        max_code = result.one_or_none()
+        today = datetime.now().strftime("%Y%m%d")
+        prefix = f"WH{today}"
 
-        if not max_code:
-            return "WH001"
+        unique_suffix = uuid.uuid4().hex[:8].upper()
 
-        last_number = int(max_code.replace("WH", ""))
-        new_number = last_number + 1
-        return f"WH{new_number:03d}"
+        return f"{prefix}{unique_suffix}"
 
     async def get_all_warehouse(self, session: AsyncSession,
                                 select_columns: Optional[List[Any]] = None,
@@ -98,13 +93,53 @@ class WareHouseRepository:
 
         return warehouses, total
 
-    async def get_warehouse(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
-        statement = select(Warehouse).options(
-            *joins if joins else []
-        ).where(conditions)
-        result = await session.exec(statement)
 
-        return result.one_or_none()
+    async def get_warehouse(self, session: AsyncSession,
+                            select_columns: Optional[List[Any]] = None,
+                            joins: Optional[List[Tuple[Any, dict]]] = None,
+                            where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            group_by_columns: Optional[List[Any]] = None,
+                            having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                            order_by: Optional[Any] = None,
+                            options: Optional[List[Any]] = None,
+                            for_update: Optional[bool] = False):
+
+        if select_columns is None:
+            query = select(Warehouse)
+        else:
+            query = select(*select_columns).select_from(Warehouse)
+
+        if joins:
+            for table, config in joins:
+                if config.get("type") == "outer":
+                    query = query.outerjoin(table, config["on"])
+                else:
+                    query = query.join(table, config["on"])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        if for_update:
+            query = query.with_for_update()
+
+        result = await session.exec(query)
+
+        warehouse = result.one_or_none()
+
+        return warehouse
+
 
     async def update_warehouse(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
                                session: AsyncSession):

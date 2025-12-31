@@ -12,9 +12,9 @@ warehouse_repository = WareHouseRepository()
 class GetWarehouseByIDService:
     async def get_warehouse_by_id(self, warehouse_id: str, session: AsyncSession):
         condition = and_(Warehouse.id == warehouse_id)
-        joins = [selectinload(Warehouse.manager)]
+        options = [selectinload(Warehouse.manager)]
 
-        warehouse = await warehouse_repository.get_warehouse(condition, session, joins)
+        warehouse = await warehouse_repository.get_warehouse(session=session, where_conditions=condition, options=options)
 
         if not warehouse:
             WareHouseException.warehouse_not_found()
@@ -22,7 +22,11 @@ class GetWarehouseByIDService:
         manager_name = None
         manager_id = None
         if warehouse.manager:
-            manager_name = f"{warehouse.manager.first_name} {warehouse.manager.last_name}".strip()
+            first_name = warehouse.manager.first_name
+            last_name = warehouse.manager.last_name
+            if not first_name and not last_name:
+                manager_name = None
+            manager_name = f"{first_name or ''} {last_name or ''}".strip()
             manager_id = str(warehouse.manager.id)
 
         warehouse_dict = {

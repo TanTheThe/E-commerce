@@ -4,19 +4,22 @@ from sqlmodel import or_, asc, desc, func
 from src.crud.warehouse.repositories import WareHouseRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.models import Warehouse, User
+from src.schemas.warehouse import WarehouseFilterParams
 
 warehouse_repository = WareHouseRepository()
 
 class GetAllWarehousesService:
-    async def get_all_warehouses(self, search: Optional[str], is_active: Optional[bool],
-                                 sort_by: Optional[str], skip: int, limit: int, session: AsyncSession):
+    async def get_all_warehouses(self, filters: WarehouseFilterParams, skip: int, limit: int, session: AsyncSession):
         conditions = []
         joins = None
 
-        if search:
-            search_term = f"%{search}%"
+        if filters.search:
+            search_term = f"%{filters.search}%"
 
-            joins = [(User, {'type': 'outer', 'on': Warehouse.manager_id == User.id})]
+            joins = [(User, {
+                'type': 'outer',
+                'on': Warehouse.manager_id == User.id
+            })]
 
             conditions.append(or_(
                 Warehouse.name.ilike(search_term),
@@ -27,21 +30,32 @@ class GetAllWarehousesService:
                 func.concat(User.first_name, ' ', User.last_name).ilike(search_term)
             ))
 
-        if is_active is not None:
-            conditions.append(Warehouse.is_active == is_active)
+        if filters.is_active is not None:
+            conditions.append(Warehouse.is_active == filters.is_active)
 
-        order_by_clause = asc(Warehouse.created_at) if sort_by == "created_asc" else desc(Warehouse.created_at)
+        order_by_clause = self.get_order_by_clause(filters.sort_by)
 
         options = [selectinload(Warehouse.manager)]
 
-        warehouses, total = await warehouse_repository.get_all_warehouse(session=session, where_conditions=conditions, joins=joins,
-                                                                         skip=skip, limit=limit, order_by=order_by_clause, options=options)
+        warehouses, total = await warehouse_repository.get_all_warehouse(
+            session=session,
+            where_conditions=conditions,
+            joins=joins,
+            skip=skip,
+            limit=limit,
+            order_by=order_by_clause,
+            options=options
+        )
 
         warehouses_list = []
         for wh in warehouses:
             manager_name = None
             if wh.manager:
-                manager_name = f"{wh.manager.first_name} {wh.manager.last_name}".strip()
+                first_name = wh.manager.first_name
+                last_name = wh.manager.last_name
+                if not first_name and not last_name:
+                    manager_name = None
+                manager_name = f"{first_name or ''} {last_name or ''}".strip()
 
             warehouse_dict = {
                 "id": str(wh.id),
@@ -61,4 +75,13 @@ class GetAllWarehousesService:
             "data": warehouses_list,
             "total": total
         }
+
+    def get_order_by_clause(self, sort_by: str):
+        order_mapping = {
+            "created_asc": asc(Warehouse.created_at),
+            "created_desc": desc(Warehouse.created_at),
+            "name_asc": asc(Warehouse.name),
+            "name_desc": desc(Warehouse.name),
+        }
+        return order_mapping.get(sort_by, desc(Warehouse.created_at))
 

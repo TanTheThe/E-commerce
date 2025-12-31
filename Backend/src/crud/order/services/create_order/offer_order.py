@@ -81,7 +81,7 @@ class OfferService:
 
         remaining_quantity = order_offer.total_quantity - order_offer.used_quantity
         if remaining_quantity < 1:
-            SpecialOfferException.offer_has_expired(order_offer.code)
+            SpecialOfferException.offer_has_expired()
 
         if order_offer.type == "percent":
             discount = int(sub_total * order_offer.discount / 100)

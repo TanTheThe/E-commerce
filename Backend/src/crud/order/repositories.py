@@ -1,10 +1,11 @@
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement
-from sqlalchemy.orm import noload, load_only
+from sqlalchemy.orm import load_only
 from src.database.models import Order, OrderStatusHistory
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, distinct, update
+from sqlmodel import select, desc, and_, func, update
 from datetime import datetime
+import uuid
 
 
 class OrderRepository:
@@ -95,7 +96,8 @@ class OrderRepository:
                         group_by_columns: Optional[List[Any]] = None,
                         having_conditions: Optional[List[ColumnElement[bool]]] = None,
                         order_by: Optional[Any] = None,
-                        options: Optional[List[Any]] = None):
+                        options: Optional[List[Any]] = None,
+                        for_update: Optional[bool] = False):
 
         if select_columns is None:
             query = select(Order)
@@ -123,6 +125,9 @@ class OrderRepository:
 
         if order_by is not None:
             query = query.order_by(order_by)
+
+        if for_update:
+            query = query.with_for_update()
 
         result = await session.exec(query)
 
@@ -189,12 +194,6 @@ class OrderRepository:
         today = datetime.now().strftime("%Y%m%d")
         prefix = f"ORD{today}"
 
-        statement = select(func.count(Order.id)).where(
-            Order.code.like(f"{prefix}%")
-        )
-        result = await session.exec(statement)
+        unique_suffix = uuid.uuid4().hex[:8].upper()
 
-        count = result.one_or_none()
-
-        sequence = str(count + 1).zfill(3)
-        return f"{prefix}{sequence}"
+        return f"{prefix}{unique_suffix}"

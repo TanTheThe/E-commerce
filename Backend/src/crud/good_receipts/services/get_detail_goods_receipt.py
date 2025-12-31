@@ -1,5 +1,4 @@
 from sqlalchemy.orm import selectinload
-from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.user.repositories import UserRepository
@@ -19,45 +18,54 @@ class GetDetailGoodsReceiptService:
             selectinload(GoodsReceipt.supplier),
             selectinload(GoodsReceipt.warehouse),
             selectinload(GoodsReceipt.purchase_order),
-            selectinload(GoodsReceipt.receipt_details).selectinload(GoodsReceiptDetail.product_variant).selectinload(
-                Product_Variant.product),
-            selectinload(GoodsReceipt.receipt_details).selectinload(GoodsReceiptDetail.product_variant).selectinload(
-                Product_Variant.color),
-            selectinload(GoodsReceipt.receipt_details).selectinload(GoodsReceiptDetail.po_detail)
+            selectinload(GoodsReceipt.receipt_details).selectinload(
+                GoodsReceiptDetail.product_variant
+            ).selectinload(Product_Variant.product),
+            selectinload(GoodsReceipt.receipt_details).selectinload(
+                GoodsReceiptDetail.product_variant
+            ).selectinload(Product_Variant.color),
+            selectinload(GoodsReceipt.receipt_details).selectinload(
+                GoodsReceiptDetail.po_detail
+            )
         ]
 
-        gr = await goods_receipt_repository.get_goods_receipt(session=session, where_conditions=condition_gr,
-                                                              options=options)
+        gr = await goods_receipt_repository.get_goods_receipt(
+            session=session,
+            where_conditions=condition_gr,
+            options=options
+        )
+
         if not gr:
             GoodsReceiptException.gr_not_found()
 
         receipt_number_parent = None
         if gr.parent_receipt_id:
-            parent_receipt = await goods_receipt_repository.get_goods_receipt(session=session,
-                                                                              where_conditions=[GoodsReceipt.id == gr.parent_receipt_id])
+            parent_receipt = await goods_receipt_repository.get_goods_receipt(
+                session=session,
+                where_conditions=[GoodsReceipt.id == gr.parent_receipt_id]
+            )
             if parent_receipt:
                 receipt_number_parent = parent_receipt.receipt_number
 
-        received_by_name = None
-        if gr.received_by:
-            condition_user = and_(User.id == gr.received_by)
-            receiver = await user_repository.get_user(condition_user, session=session)
-            if receiver:
-                received_by_name = f"{receiver.first_name} {receiver.last_name}"
+        user_ids = [
+            user_id for user_id in [gr.received_by, gr.inspected_by, gr.approved_by]
+            if user_id is not None
+        ]
 
-        inspected_by_name = None
-        if gr.inspected_by:
-            condition_user = and_(User.id == gr.inspected_by)
-            inspector = await user_repository.get_user(condition_user, session=session)
-            if inspector:
-                inspected_by_name = f"{inspector.first_name} {inspector.last_name}"
+        user_map = {}
+        if user_ids:
+            users, _ = await user_repository.get_all_users(
+                where_conditions=[User.id.in_(user_ids)],
+                session=session
+            )
+            user_map = {
+                str(user.id): f"{user.first_name} {user.last_name}"
+                for user in users
+            }
 
-        approved_by_name = None
-        if gr.approved_by:
-            condition_user = and_(User.id == gr.approved_by)
-            approver = await user_repository.get_user(condition_user, session=session)
-            if approver:
-                approved_by_name = f"{approver.first_name} {approver.last_name}"
+        received_by_name = user_map.get(str(gr.received_by)) if gr.received_by else None
+        inspected_by_name = user_map.get(str(gr.inspected_by)) if gr.inspected_by else None
+        approved_by_name = user_map.get(str(gr.approved_by)) if gr.approved_by else None
 
         items = []
         for detail in gr.receipt_details:
@@ -68,43 +76,43 @@ class GetDetailGoodsReceiptService:
                 variant_color_name = detail.product_snapshot.get("variant_color_name")
                 variant_image = detail.product_snapshot.get("variant_image")
             else:
-                product_name = detail.product_variant.product.name if detail.product_variant and detail.product_variant.product else None
-                variant_sku = detail.product_variant.sku if detail.product_variant else None
-                variant_size = detail.product_variant.size if detail.product_variant else None
+                product_variant = detail.product_variant
+                product = product_variant.product if product_variant else None
+
+                product_name = product.name if product else None
+                variant_sku = product_variant.sku if product_variant else None
+                variant_size = product_variant.size if product_variant else None
+                variant_image = product_variant.image if product_variant else None
 
                 variant_color_name = None
-                variant_image = None
-                if detail.product_variant:
-                    if detail.product_variant.color_name:
-                        variant_color_name = detail.product_variant.color_name
-                    elif detail.product_variant.color:
-                        variant_color_name = detail.product_variant.color.name
-                    variant_image = detail.product_variant.image
+                if product_variant:
+                    variant_color_name = (
+                            product_variant.color_name or
+                            (product_variant.color.name if product_variant.color else None)
+                    )
 
-            items.append(
-                {
-                    "id": str(detail.id),
-                    "product_id": str(detail.product_variant.product_id),
-                    "product_variant_id": str(detail.product_variant_id),
-                    "po_detail_id": str(detail.po_detail_id),
-                    "product_name": product_name,
-                    "variant_sku": variant_sku,
-                    "variant_size": variant_size,
-                    "variant_color_name": variant_color_name,
-                    "variant_image": variant_image,
-                    "ordered_quantity": detail.ordered_quantity,
-                    "received_quantity": detail.received_quantity,
-                    "accepted_quantity": detail.accepted_quantity,
-                    "rejected_quantity": detail.rejected_quantity,
-                    "returned_quantity": detail.returned_quantity,
-                    "unit_cost": detail.unit_cost,
-                    "total_cost": detail.total_cost,
-                    "rejection_reason": detail.rejection_reason,
-                    "product_snapshot": detail.product_snapshot,
-                    "notes": detail.notes,
-                    "created_at": str(detail.created_at),
-                }
-            )
+            items.append({
+                "id": str(detail.id),
+                "product_id": str(detail.product_variant.product_id) if detail.product_variant else None,
+                "product_variant_id": str(detail.product_variant_id),
+                "po_detail_id": str(detail.po_detail_id) if detail.po_detail_id else None,
+                "product_name": product_name,
+                "variant_sku": variant_sku,
+                "variant_size": variant_size,
+                "variant_color_name": variant_color_name,
+                "variant_image": variant_image,
+                "ordered_quantity": detail.ordered_quantity,
+                "received_quantity": detail.received_quantity,
+                "accepted_quantity": detail.accepted_quantity,
+                "rejected_quantity": detail.rejected_quantity,
+                "returned_quantity": detail.returned_quantity,
+                "unit_cost": float(detail.unit_cost) if detail.unit_cost else None,
+                "total_cost": float(detail.total_cost) if detail.total_cost else None,
+                "rejection_reason": detail.rejection_reason,
+                "product_snapshot": detail.product_snapshot,
+                "notes": detail.notes,
+                "created_at": detail.created_at.isoformat() if detail.created_at else None,
+            })
 
         return {
             "id": str(gr.id),

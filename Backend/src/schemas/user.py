@@ -92,9 +92,40 @@ class UserCreateModel(BaseModel):
         return v
 
 class UserUpdateModel(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    phone: Optional[str] = None
+    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
+    phone: Optional[str] = Field(None, min_length=9, max_length=20)
+
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if not v:
+                raise ValueError('Tên không được để trống')
+
+            if not re.match(r'^[a-zA-ZÀ-ỹ\s]+$', v):
+                raise ValueError('Tên chỉ được chứa chữ cái và khoảng trắng')
+
+            if '  ' in v:
+                raise ValueError('Tên không được chứa khoảng trắng liên tiếp')
+
+        return v
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            v = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+
+            if not v.isdigit():
+                raise ValueError('Số điện thoại chỉ được chứa chữ số')
+
+            if len(v) < 9 or len(v) > 15:
+                raise ValueError('Số điện thoại phải có từ 9-15 chữ số')
+
+        return v
 
 
 class UserLoginModel(BaseModel):
@@ -296,7 +327,18 @@ class VerifyOTPModel(BaseModel):
         return v
 
 class UserDeleteModel(BaseModel):
-    user_ids: List[str]
+    user_ids: List[str] = Field(..., min_length=1, max_length=100)
+
+    @field_validator('user_ids')
+    @classmethod
+    def validate_user_ids(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError('Danh sách user_ids không được trống')
+
+        if len(v) != len(set(v)):
+            raise ValueError('Danh sách user_ids không được chứa ID trùng lặp')
+
+        return v
 
 class CustomerStatusType:
     ACTIVE = "active"
@@ -324,15 +366,40 @@ class UserStatus(str, Enum):
     INACTIVE = "inactive"
 
 class FilterUserInputModel(BaseModel):
-    search: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    search: Optional[str] = Field(None, max_length=100)
+    email: Optional[str] = Field(None, max_length=255)
+    phone: Optional[str] = Field(None, max_length=20)
     status: Optional[UserStatus] = None
     is_verified: Optional[bool] = None
     sort_by_created_at: Optional[SortOrder] = None
-    warehouse_code: Optional[str] = None
+    warehouse_code: Optional[str] = Field(None, max_length=50)
     warehouse_role: Optional[WarehouseRole] = None
-    
+
+    @field_validator('search', 'email', 'phone', 'warehouse_code')
+    @classmethod
+    def strip_whitespace(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if v else v
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.lower().strip()
+            if '@' not in v or '.' not in v.split('@')[-1]:
+                raise ValueError('Email không hợp lệ')
+        return v
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v:
+            v = v.strip()
+            v = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+            if not v.isdigit() or len(v) < 9 or len(v) > 15:
+                raise ValueError('Số điện thoại không hợp lệ')
+        return v
+
+
 class ForgotPasswordConfirmModel(BaseModel):
     token: str = Field(..., min_length=1, max_length=500)
     new_password: str = Field(..., min_length=8, max_length=100)
@@ -419,7 +486,22 @@ class PasswordResetEmailModel(BaseModel):
         return email
 
 class StaffMultipleDeleteModel(BaseModel):
-    user_ids: List[str]
+    user_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Danh sách ID nhân viên cần remove (tối đa 100)"
+    )
+
+    @field_validator('user_ids')
+    @classmethod
+    def validate_no_duplicates(cls, v: List[str]) -> List[str]:
+        if len(v) != len(set(v)):
+            duplicates = [uid for uid in v if v.count(uid) > 1]
+            raise ValueError(
+                f"Có user_id bị trùng lặp trong danh sách: {list(set(duplicates))}"
+            )
+        return v
     
 
 

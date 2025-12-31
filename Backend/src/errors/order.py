@@ -322,4 +322,34 @@ class OrderException:
                 "error_code": "order_017",
             },
         )
+
+    @staticmethod
+    def order_amount_mismatch():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số tiền thanh toán không khớp với tổng tiền đơn hàng",
+                "error_code": "order_017",
+            },
+        )
+
+    @staticmethod
+    def duplicate_payment():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Thông tin thanh toán đơn hàng này đã tồn tại",
+                "error_code": "order_017",
+            },
+        )
+
+    @staticmethod
+    def payment_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy thông tin thanh toán cho đơn hàng này",
+                "error_code": "order_017",
+            },
+        )
     

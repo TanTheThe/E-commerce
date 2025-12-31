@@ -103,6 +103,16 @@ class PurchaseOrderException:
         )
 
     @staticmethod
+    def cant_sent_po_with_no_details():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể gửi PO khi chưa có sản phẩm nào",
+                "error_code": "po_001",
+            },
+        )
+
+    @staticmethod
     def supplier_email_not_found():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -179,6 +189,56 @@ class PurchaseOrderException:
             detail={
                 "message": f"Số lượng đặt không khớp với PO",
                 "error_code": "po_001",
+            },
+        )
+
+    @staticmethod
+    def from_date_greater_than_to_date():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "from_date không được lớn hơn to_date",
+                "error_code": "po_002",
+            },
+        )
+
+    @staticmethod
+    def invalid_po_status(invalid_statuses: str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Trạng thái không hợp lệ: " + invalid_statuses,
+                "error_code": "po_003",
+            },
+        )
+
+    @staticmethod
+    def total_amount_negative():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Tổng tiền đơn đặt hàng không được âm",
+                "error_code": "po_004",
+            },
+        )
+
+    @staticmethod
+    def error_while_send_email():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": f"Có lỗi xảy ra khi gửi email đơn đặt hàng",
+                "error_code": "po_004",
+            },
+        )
+
+    @staticmethod
+    def supplier_not_match_with_po():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "message": f"Nhà cung cấp không khớp với đơn đặt hàng",
+                "error_code": "po_004",
             },
         )
 

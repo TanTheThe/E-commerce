@@ -13,11 +13,16 @@ from src.errors.special_offer import SpecialOfferException
 
 class SpecialOfferRepository:
     async def create_special_offer(self, special_offer_data, session: AsyncSession):
+        today = datetime.now().strftime("%Y%m%d")
+        prefix = f"SPO{today}"
+        unique_suffix = uuid.uuid4().hex[:8].upper()
+
         new_special_offer = Special_Offer(
             **special_offer_data
         )
         new_special_offer.created_at = datetime.now()
-        new_special_offer.code = str(int(time.time() * 1000))
+        new_special_offer.code = f"{prefix}{unique_suffix}"
+
         session.add(new_special_offer)
         await session.commit()
 

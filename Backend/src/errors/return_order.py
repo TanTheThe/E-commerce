@@ -27,7 +27,7 @@ class ReturnOrderException:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": "Số lượng hoàn trả phải lớn hơn 0",
+                "message": "Số tiền hoàn trả phải lớn hơn 0",
                 "error_code": "return_003",
             },
         )
@@ -129,5 +129,75 @@ class ReturnOrderException:
             detail={
                 "message": "Số tiền hoàn lại không được lớn hơn tổng refund amount",
                 "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def return_order_doesnt_specify_refund_amount():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đơn hoàn hàng không có số tiền cần hoàn",
+                "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def return_order_has_been_refunded():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Đơn hoàn hàng đã được hoàn đủ số tiền",
+                "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def refund_amount_exceeds_remaining_balance():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Số tiền hoàn vượt quá số tiền còn lại",
+                "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def unauthorized_create_refund_transaction():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Bạn không có quyền tạo giao dịch hoàn tiền",
+                "error_code": "return_011",
+            },
+        )
+
+    @staticmethod
+    def number_returned_must_not_exceed_limit(limit):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng sản phẩm hoàn trả không được vượt quá {limit}",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def action_cant_be_performed(action, current_status):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể thực hiện hành động {action.value} khi đơn hàng hoàn trả đang ở trạng thái {current_status}",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def invalid_status_to_return(action):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng phải ở trạng thái pending thì mới có thể thực hiện {action.value}",
+                "error_code": "return_004",
             },
         )

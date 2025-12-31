@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import selectinload
-from src.config import Config
-from src.crud.authentication.utils import create_url_safe_token
+from sqlmodel import and_
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.purchase_order.repositories import PurchaseOrderRepository
 from src.crud.supplier.repositories import SupplierRepository
@@ -12,6 +11,9 @@ from src.database.models import Product_Variant, PurchaseOrderDetail, PurchaseOr
 from src.errors.purchase_order import PurchaseOrderException
 from src.mail import create_message, mail
 from src.schemas.purchase_order import SendPurchaseOrderRequest
+import logging
+
+logger = logging.getLogger(__name__)
 
 supplier_repository = SupplierRepository()
 warehouse_repository = WareHouseRepository()
@@ -23,22 +25,32 @@ class SendPurchaseOrderService:
     async def send_purchase_order_to_supplier(self, session: AsyncSession, po_id: str, user_id: str,
                                               request: Optional[SendPurchaseOrderRequest] = None):
         condition_po = [PurchaseOrder.id == po_id]
+
         options_po = [
             selectinload(PurchaseOrder.supplier),
             selectinload(PurchaseOrder.warehouse),
-            selectinload(PurchaseOrder.po_details).selectinload(PurchaseOrderDetail.product_variant).selectinload(
-                Product_Variant.product),
-            selectinload(PurchaseOrder.po_details).selectinload(PurchaseOrderDetail.product_variant).selectinload(
-                Product_Variant.color)
+            selectinload(PurchaseOrder.po_details).selectinload(
+                PurchaseOrderDetail.product_variant
+            ).selectinload(Product_Variant.product),
+            selectinload(PurchaseOrder.po_details).selectinload(
+                PurchaseOrderDetail.product_variant
+            ).selectinload(Product_Variant.color)
         ]
 
-        po = await purchase_order_repository.get_purchase_order(session=session, where_conditions=condition_po,
-                                                                options=options_po)
+        po = await purchase_order_repository.get_purchase_order(
+            session=session,
+            where_conditions=condition_po,
+            options=options_po
+        )
+
         if not po:
             PurchaseOrderException.po_not_found()
 
         if po.status != "draft":
             PurchaseOrderException.only_sent_when_draft()
+
+        if not po.po_details or len(po.po_details) == 0:
+            PurchaseOrderException.cant_sent_po_with_no_details()
 
         supplier_email = None
         if request and request.supplier_email:
@@ -54,28 +66,44 @@ class SendPurchaseOrderService:
                 supplier_email=supplier_email
             )
         except Exception as e:
-            raise ValueError(f"Lỗi khi gửi email: {str(e)}")
+            logger.error(f"Error sending PO email: {str(e)}")
+            PurchaseOrderException.error_while_send_email()
 
-        po.status = "sent"
-        po.approved_by = user_id
-        po.sent_at = datetime.now()
-        po.updated_at = datetime.now()
+        now = datetime.now()
+
+        update_data = {
+            "status": "sent",
+            "approved_by": user_id,
+            "approved_at": now,
+            "sent_at": now,
+            "updated_at": now
+        }
 
         if request and request.notes:
-            po.notes = f"{po.notes}\n[Gửi NCC] {request.notes}" if po.notes else f"[Gửi NCC] {request.notes}"
+            existing_notes = po.notes or ""
+            send_note = f"[Gửi NCC {now.strftime('%Y-%m-%d %H:%M')}] {request.notes}"
 
-        updated_po = await purchase_order_repository.update_purchase_order(session, po)
+            if existing_notes:
+                update_data["notes"] = f"{existing_notes}\n{send_note}"
+            else:
+                update_data["notes"] = send_note
+
+        await purchase_order_repository.update_po_some_field(
+            and_(*condition_po),
+            update_data,
+            session
+        )
+
+        await session.commit()
 
         return {
-            "id": str(updated_po.id),
-            "number": updated_po.po_number,
-            "supplier_id": str(updated_po.supplier_id),
-            "supplier_name": updated_po.supplier.name if updated_po.supplier else None,
-            "supplier_code": updated_po.supplier.code if updated_po.supplier else None,
-            "warehouse_id": str(updated_po.warehouse_id),
-            "warehouse_name": updated_po.warehouse.name if updated_po.warehouse else None,
-            "warehouse_code": updated_po.warehouse.code if updated_po.warehouse else None,
-            "status": updated_po.status,
+            "id": str(po.id),
+            "number": po.po_number,
+            "supplier_id": str(po.supplier_id) if po.supplier_id else None,
+            "supplier_name": po.supplier.name if po.supplier else None,
+            "supplier_email": supplier_email,
+            "status": "sent",
+            "sent_at": now.isoformat()
         }
 
     async def send_po_email_to_supplier(self, po: PurchaseOrder, supplier_email: str):

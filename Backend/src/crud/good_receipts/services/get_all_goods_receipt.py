@@ -7,38 +7,39 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
 from src.database.models import GoodsReceipt
+from src.schemas.goods_receipt import GetAllGoodsReceiptsQueryParams
 from src.schemas.purchase_return import SortBy
 
 
 goods_receipt_repository = GoodsReceiptRepository()
 
 class GetAllGoodsReceiptService:
-    async def get_all_goods_receipts(self, session: AsyncSession, warehouse_id: str, status_gr: Optional[str] = None,
-                                     purchase_order_id: Optional[str] = None, supplier_id: Optional[str] = None,
-                                     from_date: Optional[datetime] = None, to_date: Optional[datetime] = None,
-                                     search: Optional[str] = None, sort_by: Optional[SortBy] = None,
+    async def get_all_goods_receipts(self, session: AsyncSession, params: GetAllGoodsReceiptsQueryParams,
                                      skip: int = 0, limit: int = 10):
-        conditions = [GoodsReceipt.warehouse_id == warehouse_id]
+        conditions = [GoodsReceipt.warehouse_id == params.warehouse_id]
 
-        if status_gr:
-            conditions.append(GoodsReceipt.status == status_gr)
+        if params.status_gr:
+            conditions.append(GoodsReceipt.status == params.status_gr.value)
 
-        if purchase_order_id:
-            conditions.append(GoodsReceipt.purchase_order_id == purchase_order_id)
+        if params.purchase_order_id:
+            conditions.append(GoodsReceipt.purchase_order_id == params.purchase_order_id)
 
-        if supplier_id:
-            conditions.append(GoodsReceipt.supplier_id == supplier_id)
+        if params.supplier_id:
+            conditions.append(GoodsReceipt.supplier_id == params.supplier_id)
 
-        if from_date:
-            conditions.append(GoodsReceipt.receipt_date >= from_date)
+        if params.from_date:
+            conditions.append(GoodsReceipt.receipt_date >= params.from_date)
 
-        if to_date:
-            conditions.append(GoodsReceipt.receipt_date <= to_date)
+        if params.to_date:
+            end_of_day = params.to_date.replace(hour=23, minute=59, second=59)
+            conditions.append(GoodsReceipt.receipt_date <= end_of_day)
 
-        if search:
-            conditions.append(or_(
-                    GoodsReceipt.receipt_number.ilike(f"%{search}%"),
-                    GoodsReceipt.delivery_note_number.ilike(f"%{search}%")
+        if params.search:
+            search_pattern = f"%{params.search}%"
+            conditions.append(
+                or_(
+                    GoodsReceipt.receipt_number.ilike(search_pattern),
+                    GoodsReceipt.delivery_note_number.ilike(search_pattern)
                 )
             )
 
@@ -49,26 +50,24 @@ class GetAllGoodsReceiptService:
             selectinload(GoodsReceipt.receipt_details)
         ]
 
-        sort_by_result = None
-        if not sort_by:
-            sort_by_result = desc(GoodsReceipt.created_at)
-        elif sort_by == "receipt_date_asc":
-            sort_by_result = asc(GoodsReceipt.receipt_date)
-        elif sort_by == "receipt_date_desc":
-            sort_by_result = desc(GoodsReceipt.receipt_date)
-        elif sort_by == "created_at_asc":
-            sort_by_result = asc(GoodsReceipt.created_at)
-        elif sort_by == "created_at_desc":
-            sort_by_result = desc(GoodsReceipt.created_at)
-        elif sort_by == "total_amount_asc":
-            sort_by_result = asc(GoodsReceipt.total_received_amount)
-        elif sort_by == "total_amount_desc":
-            sort_by_result = desc(GoodsReceipt.total_received_amount)
+        if not params.sort_by:
+            return desc(GoodsReceipt.created_at)
+
+        sort_mapping = {
+            SortBy.RECEIPT_DATE_ASC: asc(GoodsReceipt.receipt_date),
+            SortBy.RECEIPT_DATE_DESC: desc(GoodsReceipt.receipt_date),
+            SortBy.CREATED_AT_ASC: asc(GoodsReceipt.created_at),
+            SortBy.CREATED_AT_DESC: desc(GoodsReceipt.created_at),
+            SortBy.TOTAL_AMOUNT_ASC: asc(GoodsReceipt.total_received_amount),
+            SortBy.TOTAL_AMOUNT_DESC: desc(GoodsReceipt.total_received_amount),
+        }
+
+        sort_order = sort_mapping.get(params.sort_by, desc(GoodsReceipt.created_at))
 
         grs, total = await goods_receipt_repository.get_all_goods_receipt(
             session=session,
             where_conditions=conditions,
-            order_by=sort_by_result,
+            order_by=sort_order,
             skip=skip,
             limit=limit,
             options=options
@@ -78,9 +77,11 @@ class GetAllGoodsReceiptService:
 
         parent_map = {}
         if parent_ids:
-            parent_receipt, _ = await goods_receipt_repository.get_all_goods_receipt(
-                session=session, where_conditions=[GoodsReceipt.id.in_(parent_ids)])
-            parent_map = {str(r.id): r.receipt_number for r in parent_receipt}
+            parent_receipts, _ = await goods_receipt_repository.get_all_goods_receipt(
+                session=session,
+                where_conditions=[GoodsReceipt.id.in_(parent_ids)]
+            )
+            parent_map = {str(r.id): r.receipt_number for r in parent_receipts}
 
         items = []
         for gr in grs:

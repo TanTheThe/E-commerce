@@ -929,6 +929,12 @@ class ReturnOrder(SQLModel, table=True):
     status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="pending"))
     note: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
 
+    # Tổng số tiền cần hoàn cho đơn này
+    total_refund_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"))
+
+    # Số tiền đã hoàn (tổng từ các cash_transactions)
+    refunded_amount: int = Field(sa_column=Column(pg.INTEGER, nullable=False, server_default="0"))
+
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, server_default=text("CURRENT_TIMESTAMP")))
     approved_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     rejected_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
@@ -1343,6 +1349,18 @@ class CashTransaction(SQLModel, table=True):
 
     # Người thực hiện giao dịch
     performed_by: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+
+    # Key duy nhất để đảm bảo không tạo duplicate transaction
+    idempotency_key: Optional[str] = Field(sa_column=Column(pg.VARCHAR(100), nullable=True, unique=True, index=True))
+
+    # ID của return order liên quan (nếu có)
+    related_return_order_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True, index=True))
+
+    # ID của order gốc (nếu có)
+    related_order_id: Optional[uuid.UUID] = Field(sa_column=Column(pg.UUID, nullable=True, index=True))
+
+    # Trạng thái của transaction: pending, completed, cancelled, failed
+    status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="completed"))
 
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
 

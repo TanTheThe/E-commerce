@@ -52,3 +52,13 @@ class TagException:
                 "error_code": "tag_003",
             },
         )
+
+    @staticmethod
+    def tag_currently_use(tag):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Tag '{tag.name}' đang được sử dụng bởi {tag.products_count} sản phẩm. Không thể xóa.",
+                "error_code": "tag_003",
+            },
+        )

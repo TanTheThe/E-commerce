@@ -1,16 +1,14 @@
 from datetime import datetime
-
-from sqlalchemy import delete, func
+from sqlalchemy import delete
+from sqlmodel import and_
 from src.crud.product.repositories import ProductRepository
 from src.crud.tag.repositories import TagRepository
 from src.database.models import Product, Product_Tag, Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, asc, desc
 from src.errors.product import ProductException
-from src.crud.tag.utils import generate_slug
-from typing import List, Optional
+from typing import List
 from src.errors.tag import TagException
-from src.schemas.tag import TagCreateModel, ProductTagAssignmentModel, TagUpdateModel, DeleteMultipleTagsModel
+from src.schemas.tag import ProductTagAssignmentModel
 
 tag_repository = TagRepository()
 product_repository = ProductRepository()
@@ -19,14 +17,14 @@ product_repository = ProductRepository()
 class AssignTagsToProductService:
     async def assign_tags_to_product(self, assignment_data: ProductTagAssignmentModel, session: AsyncSession):
         condition_tag_ids = [
-            Product.id == assignment_data.product_id, 
+            Product.id == assignment_data.product_id,
             Product.deleted_at.is_(None),
             Product.status == "active"
         ]
         product = await product_repository.get_product(session=session, where_conditions=condition_tag_ids)
         if not product:
             ProductException.not_found()
-            
+
         if assignment_data.tag_ids:
             conditions = [
                 Tag.id.in_(assignment_data.tag_ids),
@@ -48,8 +46,8 @@ class AssignTagsToProductService:
             "tags_added": added_count,
             "tags_removed": removed_count
         }
-        
-        
+
+
     async def process_assign_tags_to_product(self, product_id: str, tag_ids: List[str], session: AsyncSession):
         conditions_product_tag = [
             Product_Tag.product_id == product_id,
@@ -57,17 +55,17 @@ class AssignTagsToProductService:
         ]
 
         current_tags = await tag_repository.get_product_tags(session=session, where_conditions=conditions_product_tag)
-        
+
         current_tag_ids = [str(tag.id) for tag in current_tags]
-        
+
         new_tag_ids_set = set(tag_ids)
         current_tag_ids_set = set(current_tag_ids)
-        
+
         added_tags = new_tag_ids_set - current_tag_ids_set
         removed_tags = current_tag_ids_set - new_tag_ids_set
-        
+
         delete_stmt = delete(Product_Tag).where(
-            Product_Tag.product_id == product_id
+            and_(Product_Tag.product_id == product_id)
         )
         await session.execute(delete_stmt)
         

@@ -1,16 +1,17 @@
-from fastapi import APIRouter, status, Depends
-from typing import Optional
-
+from fastapi import APIRouter, status, Depends, Query
 from pydantic import Field
 from src.crud.tag.services.assign_tags_to_product import AssignTagsToProductService
 from src.crud.tag.services.create_tag import CreateTagService
+from src.crud.tag.services.delete_tag import DeleteTagService
 from src.crud.tag.services.get_all_tags import GetAllTagsService
+from src.crud.tag.services.update_tag import UpdateTagService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
-from src.schemas.tag import TagAdminQueryParams, TagCreateModel, ProductTagAssignmentModel, TagQueryParams, TagUpdateModel, DeleteMultipleTagsModel
+from src.schemas.tag import TagAdminQueryParams, TagCreateModel, ProductTagAssignmentModel, TagQueryParams, \
+    TagUpdateModel, DeleteMultipleTagsModel, TagDeleteStrategy
 
 tag_admin_router = APIRouter(prefix="/tag")
 tag_customer_router = APIRouter(prefix="/tag")
@@ -19,6 +20,8 @@ tag_staff_router = APIRouter(prefix="/tag")
 create_tag_service = CreateTagService()
 get_all_tags_service = GetAllTagsService()
 assign_tags_to_product_service = AssignTagsToProductService()
+update_tag_service = UpdateTagService()
+delete_tag_service = DeleteTagService()
 access_token_bearer = AccessTokenBearer()
 
 @tag_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
@@ -69,7 +72,7 @@ async def assign_tags_to_product(assignment_data: ProductTagAssignmentModel,
 async def update_tag(id: str, tag_data: TagUpdateModel,
                      token_details: dict = Depends(access_token_bearer),
                      session: AsyncSession = Depends(get_session)):
-    tag = await tag_service.update_tag_service(id, tag_data, session)
+    tag = await update_tag_service.update_tag(id, tag_data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -81,9 +84,15 @@ async def update_tag(id: str, tag_data: TagUpdateModel,
 
 
 @tag_admin_router.delete("/{id}", dependencies=[Depends(admin_role_middleware)])
-async def delete_tag(id: str, token_details: dict = Depends(access_token_bearer),
-                          session: AsyncSession = Depends(get_session)):
-    result = await tag_service.delete_tag(id, session)
+async def delete_tag(id: str,
+                     strategy: TagDeleteStrategy = Query(
+                         TagDeleteStrategy.SOFT_DELETE,
+                         description="Chiến lược xóa"
+                     ),
+                     token_details: dict = Depends(access_token_bearer),
+                     session: AsyncSession = Depends(get_session)):
+    result = await delete_tag_service.delete_tag(id, strategy, session)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -92,16 +101,16 @@ async def delete_tag(id: str, token_details: dict = Depends(access_token_bearer)
         }
     )
 
-@tag_admin_router.post("/delete", dependencies=[Depends(admin_role_middleware)])
+@tag_admin_router.post("/bulk-delete", dependencies=[Depends(admin_role_middleware)])
 async def delete_multiple_tags(data: DeleteMultipleTagsModel,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
-    result = await tag_service.delete_multiple_tags(data, session)
+    result = await delete_tag_service.delete_multiple_tags(data, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Xóa {len(result)} tags thành công",
+            "message": f"Đã xóa {result['deleted']}/{result['total_requested']} tags",
             "content": result
         }
     )

@@ -1,16 +1,9 @@
-from datetime import datetime
-
-from sqlalchemy import func
 from src.crud.product.repositories import ProductRepository
 from src.crud.tag.repositories import TagRepository
-from src.database.models import Product, Tag
+from src.database.models import Tag
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_, asc, desc
-from src.errors.product import ProductException
-from src.crud.tag.utils import generate_slug
-from typing import Optional
-from src.errors.tag import TagException
-from src.schemas.tag import TagAdminQueryParams, TagCreateModel, ProductTagAssignmentModel, TagQueryParams, TagSortEnum, TagUpdateModel, DeleteMultipleTagsModel
+from sqlmodel import asc, desc
+from src.schemas.tag import TagAdminQueryParams, TagQueryParams, TagSortEnum
 
 tag_repository = TagRepository()
 product_repository = ProductRepository()
@@ -29,11 +22,11 @@ class GetAllTagsService:
         order_by_clause = self.get_order_by_clause(params.sort_by)
 
         tags, total = await tag_repository.get_all_tag(
-            conditions=conditions,
+            where_conditions=conditions,
             session=session,
             skip=skip,
             limit=limit,
-            order_by_clause=order_by_clause
+            order_by=order_by_clause
         )
 
         tags_list = [
@@ -66,11 +59,11 @@ class GetAllTagsService:
         order_by_clause = desc(Tag.created_at)
 
         tags, total = await tag_repository.get_all_tag(
-            conditions=conditions,
+            where_conditions=conditions,
             session=session,
             skip=skip,
             limit=limit,
-            order_by_clause=order_by_clause
+            order_by=order_by_clause
         )
 
         tags_list = [

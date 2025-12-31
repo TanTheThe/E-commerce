@@ -23,6 +23,16 @@ class UserException:
         )
 
     @staticmethod
+    def token_invalid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Token không hợp lệ",
+                "error_code": "user_002",
+            },
+        )
+
+    @staticmethod
     def only_staff_can_be_assigned():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -158,6 +168,57 @@ class UserException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": f"Kho hiện tại không có quản lí",
+                "error_code": "user_016",
+            },
+        )
+
+    @staticmethod
+    def search_must_have_at_least_2_characters():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Từ khóa tìm kiếm phải có ít nhất 2 ký tự",
+                "error_code": "user_016",
+            },
+        )
+
+    @staticmethod
+    def phone_already_in_use():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số điện thoại này đã được sử dụng",
+                "error_code": "user_016",
+            },
+        )
+
+    @staticmethod
+    def cant_delete_oneself():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Không thể xóa chính mình",
+                "error_code": "user_016",
+            },
+        )
+
+    @staticmethod
+    def not_found_or_deleted(missing_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy hoặc đã bị xóa: {', '.join(list(missing_ids)[:5])}",
+                "error_code": "user_016",
+            },
+        )
+
+    @staticmethod
+    def not_found_or_deleted_example(missing_count, sample_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy hoặc đã bị xóa {missing_count} người dùng. "
+                    f"Ví dụ: {sample_ids}...",
                 "error_code": "user_016",
             },
         )

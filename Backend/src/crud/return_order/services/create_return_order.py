@@ -1,6 +1,7 @@
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import List, Dict
 from datetime import datetime
+from src.crud.notification.services.create_notification import CreateNotificationService
 from src.crud.order.repositories import OrderRepository
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
@@ -10,10 +11,13 @@ from src.crud.order_detail.repositories import OrderDetailRepository
 from src.crud.vnpay.repositories import VNPayRepository
 from src.database.models import ReturnOrder, Order, Order_Detail, ReturnItem
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import and_
 from src.errors.order import OrderException
 from src.errors.return_order import ReturnOrderException
-from src.schemas.return_order import ReturnOrderType
+import logging
+
+from src.schemas.return_order import ReturnOrderStatus
+
+logger = logging.getLogger(__name__)
 
 order_repository = OrderRepository()
 return_order_repository = ReturnOrderRepository()
@@ -23,21 +27,30 @@ payment_refund_service = PaymentRefundService()
 payment_refund_repository = PaymentRefundRepository()
 product_variant_repository = ProductVariantRepository()
 
+create_notification_service = CreateNotificationService()
+
 
 class CreateReturnOrderService:
+    MAX_RETURN_DAYS = 7
+    MIN_IMAGES_REQUIRED = 5
+    MAX_IMAGES_ALLOWED = 20
+    MAX_REASON_LENGTH = 500
+    MAX_NOTE_LENGTH = 1000
+    MAX_RETURN_ITEMS = 50
+
     async def validate_return_eligibility(self, order_id: str, user_id: str, session: AsyncSession):
-        conditions = and_(
+        conditions = [
             Order.id == order_id,
             Order.user_id == user_id,
             Order.deleted_at.is_(None)
-        )
+        ]
 
-        joins = [
+        options = [
             selectinload(Order.order_detail),
             selectinload(Order.payments)
         ]
 
-        order = await order_repository.get_order(conditions, session, joins)
+        order = await order_repository.get_order(session=session, where_conditions=conditions, options=options)
 
         if not order:
             OrderException.not_found()
@@ -55,30 +68,28 @@ class CreateReturnOrderService:
         if days_since_delivery > 7:
             OrderException.overdue_return_order()
 
-        condition = [ReturnOrder.order_id == order_id]
-        existing_return = await return_order_repository.get_return_order(condition, session)
+        conditions = [ReturnOrder.order_id == order_id]
+        existing_return = await return_order_repository.get_return_order(session=session, where_conditions=conditions,
+                                                                         for_update=True)
 
         if existing_return:
             ReturnOrderException.already_exists()
 
         return True, "Đơn hàng hợp lệ để hoàn trả", order
 
+
     async def validate_return_items(self, return_items: List[dict], order_details: List[Order_Detail]):
         if not return_items:
             ReturnOrderException.at_least_one_product_to_return()
+
+        if len(return_items) > self.MAX_RETURN_ITEMS:
+            ReturnOrderException.number_returned_must_not_exceed_limit(self.MAX_RETURN_ITEMS)
 
         order_detail_dict = {str(detail.id): detail for detail in order_details}
 
         for item in return_items:
             order_detail_id = item.get('order_detail_id')
             return_quantity = item.get('quantity', 0)
-            images = item.get('images', [])
-
-            if not order_detail_id or return_quantity <= 0:
-                ReturnOrderException.refund_amount_greater_than_0()
-
-            if not images or len(images) < 5:
-                ReturnOrderException.at_least_5_products_image()
 
             if order_detail_id not in order_detail_dict:
                 OrderException.product_not_include_order()
@@ -89,84 +100,100 @@ class CreateReturnOrderService:
 
         return True, "Danh sách sản phẩm hợp lệ"
 
-    async def calculate_refund_amount(self, return_items: List[dict], order: Order, session: AsyncSession) -> int:
+
+    def calculate_item_refund(self, price: int, quantity: int, discount_percent: float) -> int:
+        item_refund = price * quantity
+        return int(item_refund * (1 - discount_percent / 100))
+
+
+    async def calculate_refund_amount(self, return_items: List[dict], order: Order, order_details_dict: Dict[str, Order_Detail]) -> int:
         total_refund = 0
         discount_percent = order.discount_percent or 0
 
         for item in return_items:
-            condition = and_(Order_Detail.id == item['order_detail_id'], Order_Detail.deleted_at.is_(None))
-            order_detail = await order_detail_repository.get_order_detail(condition, session)
-
+            order_detail = order_details_dict.get(item['order_detail_id'])
             if order_detail:
-                item_refund = order_detail.price * item['quantity']
-                item_refund = int(item_refund * (1 - discount_percent / 100))
+                item_refund = self.calculate_item_refund(
+                    order_detail.price,
+                    item['quantity'],
+                    discount_percent
+                )
                 total_refund += item_refund
 
         return total_refund
 
+
     async def create_return_request(self, order_id: str, user_id: str, request_data: dict, session: AsyncSession):
-        is_valid, message, order = await self.validate_return_eligibility(order_id, user_id, session)
-        if not is_valid:
-            ReturnOrderException.order_not_valid_for_return()
+        try:
+            is_valid, message, order = await self.validate_return_eligibility(order_id, user_id, session)
+            if not is_valid:
+                ReturnOrderException.order_not_valid_for_return()
 
-        return_items = request_data.get('return_items', [])
-        items_valid, items_message = await self.validate_return_items(return_items, order.order_detail)
-        if not items_valid:
-            ReturnOrderException.order_not_valid_for_return()
+            return_items = request_data.get('return_items', [])
+            items_valid, items_message = await self.validate_return_items(return_items, order.order_detail)
 
-        # try:
-        #
-        #
-        # except Exception as e:
-        #     await session.rollback()
-        #     ReturnOrderException.error_return_order()
+            if not items_valid:
+                ReturnOrderException.order_not_valid_for_return()
 
-        refund_amount = await self.calculate_refund_amount(return_items, order, session)
+            order_details_dict = {str(detail.id): detail for detail in order.order_detail}
 
-        return_order = ReturnOrder(
-            order_id=order_id,
-            user_id=user_id,
-            reason=request_data.get('reason', ''),
-            status=ReturnOrderType.PENDING,
-            note=request_data.get('note'),
-            created_at=datetime.now()
-        )
+            refund_amount = await self.calculate_refund_amount(return_items, order, order_details_dict)
 
-        session.add(return_order)
-        await session.flush()
+            if refund_amount <= 0:
+                ReturnOrderException.refund_amount_greater_than_0()
 
-        for item_data in return_items:
-            condition = and_(Order_Detail.id == item_data['order_detail_id'], Order_Detail.deleted_at.is_(None))
-            order_detail = await order_detail_repository.get_order_detail(condition, session)
-
-            item_refund = order_detail.price * item_data['quantity']
-            item_refund = int(item_refund * (1 - (order.discount_percent or 0) / 100))
-
-            return_item = ReturnItem(
-                return_order_id=return_order.id,
-                order_detail_id=item_data['order_detail_id'],
-                quantity=item_data['quantity'],
-                refund_amount=item_refund,
-                images=item_data.get('images', []),
+            return_order = ReturnOrder(
+                order_id=order_id,
+                user_id=user_id,
+                reason=request_data.get('reason'),
+                status=ReturnOrderStatus.PENDING,
+                note=request_data.get('note'),
+                total_refund_amount=refund_amount,
                 created_at=datetime.now()
             )
-            session.add(return_item)
 
-        await notification_service.create_return_request_notification(
-            session=session,
-            return_order_id=str(return_order.id),
-            customer_id=user_id,
-            order_code=order.code,
-            order_id=str(order.id),
-        )
+            session.add(return_order)
+            await session.flush()
 
-        await session.commit()
+            for item_data in return_items:
+                order_detail = order_details_dict[item_data['order_detail_id']]
 
-        message = f"Yêu cầu hoàn trả đơn hàng #{order.code} đã được gửi thành công"
-        return message, {
-            "return_order_id": str(return_order.id),
-            "total_refund": refund_amount
-        }
+                item_refund = self.calculate_item_refund(
+                    order_detail.price,
+                    item_data['quantity'],
+                    order.discount_percent or 0
+                )
+
+                return_item = ReturnItem(
+                    return_order_id=return_order.id,
+                    order_detail_id=item_data['order_detail_id'],
+                    quantity=item_data['quantity'],
+                    refund_amount=item_refund,
+                    images=[str(img) for img in item_data.get('images', [])],
+                    created_at=datetime.now()
+                )
+                session.add(return_item)
+
+            await create_notification_service.create_return_request_notification(
+                session=session,
+                return_order_id=str(return_order.id),
+                customer_id=user_id,
+                order_code=order.code,
+                order_id=str(order.id),
+            )
+
+            await session.commit()
+
+            message = f"Yêu cầu hoàn trả đơn hàng #{order.code} đã được gửi thành công"
+            return message, {
+                "return_order_id": str(return_order.id),
+                "total_refund": refund_amount
+            }
+
+        except Exception as e:
+            await session.rollback()
+            logger.error("Error create return order: ", e)
+            ReturnOrderException.error_return_order()
 
 
 
