@@ -4,8 +4,9 @@ from io import BytesIO
 from PIL import Image
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Request
-from src.crud.authentication.services.setup_2fa_security import Setup2FASecurityService
-from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
+from src.cache.cache_service import CacheService
+from src.crud.authentication.services.login_2fa.setup_2fa_security import Setup2FASecurityService
+from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 from src.crud.authentication.utils import decode_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -16,8 +17,9 @@ import logging
 import base64
 
 user_repository = UserRepository()
-token_balcklist_service = TokenBlacklistService()
+token_blacklist_service = TokenBlacklistService()
 setup_2fa_security_service = Setup2FASecurityService()
+cache_service = CacheService()
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +27,10 @@ class Setup2FAService:
     async def setup_2fa(self, user_data: Setup2FA, role: AdminStaffRole, request: Request, session: AsyncSession):
         token = user_data.token
 
-        is_blacklisted = await token_balcklist_service.token_in_blocklist(
+        is_blacklisted = await token_blacklist_service.token_in_blocklist(
             token=token,
             role=str(role.value),
-            purpose="first_class_login",
-            request=request,
+            purpose="first_class_login"
         )
 
         if is_blacklisted:
@@ -88,31 +89,43 @@ class Setup2FAService:
         except Exception as e:
             await session.rollback()
             logger.error(f"Failed to setup 2FA for user {user_id}: {str(e)}")
+            raise
 
         role_display = "Admin" if role == AdminStaffRole.ADMIN else "Staff"
         issuer = f"E-Commerce {role_display}"
         account_name = f"{user.first_name} {user.last_name} ({user.email})"
+        
+        qr_cache_key = f"2fa:qr_code:{user_id}"
+        cached_qr = await cache_service.get(qr_cache_key)
 
-        otp_url = pyotp.totp.TOTP(secret).provisioning_uri(
-            name=account_name,
-            issuer_name=issuer
-        )
+        if cached_qr:
+                logger.info(f"QR code retrieved from cache for user: {user_id}")
+                qr_base64 = cached_qr
+        else:
+            otp_url = pyotp.totp.TOTP(secret).provisioning_uri(
+                name=account_name,
+                issuer_name=issuer
+            )
 
-        try:
-            qr = QRCode(version=1, box_size=10, border=5)
-            qr.add_data(otp_url)
-            qr.make(fit=True)
+            try:
+                qr = QRCode(version=1, box_size=10, border=5)
+                qr.add_data(otp_url)
+                qr.make(fit=True)
 
-            qr_img: Image.Image = qr.make_image(fill_color="black", back_color="white")
+                qr_img: Image.Image = qr.make_image(fill_color="black", back_color="white")
 
-            buffered = BytesIO()
-            qr_img.save(buffered, format="PNG")
-            qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        except Exception as e:
-            logger.error(f"Failed to generate QR code: {str(e)}")
-            qr_base64 = None
-
+                buffered = BytesIO()
+                qr_img.save(buffered, format="PNG")
+                qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                
+                await cache_service.set(qr_cache_key, qr_base64, ttl=600)
+                
+            except Exception as e:
+                logger.error(f"Failed to generate QR code: {str(e)}")
+                qr_base64 = None
+        
+        await setup_2fa_security_service.reset_setup_attempts(user_id)
+            
         role_display_vn = "quản trị viên" if role == AdminStaffRole.ADMIN else "nhân viên"
 
         return {

@@ -26,7 +26,6 @@ class RedisManager:
             return
 
         try:
-            # Tạo connection pool
             self._redis = await aioredis.from_url(
                 Settings.redis_url,
                 encoding="utf-8",
@@ -37,12 +36,10 @@ class RedisManager:
                 health_check_interval=30
             )
 
-            # Test connection
             await self._redis.ping()
 
             logger.info(f"Redis connected successfully at {Settings.REDIS_HOST}:{Settings.REDIS_PORT}")
 
-            # Log Redis info
             info = await self._redis.info()
             logger.info(f"Redis version: {info.get('redis_version', 'unknown')}")
             logger.info(f"Redis mode: {info.get('redis_mode', 'unknown')}")
@@ -50,6 +47,7 @@ class RedisManager:
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise
+
 
     async def disconnect(self) -> None:
         """
@@ -80,7 +78,7 @@ class RedisManager:
             )
         return self._redis
 
-    async def health_check(self) -> dict:
+    async def health_check(self):
         """Kiểm tra trạng thái Redis"""
         try:
             await self._redis.ping()
@@ -136,8 +134,7 @@ class RedisManager:
             return {}
 
     @staticmethod
-    def _calculate_hit_rate(hits: int, misses: int) -> float:
-        """Tính cache hit rate"""
+    def _calculate_hit_rate(hits: int, misses: int):
         total = hits + misses
         if total == 0:
             return 0.0

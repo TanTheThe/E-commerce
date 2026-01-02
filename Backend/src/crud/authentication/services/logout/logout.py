@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Request
-from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
+from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 from src.errors.authentication import AuthException
 from src.schemas.user import UserRole
 import logging

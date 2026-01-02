@@ -74,6 +74,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     BUCKET_NAME: str
+    
+    @property
+    def redis_url(self):
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
     model_config = SettingsConfigDict(
         env_file='../.env',

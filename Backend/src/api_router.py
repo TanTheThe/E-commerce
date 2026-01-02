@@ -29,6 +29,7 @@ from src.crud.evaluate.routes import evaluate_admin_router, evaluate_customer_ro
 from src.crud.vnpay.routes import vnpay_admin_router, vnpay_customer_router, vnpay_staff_router
 from src.crud.brand.routes import brand_admin_router, brand_customer_router, brand_staff_router
 from src.crud.warehouse.routes import warehouse_admin_router, warehouse_customer_router, warehouse_staff_router
+from src.crud.health_check.routes import health_admin_router, health_customer_router, health_staff_router
 
 version = "v1"
 api_router = APIRouter(prefix=f"/api/{version}")
@@ -58,6 +59,7 @@ admin_router.include_router(suppliers_admin_router)
 admin_router.include_router(goods_receipt_admin_router)
 admin_router.include_router(return_purchase_admin_router)
 admin_router.include_router(image_admin_router)
+admin_router.include_router(health_admin_router)
 
 customer_router = APIRouter(prefix="/customer", tags=["user-customer"])
 customer_router.include_router(user_customer_router)
@@ -84,6 +86,7 @@ customer_router.include_router(suppliers_customer_router)
 customer_router.include_router(goods_receipt_customer_router)
 customer_router.include_router(return_purchase_customer_router)
 customer_router.include_router(image_customer_router)
+customer_router.include_router(health_customer_router)
 
 staff_router = APIRouter(prefix="/staff", tags=["user-staff"])
 staff_router.include_router(user_staff_router)
@@ -110,3 +113,4 @@ staff_router.include_router(suppliers_staff_router)
 staff_router.include_router(goods_receipt_staff_router)
 staff_router.include_router(return_purchase_staff_router)
 staff_router.include_router(image_staff_router)
+staff_router.include_router(health_staff_router)

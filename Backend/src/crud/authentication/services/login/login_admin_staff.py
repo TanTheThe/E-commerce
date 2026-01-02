@@ -1,6 +1,7 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi import Request
-from src.crud.authentication.services.login_security import LoginSecurityService
+from src.crud.authentication.services.login_security.login_attempt_logger import AttemptLoggerService
+from src.crud.authentication.services.login_security.login_security import LoginSecurityService
 from src.crud.authentication.utils import verify_password, create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -10,6 +11,7 @@ import logging
 
 user_repository = UserRepository()
 login_security_service = LoginSecurityService()
+attempt_logger_service = AttemptLoggerService()
 
 logger = logging.getLogger(__name__)
 
@@ -25,28 +27,28 @@ class LoginAdminStaffService:
             user = await user_repository.get_user(session=session, where_conditions=condition)
 
             if not user:
-                await login_security_service.log_failed_login_attempt(email, request, session)
+                await attempt_logger_service.log_failed_attempt(email, request, session)
                 AuthException.user_not_found()
 
             password_valid = verify_password(password, user.password)
             if not password_valid:
-                await login_security_service.log_failed_login_attempt(email, request, session)
+                await attempt_logger_service.log_failed_attempt(email, request, session)
                 AuthException.invalid_account()
 
             if not user.is_verified:
-                await login_security_service.log_failed_login_attempt(email, request, session)
+                await attempt_logger_service.log_failed_attempt(email, request, session)
                 AuthException.user_not_verified()
 
             if role == AdminStaffRole.ADMIN:
                 if not user.is_admin:
-                    await login_security_service.log_failed_login_attempt(email, request, session)
+                    await attempt_logger_service.log_failed_attempt(email, request, session)
                     AuthException.unauthorized_admin()
             elif role == AdminStaffRole.STAFF:
                 if not user.is_staff:
-                    await login_security_service.log_failed_login_attempt(email, request, session)
+                    await attempt_logger_service.log_failed_attempt(email, request, session)
                     AuthException.unauthorized_staff()
                 if user.staff_status != "active":
-                    await login_security_service.log_failed_login_attempt(email, request, session)
+                    await attempt_logger_service.log_failed_attempt(email, request, session)
                     AuthException.staff_account_disabled()
 
             token = create_url_safe_token(
@@ -56,6 +58,8 @@ class LoginAdminStaffService:
             )
 
             role_display = "quản trị viên" if role == AdminStaffRole.ADMIN else "nhân viên"
+            
+            await attempt_logger_service.log_successful_attempt(email, request, session)
 
             if not user.two_fa_secret or not user.two_fa_enabled:
                 return {
@@ -79,5 +83,5 @@ class LoginAdminStaffService:
                     }
 
         except Exception as e:
-            logger.error(e)
+            logger.error(f"Login failed for {email}: {str(e)}")
             AuthException.login_failed()

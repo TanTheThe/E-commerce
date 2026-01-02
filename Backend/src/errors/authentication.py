@@ -611,3 +611,33 @@ class AuthException:
                 "error_code": "auth_045",
             },
         )
+        
+    @staticmethod
+    def too_many_login_attempts(retry_after):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần đăng nhập từ địa chỉ IP này. Vui lòng thử lại sau {retry_after} giây.",
+                "error_code": "auth_045",
+            },
+        )
+        
+    @staticmethod
+    def too_many_2fa_setup(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần cài đặt 2FA từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
+        
+    @staticmethod
+    def too_many_otp_verification(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần xác thực OTP từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )

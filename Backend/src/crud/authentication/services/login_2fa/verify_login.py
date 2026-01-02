@@ -2,8 +2,8 @@ import logging
 from datetime import timedelta, datetime
 import pyotp
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
-from src.crud.authentication.services.verify_login_security import VerifyLoginSecurityService
+from src.crud.authentication.services.login_2fa.verify_login_security import VerifyLoginSecurityService
+from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 from src.crud.authentication.utils import decode_url_safe_token, create_access_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -28,7 +28,6 @@ class VerifyLoginService:
             token=token,
             role=role.value,
             purpose="first_class_login",
-            request=request
         )
 
         if is_blacklisted:

@@ -1,6 +1,4 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from starlette import status
 from src.config import Config
 from src.crud.authentication.services.change_password import ChangePasswordService
@@ -8,11 +6,11 @@ from src.crud.authentication.services.create_account import CreateAccountService
 from src.crud.authentication.services.detect_user_role import DetectUserRoleService
 from src.crud.authentication.services.forgot_password import ForgotPasswordService
 from src.crud.authentication.services.forgot_password_confirm import ForgotPasswordConfirmService
-from src.crud.authentication.services.login_admin_staff import LoginAdminStaffService
-from src.crud.authentication.services.login_customer import LoginCustomerService
-from src.crud.authentication.services.logout import LogoutService
-from src.crud.authentication.services.setup_2fa import Setup2FAService
-from src.crud.authentication.services.verify_login import VerifyLoginService
+from src.crud.authentication.services.login.login_admin_staff import LoginAdminStaffService
+from src.crud.authentication.services.login.login_customer import LoginCustomerService
+from src.crud.authentication.services.login_2fa.setup_2fa import Setup2FAService
+from src.crud.authentication.services.login_2fa.verify_login import VerifyLoginService
+from src.crud.authentication.services.logout.logout import LogoutService
 from src.crud.authentication.services.verify_otp import VerifyOtpService
 from src.crud.authentication.services.verify_user_account import VerifyUserAccountService
 from src.dependencies import AccessTokenBearer, RefreshTokenBearer
@@ -28,8 +26,6 @@ from src.dependencies import admin_role_middleware, customer_role_middleware, st
 auth_admin_router = APIRouter(prefix="/auth")
 auth_customer_router = APIRouter(prefix="/auth")
 auth_staff_router = APIRouter(prefix="/auth")
-
-limiter = Limiter(key_func=get_remote_address)
 
 REFRESH_TOKEN_EXPIRY = 2
 
@@ -49,8 +45,6 @@ detect_user_role_service = DetectUserRoleService()
 
 
 @auth_customer_router.post("/login")
-@limiter.limit("15/minute")
-@limiter.limit("30/hour")
 async def login_customer(request: Request, user_data: UserLoginModel, session: AsyncSession = Depends(get_session)):
     login_data = await login_customer_service.login_customer(user_data, request, session)
 
@@ -64,7 +58,6 @@ async def login_customer(request: Request, user_data: UserLoginModel, session: A
 
 
 @auth_customer_router.get("/logout", dependencies=[Depends(customer_role_middleware)])
-@limiter.limit("20/minute")
 async def logout_customer(request: Request, token_details: dict = Depends(AccessTokenBearer()),
                        session: AsyncSession = Depends(get_session)):
     await logout_service.revoke_token(token_details, request, session, UserRole.CUSTOMER)
@@ -78,7 +71,6 @@ async def logout_customer(request: Request, token_details: dict = Depends(Access
 
 
 @auth_customer_router.post('/forgot-password')
-@limiter.limit("10/minute")
 async def forgot_password(request: Request, email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
     message = await forgot_password_service.forgot_password(email_data.email, email_data.check, UserRole.CUSTOMER, session)
 
@@ -91,7 +83,6 @@ async def forgot_password(request: Request, email_data: PasswordResetEmailModel,
 
 
 @auth_customer_router.post('/confirm-reset')
-@limiter.limit("10/minute")
 async def forget_password_confirm(data: ForgotPasswordConfirmModel,
                                   request: Request,
                                   session: AsyncSession = Depends(get_session)):
@@ -196,8 +187,6 @@ async def verify_user_account(token: str, request: Request, session: AsyncSessio
 
 
 @auth_admin_router.post("/login")
-@limiter.limit("15/minute")
-@limiter.limit("30/hour")
 async def login_admin(user_data: UserLoginModel, request: Request, session: AsyncSession = Depends(get_session)):
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_user_role(user_data.email, allowed_roles, session)
@@ -214,8 +203,6 @@ async def login_admin(user_data: UserLoginModel, request: Request, session: Asyn
 
 
 @auth_admin_router.post("/login/2fa")
-@limiter.limit("15/minute")
-@limiter.limit("30/hour")
 async def login_admin_with_2fa(user_data: Setup2FA, request: Request, session: AsyncSession = Depends(get_session)):
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_role_from_token(user_data.token, allowed_roles, "first_class_login", session)
@@ -232,8 +219,6 @@ async def login_admin_with_2fa(user_data: Setup2FA, request: Request, session: A
 
 
 @auth_admin_router.post("/login/verify")
-@limiter.limit("15/minute")
-@limiter.limit("30/hour")
 async def verify_login_admin(user_data: VerifyLoginAdminModel, request: Request, session: AsyncSession = Depends(get_session)):
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_role_from_token(user_data.token, allowed_roles, "first_class_login", session)
@@ -250,7 +235,6 @@ async def verify_login_admin(user_data: VerifyLoginAdminModel, request: Request,
 
 
 @auth_admin_router.get("/logout", dependencies=[Depends(admin_role_middleware)])
-@limiter.limit("20/minute")
 async def logout_admin(request: Request, token_details: dict = Depends(AccessTokenBearer()),
                        session: AsyncSession = Depends(get_session)):
     await logout_service.revoke_token(token_details, request, session, UserRole.ADMIN)
@@ -392,7 +376,6 @@ async def verify_user_account(token: str, request: Request, session: AsyncSessio
 
 
 @auth_staff_router.get("/logout", dependencies=[Depends(staff_role_middleware)])
-@limiter.limit("20/minute")
 async def logout_staff(request: Request, token_details: dict = Depends(AccessTokenBearer()),
                        session: AsyncSession = Depends(get_session)):
     await logout_service.revoke_token(token_details, request, session, UserRole.STAFF)
