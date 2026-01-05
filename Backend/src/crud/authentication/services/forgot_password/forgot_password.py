@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.config import Config
+from src.crud.authentication.services.forgot_password.forgot_password_security import ForgotPasswordSecurityService
 from src.crud.authentication.utils import create_url_safe_token, generate_password_hash
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -14,22 +15,25 @@ import logging
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
 user_repository = UserRepository()
+forgot_password_security_service = ForgotPasswordSecurityService()
 
 logger = logging.getLogger(__name__)
 
 class ForgotPasswordService:
     async def forgot_password(self, email: str, check: ResetMethod, role: UserRole, session: AsyncSession):
         email = email.strip().lower()
-
-        if not email:
-            AuthException.email_required()
-
-        if not re.match(EMAIL_REGEX, email):
-            AuthException.invalid_email_format()
-
+        
         try:
-            user = await self.find_and_validate_user(email, role, session)
+            if not email:
+                AuthException.email_required()
 
+            if not re.match(EMAIL_REGEX, email):
+                AuthException.invalid_email_format()
+                
+            await forgot_password_security_service.check_forgot_password_rate_limit(email)
+            
+            user = await self.find_and_validate_user(email, role, session)
+            
             if check == ResetMethod.EMAIL:
                 return await self.send_reset_email(user, role, session)
             elif check == ResetMethod.OTP:
@@ -38,7 +42,7 @@ class ForgotPasswordService:
                 AuthException.invalid_reset_method()
 
         except Exception as e:
-            logger.error("Send reset email or otp error: ", e)
+            logger.error(f"Forgot password failed for email {email}: {str(e)}")
             AuthException.forgot_password_failed()
 
 
@@ -70,15 +74,6 @@ class ForgotPasswordService:
                 AuthException.customer_account_disabled()
 
         return user
-
-
-    def get_role_display(self, role: UserRole) -> str:
-        role_mapping = {
-            UserRole.ADMIN: "quản trị viên",
-            UserRole.STAFF: "nhân viên",
-            UserRole.CUSTOMER: "khách hàng"
-        }
-        return role_mapping.get(role, "người dùng")
 
 
     async def send_reset_email(self, user, role: UserRole, session: AsyncSession):
@@ -224,23 +219,13 @@ class ForgotPasswordService:
             logger.error("Send reset email error: ", e)
             AuthException.email_send_failed()
 
+
     async def send_reset_otp(self, user, role: UserRole, session: AsyncSession):
         try:
-            otp = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
-            otp_hash = generate_password_hash(otp)
-
-            expires_at = datetime.now() + timedelta(minutes=5)
-
-            update_data = {
-                'otp_hash': otp_hash,
-                'expires_at': expires_at,
-                'otp_attempts': 0,
-                'updated_at': datetime.now()
-            }
-
-            condition = [User.id == user.id, User.deleted_at.is_(None)]
-            await user_repository.update_user(condition, update_data, session)
-            await session.commit()
+            otp = await forgot_password_security_service.generate_and_store_otp(
+                user_id=str(user.id),
+                email=user.email
+            )
 
             role_display = self.get_role_display(role)
 
@@ -370,9 +355,17 @@ class ForgotPasswordService:
             return f"Vui lòng kiểm tra email để lấy mã OTP đặt lại mật khẩu {role_display}"
 
         except Exception as e:
-            await session.rollback()
-            logger.error("Send reset otp error: ", e)
+            logger.error(f"Failed to send reset OTP: {str(e)}")
             AuthException.otp_send_failed()
+            
+    
+    def get_role_display(self, role: UserRole):
+        role_mapping = {
+            UserRole.ADMIN: "quản trị viên",
+            UserRole.STAFF: "nhân viên",
+            UserRole.CUSTOMER: "khách hàng"
+        }
+        return role_mapping.get(role, "người dùng")
 
 
 

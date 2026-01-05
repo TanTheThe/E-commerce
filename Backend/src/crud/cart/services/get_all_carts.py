@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
-
 from src.crud.cart.repositories import CartRepository
+from src.crud.cart.services.cart_cache import CartCacheService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.database.models import Product_Variant, Product, Special_Offer, Cart, Cart_Item, Color
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -16,6 +16,7 @@ product_variant_repository = ProductVariantRepository()
 
 MAX_ITEMS_PER_PAGE = 100
 DEFAULT_LIMIT = 10
+cart_cache_service = CartCacheService()
 
 class GetAllCartsService:
     async def get_all_cart(self, user_id: str, session: AsyncSession, skip: int = 0, limit: int = 10):
@@ -25,6 +26,11 @@ class GetAllCartsService:
             limit = DEFAULT_LIMIT
         
         try:   
+            cached_cart = await cart_cache_service.get_cart_items_cache(user_id, skip, limit)
+            
+            if cached_cart is not None:
+                return cached_cart.copy()
+            
             cart = await self.get_user_cart(user_id, session)
             
             if not cart or not cart.id:
@@ -42,13 +48,17 @@ class GetAllCartsService:
             
             await self.check_and_update_cart_prices(cart_items, session)
         
-            return await self.format_grouped_cart_response(cart=cart,
+            cart_data = await self.format_grouped_cart_response(cart=cart,
                 cart_items=cart_items,
                 total_count=total_count,
                 skip=skip,
                 limit=limit,
                 session=session
             )
+            
+            await cart_cache_service.warm_up_cache(user_id, cart_data, skip, limit)
+            
+            return cart_data
         
         except Exception as e:
             logger.error(f"Failed to get cart for user {user_id}: {str(e)}")
@@ -60,7 +70,6 @@ class GetAllCartsService:
             Cart.user_id == user_id,
             Cart.deleted_at.is_(None)
         ]
-
         cart = await cart_repository.get_cart(session=session, where_conditions=condition_get_cart)
         return cart 
     
@@ -196,6 +205,7 @@ class GetAllCartsService:
             logger.error(f"Error calculating price: {str(e)}")
             return original_price
     
+    
     def _is_offer_valid(self, offer: Optional[Special_Offer]) -> bool:
         if not offer or offer.deleted_at is not None:
             return False
@@ -215,13 +225,15 @@ class GetAllCartsService:
             
         return True
     
-    def get_availability_status(self, is_available: bool, is_quantity_sufficient: bool, cart_quantity: int, max_quantity: int) -> str:
+    
+    def get_availability_status(self, is_available: bool, is_quantity_sufficient: bool, cart_quantity: int, max_quantity: int):
         if not is_available:
             return "out_of_stock" # Sản phẩm hết hàng hoàn toàn
         elif not is_quantity_sufficient:
             return "insufficient" # Sản phẩm có sẵn nhưng không đủ số lượng yêu cầu
         else:
             return "available"  # Sản phẩm có sẵn và đủ số lượng
+
 
     async def bulk_update_cart_items(self, cart_items: List[Cart_Item], session: AsyncSession) -> bool:
         if not cart_items:
@@ -250,6 +262,7 @@ class GetAllCartsService:
             await session.rollback()
             logger.error(f"Failed to bulk update cart items: {str(e)}")
             raise
+
 
     async def format_grouped_cart_response(self, cart: Cart, cart_items: List[Cart_Item],
                                            total_count: int, skip: int, limit: int, session: AsyncSession):
@@ -307,6 +320,7 @@ class GetAllCartsService:
             "total_items_in_cart": total_count,
         }
 
+
     async def get_empty_cart_response(self, user_id: str, skip: int = 0, limit: int = 10):
         current_page = skip // limit + 1 if limit > 0 else 1
 
@@ -322,6 +336,7 @@ class GetAllCartsService:
             "per_page": limit,
             "products": []
         }
+
 
     async def build_variant_info(self, cart_item: Cart_Item, session: AsyncSession):
         if not cart_item or not cart_item.id:

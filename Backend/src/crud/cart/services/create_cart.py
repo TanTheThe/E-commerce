@@ -1,5 +1,6 @@
 from datetime import datetime
 from src.crud.cart.repositories import CartRepository
+from src.crud.cart.services.cart_cache import CartCacheService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.database.models import Product_Variant, Product, Special_Offer, Cart, Cart_Item
 from src.errors.cart import CartException
@@ -13,6 +14,7 @@ import logging
 
 cart_repository = CartRepository()
 product_variant_repository = ProductVariantRepository()
+cart_cache_service = CartCacheService()
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,9 @@ class CreateCartService:
             )
 
             await session.commit()
+            
+            await cart_cache_service.invalidate_user_cart_cache(user_id)
+            logger.info(f"Cache invalidated for user {user_id} after cart creation")
 
             final_cart = await self.get_cart_with_details(str(cart.id), session)
             return await self.format_cart_response(final_cart, session)

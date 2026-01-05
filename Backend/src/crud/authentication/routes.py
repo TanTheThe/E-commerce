@@ -2,17 +2,17 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette import status
 from src.config import Config
 from src.crud.authentication.services.change_password import ChangePasswordService
-from src.crud.authentication.services.create_account import CreateAccountService
+from src.crud.authentication.services.create_account.create_account import CreateAccountService
 from src.crud.authentication.services.detect_user_role import DetectUserRoleService
-from src.crud.authentication.services.forgot_password import ForgotPasswordService
-from src.crud.authentication.services.forgot_password_confirm import ForgotPasswordConfirmService
+from src.crud.authentication.services.forgot_password.forgot_password import ForgotPasswordService
+from src.crud.authentication.services.forgot_password.forgot_password_confirm import ForgotPasswordConfirmService
+from src.crud.authentication.services.forgot_password.verify_otp import VerifyOtpService
 from src.crud.authentication.services.login.login_admin_staff import LoginAdminStaffService
 from src.crud.authentication.services.login.login_customer import LoginCustomerService
 from src.crud.authentication.services.login_2fa.setup_2fa import Setup2FAService
 from src.crud.authentication.services.login_2fa.verify_login import VerifyLoginService
 from src.crud.authentication.services.logout.logout import LogoutService
-from src.crud.authentication.services.verify_otp import VerifyOtpService
-from src.crud.authentication.services.verify_user_account import VerifyUserAccountService
+from src.crud.authentication.services.verify_user_account.verify_user_account import VerifyUserAccountService
 from src.dependencies import AccessTokenBearer, RefreshTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.authentication.utils import create_access_token
@@ -96,8 +96,6 @@ async def forget_password_confirm(data: ForgotPasswordConfirmModel,
 
 
 @auth_customer_router.post("/forgot-password/verify-otp")
-@limiter.limit("10/minute")
-@limiter.limit("20/hour")
 async def verify_otp(request: Request, data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
     token = await verify_otp_service.verify_otp(data, UserRole.CUSTOMER, session, request)
 
@@ -140,7 +138,6 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 
 
 @auth_customer_router.put('/change-password', dependencies=[Depends(customer_role_middleware)])
-@limiter.limit("10/minute")
 async def change_password_customer(passwords: ChangePasswordModel, request: Request, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
@@ -156,12 +153,11 @@ async def change_password_customer(passwords: ChangePasswordModel, request: Requ
 
 
 @auth_customer_router.post("/signup", status_code=status.HTTP_201_CREATED)
-@limiter.limit("10/hour")
 async def create_user_account(user_data: UserCreateModel, 
                               bg_tasks: BackgroundTasks,
                               request: Request = None,
                               session: AsyncSession = Depends(get_session)):
-    new_user = await create_account_service.create_user_account(user_data, UserRole.CUSTOMER, bg_tasks, session)
+    new_user = await create_account_service.create_user_account(user_data, UserRole.CUSTOMER, bg_tasks, session, request)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -173,7 +169,6 @@ async def create_user_account(user_data: UserCreateModel,
 
 
 @auth_customer_router.get('/verify/{token}')
-@limiter.limit("10/hour")
 async def verify_user_account(token: str, request: Request, session: AsyncSession = Depends(get_session)):
     try:
         await verify_user_account_service.verify_user_account(token, UserRole.CUSTOMER, request, session)
@@ -248,7 +243,6 @@ async def logout_admin(request: Request, token_details: dict = Depends(AccessTok
 
 
 @auth_admin_router.post('/forgot-password')
-@limiter.limit("10/minute")
 async def forgot_password(request: Request, email_data: PasswordResetEmailModel, session: AsyncSession = Depends(get_session)):
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_user_role(email_data.email, allowed_roles, session)
@@ -264,7 +258,6 @@ async def forgot_password(request: Request, email_data: PasswordResetEmailModel,
 
 
 @auth_admin_router.post('/confirm-reset')
-@limiter.limit("10/minute")
 async def forget_password_confirm(data: ForgotPasswordConfirmModel,
                                   request: Request,
                                   session: AsyncSession = Depends(get_session)):
@@ -282,8 +275,6 @@ async def forget_password_confirm(data: ForgotPasswordConfirmModel,
 
 
 @auth_admin_router.post("/forgot-password/verify-otp")
-@limiter.limit("10/minute")
-@limiter.limit("20/hour")
 async def verify_otp(request: Request, data: VerifyOTPModel, session: AsyncSession = Depends(get_session)):
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_user_role(data.email, allowed_roles, session)
@@ -329,7 +320,6 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 
 
 @auth_admin_router.put('/change-password', dependencies=[Depends(admin_role_middleware)])
-@limiter.limit("10/minute")
 async def change_password_admin(request: Request, passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
@@ -349,12 +339,11 @@ async def change_password_admin(request: Request, passwords: ChangePasswordModel
 
 
 @auth_admin_router.post("/signup", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
-@limiter.limit("10/hour")
 async def create_user_account(user_data: UserCreateModel,
                               bg_tasks: BackgroundTasks,
                               request: Request = None,
                               session: AsyncSession = Depends(get_session)):
-    new_user = await create_account_service.create_user_account(user_data, UserRole.STAFF, bg_tasks, session)
+    new_user = await create_account_service.create_user_account(user_data, UserRole.STAFF, bg_tasks, session, request)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -366,7 +355,6 @@ async def create_user_account(user_data: UserCreateModel,
 
 
 @auth_staff_router.get('/verify/{token}')
-@limiter.limit("10/hour")
 async def verify_user_account(token: str, request: Request, session: AsyncSession = Depends(get_session)):
     try:
         await verify_user_account_service.verify_user_account(token, UserRole.STAFF, request, session)
@@ -389,7 +377,6 @@ async def logout_staff(request: Request, token_details: dict = Depends(AccessTok
 
 
 @auth_staff_router.put('/change-password', dependencies=[Depends(staff_role_middleware)])
-@limiter.limit("10/minute")
 async def change_password_staff(request: Request, passwords: ChangePasswordModel, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']

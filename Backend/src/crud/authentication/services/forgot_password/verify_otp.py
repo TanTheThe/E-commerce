@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.crud.authentication.services.forgot_password.forgot_password_security import ForgotPasswordSecurityService
 from src.crud.authentication.utils import verify_password, create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -12,59 +13,46 @@ user_repository = UserRepository()
 
 logger = logging.getLogger(__name__)
 
+forgot_password_security_service = ForgotPasswordSecurityService()
+
 class VerifyOtpService:
     async def verify_otp(self, data: VerifyOTPModel, role: UserRole, session: AsyncSession, request: Request):
+        email = data.email.strip().lower()
+        otp = data.otp.strip()
+        
         try:
-            email = data.email
-            otp = data.otp
-
+            if not email or not otp:
+                AuthException.invalid_otp_or_email()
+                
             condition = [
                 User.email == email,
                 User.deleted_at.is_(None),
             ]
             user = await user_repository.get_user(session=session, where_conditions=condition)
 
-            if not user or not user.otp_hash:
+            if not user:
                 AuthException.invalid_otp_or_email()
 
-            if user.otp_attempts >= 5:
-                AuthException.otp_max_attempts_exceeded()
-
             await self.validate_user_role(user, role)
-
-            if not user.expires_at or datetime.now() > user.expires_at:
-                AuthException.otp_expired()
-
-            if not verify_password(otp, user.otp_hash):
-                update_data = {
-                    "otp_attempts": user.otp_attempts + 1,
-                    "updated_at": datetime.now(),
-                }
-                condition_update = [
-                    User.id == user.id,
-                    User.email == user.email,
-                    User.deleted_at.is_(None),
-                ]
-                await user_repository.update_user(condition_update, update_data, session=session)
-                await session.commit()
-
-                attempts_left = 5 - user.otp_attempts - 1
-
-                AuthException.invalid_otp_attempts(attempts_left)
-
-            update_data = {
-                "otp_hash": None,
-                "expires_at": None,
-                "otp_attempts": 0,
-                "updated_at": datetime.now(),
-            }
-            condition_update = [
-                User.id == user.id,
-                User.email == user.email,
-                User.deleted_at.is_(None),
-            ]
-            await user_repository.update_user(condition_update, update_data, session=session)
-            await session.commit()
+            
+            is_valid, error_message = await forgot_password_security_service.verify_otp(
+                user_id=str(user.id),
+                otp=otp
+            )
+            
+            if not is_valid:
+                if "expired" in error_message.lower():
+                    AuthException.otp_expired()
+                elif "exceeded" in error_message.lower():
+                    AuthException.otp_max_attempts_exceeded()
+                elif "remaining" in error_message:
+                    try:
+                        attempts_left = int(error_message.split()[2])
+                        AuthException.invalid_otp_attempts(attempts_left)
+                    except:
+                        AuthException.invalid_otp()
+                else:
+                    AuthException.invalid_otp()
 
             token_payload = {
                 "email": user.email,
@@ -78,12 +66,11 @@ class VerifyOtpService:
                 purpose="reset_password"
             )
 
-            print("j9dja90dja", token)
-
             return token
+        
         except Exception as e:
-            await session.rollback()
-            logger.error(e)
+            logger.error(f"OTP verification failed: {str(e)}")
+            AuthException.otp_verification_failed()
 
 
     async def validate_user_role(self, user, role: UserRole):

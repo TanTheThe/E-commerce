@@ -1,5 +1,6 @@
 from typing import List
 from src.crud.cart.repositories import CartRepository
+from src.crud.cart.services.cart_cache import CartCacheService
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.database.models import Product_Variant, Product, Cart, Cart_Item
 from src.errors.cart import CartException
@@ -12,6 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 cart_repository = CartRepository()
 product_variant_repository = ProductVariantRepository()
+cart_cache_service = CartCacheService()
 
 
 class RemoveCartItemsService:
@@ -34,6 +36,13 @@ class RemoveCartItemsService:
             )
             
             await session.commit()
+            
+            if deletion_result['deleted_count'] > 0:
+                await cart_cache_service.invalidate_user_cart_cache(user_id)
+                logger.info(
+                    f"Cache invalidated for user {user_id} after deleting "
+                    f"{deletion_result['deleted_count']} items"
+                )
             
             return self.format_deletion_response(deletion_result, data.item_ids)
         

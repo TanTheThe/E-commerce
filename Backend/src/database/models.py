@@ -1276,9 +1276,6 @@ class User(SQLModel, table=True):
     is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
     two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    otp_hash: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    otp_attempts: Optional[int] = Field(sa_column=Column(pg.INTEGER, nullable=True), default=0)
-    expires_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
     warehouse_role: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "manager", "staff", "picker", "checker"

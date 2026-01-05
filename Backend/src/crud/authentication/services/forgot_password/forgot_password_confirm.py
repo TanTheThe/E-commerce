@@ -1,7 +1,6 @@
 from datetime import datetime
-from itsdangerous import SignatureExpired, BadSignature
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
+from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 from src.crud.authentication.utils import decode_url_safe_token, verify_password, generate_password_hash
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
@@ -28,7 +27,6 @@ class ForgotPasswordConfirmService:
                 token=data.token,
                 role=role.value,
                 purpose="reset_password",
-                request=request
             )
 
             if is_blacklisted:
@@ -65,9 +63,7 @@ class ForgotPasswordConfirmService:
 
             update_data = {
                 "password": password_hash,
-                'otp_hash': None,
-                'expires_at': None,
-                'updated_at': datetime.now()
+                "updated_at": datetime.now()
             }
 
             await user_repository.update_user(condition, update_data, session)
@@ -76,7 +72,6 @@ class ForgotPasswordConfirmService:
                 token=data.token,
                 role=role.value,
                 purpose="reset_password",
-                request=request,
                 ttl=None,
                 metadata={
                     "user_id": str(user.id),
@@ -92,12 +87,8 @@ class ForgotPasswordConfirmService:
 
             return f"Đổi mật khẩu {role_display} thành công"
 
-        except SignatureExpired:
-            AuthException.token_invalid()
-        except BadSignature:
-            AuthException.token_invalid()
         except Exception as e:
-            logger.error(e)
+            logger.error(f"Password reset confirmation failed: {str(e)}")
             await session.rollback()
             raise
 
@@ -159,7 +150,7 @@ class ForgotPasswordConfirmService:
         return False
 
 
-    def get_role_display(self, role: UserRole) -> str:
+    def get_role_display(self, role: UserRole):
         role_mapping = {
             UserRole.ADMIN: "quản trị viên",
             UserRole.STAFF: "nhân viên",

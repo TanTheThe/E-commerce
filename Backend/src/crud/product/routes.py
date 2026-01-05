@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Path, status, Depends, Query
+from src.cache.cache_service import CacheService
 from src.crud.product.services.create_product import CreateProductService
 from src.crud.product.services.get_all_products_admin import GetAllProductsAdminService
 from src.crud.product.services.get_all_products_customer import GetAllProductsCustomerService
@@ -23,14 +24,15 @@ from src.errors.product import ProductException
 from src.schemas.product import ProductCreateModel, ProductUpdateModel, DeleteMultipleProductModel, ProductFilterModel, ProductStatusUpdateModel, BulkUpdateStatusModel, SortBy
 from src.dependencies import admin_role_middleware
 from typing import Optional, List
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+import hashlib
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 product_admin_router = APIRouter(prefix="/product")
 product_customer_router = APIRouter(prefix="/product")
 product_staff_router = APIRouter(prefix="/product")
-
-limiter = Limiter(key_func=get_remote_address)
 
 product_service = ProductService()
 create_product_service = CreateProductService()
@@ -48,9 +50,9 @@ get_top_discount_service = GetTopDiscountService()
 get_product_variant_select_box_service = GetProductVariantSelectBoxService()
 update_product_service = UpdateProductService()
 update_product_status_service = UpdateProductStatusService()
+cache_service = CacheService()
 
 
-@limiter.limit("30/minute")
 @product_admin_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(admin_role_middleware)])
 async def create_product(product_data: ProductCreateModel,
                          token_details: dict = Depends(access_token_bearer),
@@ -103,8 +105,30 @@ async def get_all_products_customer(category_identifier: str = Path(..., descrip
         brand_id=brand_id,
         material_ids=material_ids or []
     )
+    
+    filter_dict = filter_data.model_dump()
+    filter_dict = {k: (sorted(v) if isinstance(v, list) else v) for k, v in filter_dict.items()}
+    filter_hash = hashlib.md5(json.dumps(filter_dict, sort_keys=True).encode()).hexdigest()[:12]
+    
+    category_identifier=category_identifier.strip()
+    cache_key = "product:list:category:{category_identifier}:filter:{filter_hash}:skip:{skip}:limit:{limit}"
+    cached_products = await cache_service.get(cache_key)
+    
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các sản phẩm",
+                "content": cached_products
+            }
+        )
+        
+    logger.debug(f"Cache MISS: {cache_key}")
 
     products = await get_all_products_customer_service.get_all_products_customer(category_identifier, filter_data, session, skip, limit)
+    
+    await cache_service.set(cache_key, products, ttl=600)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -120,7 +144,24 @@ async def get_products_popular(parent_category_id: str = Path(
                                limit_per_category: int = Query(
                                 default=12, ge=1, le=50, description="Số sản phẩm tối đa cho mỗi category con"), 
                                session: AsyncSession = Depends(get_session)):
+    cache_key = "product:popular:parent:{parent_category_id}:limit:{limit_per_category}"
+    
+    cached_products = await cache_service.get(cache_key)
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các sản phẩm",
+                "content": cached_products
+            }
+        )
+        
+    logger.debug(f"Cache MISS: {cache_key}")
+        
     products = await get_products_popular_service.get_products_popular(parent_category_id, session, limit_per_category)
+    
+    await cache_service.set(cache_key, products, ttl=1800)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

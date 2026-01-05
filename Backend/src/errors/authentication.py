@@ -641,3 +641,43 @@ class AuthException:
                 "error_code": "auth_045",
             },
         )
+        
+    @staticmethod
+    def too_many_password_reset(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần thay đổi mật khẩu từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
+        
+    @staticmethod
+    def too_many_signup_attempts(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần đăng kí từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
+        
+    @staticmethod
+    def too_many_signup_from_this_email(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Vui lòng chờ {remaining_minutes} phút trước khi thử đăng kí lại với email này lần nữa.",
+                "error_code": "auth_045",
+            },
+        )
+        
+    @staticmethod
+    def too_many_verification_attempts(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần xác thực đăng kí từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
