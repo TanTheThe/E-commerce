@@ -21,6 +21,12 @@ class ReturnOrderActionType(str, Enum):
     REJECT = "reject"
 
 
+class RefundRetrySource(str, Enum):
+    MANUAL = "manual"  # Admin click button
+    AUTO = "auto"      # Celery task
+    SYSTEM = "system"  # System trigger
+
+
 class ReturnItemRequest(BaseModel):
     order_detail_id: str = Field(..., description="ID của chi tiết đơn hàng cần hoàn trả")
     quantity: int = Field(..., gt=0, description="Số lượng cần hoàn trả (phải > 0)")
@@ -98,7 +104,6 @@ class ProcessReturnRequest(BaseModel):
         return v
 
 
-
 class CompleteReturnRequest(BaseModel):
     restore_stock: bool = Field(default=True, description="Có hoàn trả sản phẩm vào kho không")
     admin_note: Optional[str] = Field(None, max_length=500, description="Ghi chú khi hoàn thành")
@@ -114,7 +119,6 @@ class CompleteReturnRequest(BaseModel):
         return v
 
 
-
 class UpdateRefundStatusRequest(BaseModel):
-    status: str
+    status: ReturnOrderStatus
 

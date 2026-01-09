@@ -37,8 +37,8 @@ class UpdatePaymentRefundStatusService:
             )
 
             payment = await vnpay_repository.get_payment(
-                and_(Payment.id == refund.payment_id),
-                session
+                session=session,
+                where_conditions=[Payment.id == refund.payment_id]
             )
 
             await order_repository.update_order_some_field(

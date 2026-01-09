@@ -41,3 +41,13 @@ class PaymentException:
                 "error_code": "payment_004",
             },
         )
+
+    @staticmethod
+    def cant_retry_refund_with_status(status_refund):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Không thể thử lại yêu cầu hoàn tiền với trạng thái: {status_refund}",
+                "error_code": "payment_004",
+            },
+        )

@@ -1,11 +1,11 @@
 from datetime import datetime
-
 from fastapi import APIRouter, status, Depends, Query, Path, Body
-
+from src.cache import cache_service, CacheKeys
+from src.crud.user.services.change_status import ChangeStatusUserService
 from src.crud.user.services.delete_user import DeleteUserService
 from src.crud.user.services.get_all_users import GetAllUsersService
 from src.crud.user.services.get_for_offer import GetAllCustomerForOfferService
-from src.crud.user.services.get_profile_customer import GetProfileCustomerService
+from src.crud.user.services.get_profile_customer import GetProfileService
 from src.crud.user.services.get_staffs import GetStaffsService
 from src.crud.user.services.update_profile_service import UpdateProfileService
 from src.dependencies import AccessTokenBearer
@@ -14,18 +14,22 @@ from src.schemas.stock import WarehouseRole
 from src.schemas.user import UserUpdateModel, UserDeleteModel, FilterUserInputModel, UserStatus, UserRole
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
-from src.crud.user.services import UserService
 from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware, customer_role_middleware
 from typing import Optional
+import logging
+import asyncio
 
-user_service = UserService()
+logger = logging.getLogger(__name__)
+
+
 get_all_users_service = GetAllUsersService()
 get_staffs_service = GetStaffsService()
 get_all_customer_for_offer_service = GetAllCustomerForOfferService()
 update_profile_service = UpdateProfileService()
-get_profile_customer_service = GetProfileCustomerService()
+get_profile_service = GetProfileService()
 delete_user_service = DeleteUserService()
+change_status_service = ChangeStatusUserService()
 access_token_bearer = AccessTokenBearer()
 
 user_admin_router = APIRouter(prefix="/user")
@@ -93,7 +97,7 @@ async def get_all_staffs(search: Optional[str] = Query(None, max_length=100, des
         warehouse_code=warehouse_code,
     )
 
-    filtered_users = await user_service.get_all_users_service(filter_data, UserRole.STAFF, session, skip, limit)
+    filtered_users = await get_all_users_service.get_all_users(filter_data, UserRole.STAFF, session, skip, limit)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -174,7 +178,7 @@ async def get_all_customer_for_offer(offer_id: str = Path(..., description="UUID
 #     )
 
 
-@user_admin_router.get('')
+@user_admin_router.get('/')
 async def get_profile_admin(token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
@@ -186,7 +190,24 @@ async def get_profile_admin(token_details: dict = Depends(access_token_bearer),
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    filtered_user = await user_service.get_profile_admin_staff_service(user_id, session)
+    cache_key = f"user:profile:admin_staff:{user_id}"
+
+    cached_profile = await cache_service.get(cache_key)
+    if cached_profile is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Lấy thông tin thành công",
+                "content": cached_profile
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
+    filtered_user = await get_profile_service.get_profile_admin_staff(user_id, session)
+
+    await cache_service.set(cache_key, filtered_user, ttl=1800)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -197,7 +218,7 @@ async def get_profile_admin(token_details: dict = Depends(access_token_bearer),
     )
 
 
-@user_admin_router.put('', dependencies=[Depends(admin_role_middleware)])
+@user_admin_router.put('/', dependencies=[Depends(admin_role_middleware)])
 async def update_profile_admin(user_update_data: UserUpdateModel = Body(..., description="Dữ liệu cập nhật profile"),
                                session: AsyncSession = Depends(get_session),
                                token_details: dict = Depends(access_token_bearer)):
@@ -207,6 +228,9 @@ async def update_profile_admin(user_update_data: UserUpdateModel = Body(..., des
         UserException.token_invalid()
 
     updated_user = await update_profile_service.update_profile(user_id, user_update_data, session)
+
+    await cache_service.delete_pattern(CacheKeys.user_profile_pattern(user_id))
+    logger.info(f"Invalidated profile cache for user {user_id}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -233,6 +257,9 @@ async def update_profile_customer(user_update_data: UserUpdateModel = Body(..., 
 
     updated_user = await update_profile_service.update_profile(user_id, user_update_data, session)
 
+    await cache_service.delete_pattern(CacheKeys.user_profile_pattern(user_id))
+    logger.info(f"Invalidated profile cache for user {user_id}")
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -255,7 +282,24 @@ async def get_profile_customer(token_details: dict = Depends(access_token_bearer
     if not user_id:
         UserException.token_invalid()
 
-    filtered_user = await get_profile_customer_service.get_profile_customer(user_id, session)
+    cache_key = f"user:profile:customer:{user_id}"
+
+    cached_profile = await cache_service.get(cache_key)
+    if cached_profile is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin người dùng",
+                "content": cached_profile
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
+    filtered_user = await get_profile_service.get_profile_customer(user_id, session)
+
+    await cache_service.set(cache_key, filtered_user, ttl=1800)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -278,6 +322,9 @@ async def delete_user(user_id: str = Path(..., description="UUID của user cầ
         UserException.cant_delete_oneself()
 
     deleted_user_id = await delete_user_service.delete_user(user_id, session)
+
+    await cache_service.delete_pattern(CacheKeys.user_profile_pattern(user_id))
+    logger.info(f"Invalidated profile cache for user {user_id}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -305,6 +352,12 @@ async def delete_multiple_users(data: UserDeleteModel = Body(..., description="D
 
     result = await delete_user_service.delete_multiple_user(data, session)
 
+    invalidate_tasks = [
+        await cache_service.delete_pattern(CacheKeys.user_profile_pattern(user_id))
+        for user_id in data.user_ids
+    ]
+    await asyncio.gather(*invalidate_tasks)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -317,7 +370,10 @@ async def delete_multiple_users(data: UserDeleteModel = Body(..., description="D
 @user_admin_router.put('/{id}/change-staff-status', dependencies=[Depends(admin_role_middleware)])
 async def change_status_staff(id: str, token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
-    user_block = await user_service.change_status_user(id, UserRole.STAFF, session)
+    user_block = await change_status_service.change_status_user(id, UserRole.STAFF, session)
+
+    await cache_service.delete_pattern(CacheKeys.user_profile_pattern(id))
+    logger.info(f"Invalidated profile cache for user {id}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -331,7 +387,10 @@ async def change_status_staff(id: str, token_details: dict = Depends(access_toke
 @user_admin_router.put('/{id}/change-customer-status', dependencies=[Depends(admin_role_middleware)])
 async def change_status_customer(id: str, token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    user_block = await user_service.change_status_user(id, UserRole.CUSTOMER, session)
+    user_block = await change_status_service.change_status_user(id, UserRole.CUSTOMER, session)
+
+    await cache_service.delete_pattern(CacheKeys.user_profile_pattern(id))
+    logger.info(f"Invalidated profile cache for user {id}")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

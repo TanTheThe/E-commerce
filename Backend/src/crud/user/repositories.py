@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
 
 from src.errors.authentication import AuthException
+from src.errors.user import UserException
 from src.schemas.user import UserCreateModel, UserDeleteModel, UserRole
 
 
@@ -20,7 +21,8 @@ class UserRepository:
                        group_by_columns: Optional[List[Any]] = None,
                        having_conditions: Optional[List[ColumnElement[bool]]] = None,
                        order_by: Optional[Any] = None,
-                       options: Optional[List[Any]] = None):
+                       options: Optional[List[Any]] = None,
+                       for_update: Optional[bool] = False):
 
         if select_columns is None:
             query = select(User)
@@ -48,6 +50,9 @@ class UserRepository:
 
         if order_by is not None:
             query = query.order_by(order_by)
+
+        if for_update:
+            query = query.with_for_update()
 
         result = await session.exec(query)
         user = result.one_or_none()
@@ -139,56 +144,15 @@ class UserRepository:
 
 
     async def delete_multiple_user(self, data: UserDeleteModel, session: AsyncSession):
-        condition = and_(User.id.in_(data.user_ids), User.deleted_at.is_(None))
-        users = await self.get_all_user(condition, session, None, 0, 1000)
+        conditions = [User.id.in_(data.user_ids), User.deleted_at.is_(None)]
+        users = await self.get_all_users(session=session, where_conditions=conditions, skip=0, limit=1000)
         existing_ids = {str(row.id) for row in users}
         missing_ids = set(data.user_ids) - existing_ids
         if missing_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Không tìm thấy các mã người dùng: {list(missing_ids)}"
-            )
+            UserException.not_found_or_deleted(missing_ids)
+
         stmt = update(User).where(User.id.in_(data.user_ids)).values(deleted_at=datetime.now())
         await session.exec(stmt)
         await session.commit()
 
         return data.user_ids
-
-
-    async def change_status_user(self, condition: Optional[ColumnElement[bool]], role: UserRole, session: AsyncSession):
-        user_to_block = await self.get_user(condition, session)
-
-        if user_to_block is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "message": "Không tìm thấy người dùng.",
-                    "error_code": "product_006",
-                },
-            )
-
-        status_key = ""
-        new_status = ""
-
-        if role == UserRole.CUSTOMER:
-            if user_to_block.customer_status == "active":
-                user_to_block.customer_status = "inactive"
-            else:
-                user_to_block.customer_status = "active"
-            new_status = user_to_block.customer_status
-            status_key = "customer_status"
-
-        elif role == UserRole.STAFF:
-            if user_to_block.staff_status == "active":
-                user_to_block.staff_status = "inactive"
-            else:
-                user_to_block.staff_status = "active"
-            new_status = user_to_block.staff_status
-            status_key = "staff_status"
-
-        await session.commit()
-
-        return {
-            "id": str(user_to_block.id),
-            status_key: new_status
-        }

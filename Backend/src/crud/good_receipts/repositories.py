@@ -182,7 +182,7 @@ class GoodsReceiptRepository:
                 po.po_details.clear()
 
             statement = delete(PurchaseOrderDetail).where(
-                PurchaseOrderDetail.purchase_order_id == po.id
+                and_(PurchaseOrderDetail.purchase_order_id == po.id)
             )
             await session.exec(statement)
             await session.flush()

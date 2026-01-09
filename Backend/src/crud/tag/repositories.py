@@ -179,8 +179,10 @@ class TagRepository:
         ).join(
             Product, and_(Product_Tag.product_id == Product.id)
         ).where(
-            Product.deleted_at.is_(None),
-            Product.status == "active"
+            and_(
+                Product.deleted_at.is_(None),
+                Product.status == "active"
+            )
         )
         result = await session.exec(query)
         return result.one_or_none()
@@ -230,7 +232,7 @@ class TagRepository:
     
     async def delete_multiple_tags(self, data: DeleteMultipleTagsModel, session: AsyncSession):
         conditions = [Tag.id.in_(data.tag_ids), Tag.deleted_at.is_(None)]
-        tags, _ = await self.get_all_tag(conditions, session)
+        tags, _ = await self.get_all_tag(session=session, where_conditions=conditions)
         existing_ids = {str(row.id) for row in tags}
         missing_ids = set(data.tag_ids) - existing_ids
         if missing_ids:

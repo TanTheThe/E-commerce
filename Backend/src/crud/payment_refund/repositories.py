@@ -12,8 +12,12 @@ class PaymentRefundRepository:
 
         return refund
 
-    async def get_payment_refund(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
+    async def get_payment_refund(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None,
+                                 for_update: Optional[bool] = False):
         statement = select(PaymentRefund).where(conditions).options(*joins if joins else [])
+        if for_update:
+            statement = statement.with_for_update()
+
         result = await session.exec(statement)
 
         return result.first()

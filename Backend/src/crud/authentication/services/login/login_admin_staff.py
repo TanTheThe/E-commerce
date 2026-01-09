@@ -21,34 +21,34 @@ class LoginAdminStaffService:
         password = user_data.password
 
         try:
-            await login_security_service.check_rate_limit(email, session)
+            await login_security_service.check_rate_limit(email, request, session)
 
             condition = [User.email == email, User.deleted_at.is_(None)]
             user = await user_repository.get_user(session=session, where_conditions=condition)
 
             if not user:
-                await attempt_logger_service.log_failed_attempt(email, request, session)
+                await login_security_service.handle_failed_login(email, request, session)
                 AuthException.user_not_found()
 
             password_valid = verify_password(password, user.password)
             if not password_valid:
-                await attempt_logger_service.log_failed_attempt(email, request, session)
+                await login_security_service.handle_failed_login(email, request, session)
                 AuthException.invalid_account()
 
             if not user.is_verified:
-                await attempt_logger_service.log_failed_attempt(email, request, session)
+                await login_security_service.handle_failed_login(email, request, session)
                 AuthException.user_not_verified()
 
             if role == AdminStaffRole.ADMIN:
                 if not user.is_admin:
-                    await attempt_logger_service.log_failed_attempt(email, request, session)
+                    await login_security_service.handle_failed_login(email, request, session)
                     AuthException.unauthorized_admin()
             elif role == AdminStaffRole.STAFF:
                 if not user.is_staff:
-                    await attempt_logger_service.log_failed_attempt(email, request, session)
+                    await login_security_service.handle_failed_login(email, request, session)
                     AuthException.unauthorized_staff()
                 if user.staff_status != "active":
-                    await attempt_logger_service.log_failed_attempt(email, request, session)
+                    await login_security_service.handle_failed_login(email, request, session)
                     AuthException.staff_account_disabled()
 
             token = create_url_safe_token(
@@ -59,7 +59,7 @@ class LoginAdminStaffService:
 
             role_display = "quản trị viên" if role == AdminStaffRole.ADMIN else "nhân viên"
             
-            await attempt_logger_service.log_successful_attempt(email, request, session)
+            await login_security_service.handle_successful_login(email, request, session)
 
             if not user.two_fa_secret or not user.two_fa_enabled:
                 return {

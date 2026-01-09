@@ -34,31 +34,55 @@ class CacheKeys:
         """2FA setup attempts"""
         return f"auth:2fa_setup:{user_id}"
     
-    # ================================== PRODUCTS ================================== 
+    # ================================== PRODUCTS ==================================
     @staticmethod
-    def product_detail(product_id: str) -> str:
-        """Product detail với variants, colors, sizes"""
-        return f"product:detail:{product_id}"
-    
+    def product_filter_info_pattern() -> str:
+        """Pattern để invalidate filter info cache"""
+        return f"product:filter_info:*"
+
     @staticmethod
-    def product_list_category(category_id: str, page: int = 1) -> str:
-        """Product list theo category với phân trang"""
-        return f"product:list:category:{category_id}:page:{page}"
-    
+    def product_selectbox_pattern() -> str:
+        """Pattern để invalidate products selectbox cache"""
+        return f"product:selectbox:*"
+
     @staticmethod
-    def product_variants(product_id: str) -> str:
-        """Product variants"""
-        return f"product:variants:{product_id}"
-    
+    def product_variants_selectbox_pattern(product_id: str = None) -> str:
+        """Pattern để invalidate variants selectbox cache"""
+        if product_id:
+            return f"product:variants_selectbox:product:{product_id}"
+        return f"product:variants_selectbox:*"
+
     @staticmethod
-    def product_search(keyword: str, page: int = 1) -> str:
-        """Search results"""
-        return f"search:results:keyword:{keyword}:page:{page}"
-    
+    def product_list_all_pattern() -> str:
+        """Pattern để invalidate tất cả product list cache"""
+        return f"product:list:*"
+
     @staticmethod
-    def popular_products(limit: int = 10) -> str:
-        """Popular products (sorted set)"""
-        return f"analytics:popular_products:top:{limit}"
+    def product_popular_pattern() -> str:
+        """Pattern để invalidate tất cả popular products cache"""
+        return f"product:popular:*"
+
+    @staticmethod
+    def product_latest_pattern() -> str:
+        """Pattern để invalidate latest products cache"""
+        return f"product:latest:*"
+
+    @staticmethod
+    def product_top_discount_pattern() -> str:
+        """Pattern để invalidate top discount cache"""
+        return f"product:top_discount:*"
+
+    @staticmethod
+    def product_detail_customer_pattern() -> str:
+        """Pattern để invalidate product detail cache"""
+        return f"product:detail:customer:*"
+
+    @staticmethod
+    def product_related_pattern(product_id: str = None) -> str:
+        """Pattern để invalidate related products cache"""
+        if product_id:
+            return f"product:related:{product_id}:*"
+        return f"product:related:*"
     
     # ================================== CATEGORIES ==================================
     @staticmethod
@@ -149,24 +173,16 @@ class CacheKeys:
     
     # ================================== SPECIAL OFFERS ==================================
     @staticmethod
-    def offers_active() -> str:
-        """All active special offers"""
-        return "offer:active:all"
-    
+    def special_offer_admin_list_pattern() -> str:
+        """Pattern để invalidate admin offers list cache"""
+        return f"special_offer:admin:*"
+
     @staticmethod
-    def offers_user(user_id: str) -> str:
-        """User-specific offers"""
-        return f"offer:user:{user_id}"
-    
-    @staticmethod
-    def offer_detail(offer_id: str) -> str:
-        """Offer detail"""
-        return f"offer:detail:{offer_id}"
-    
-    @staticmethod
-    def offer_eligible(user_id: str, offer_id: str) -> str:
-        """Check if user eligible for offer"""
-        return f"offer:eligible:user:{user_id}:offer:{offer_id}"
+    def special_offer_customer_list_pattern(user_id: str = None) -> str:
+        """Pattern để invalidate customer offers cache"""
+        if user_id:
+            return f"special_offer:customer:user:{user_id}:*"
+        return f"special_offer:customer:*"
     
     # ================================== LOCATION ==================================
     @staticmethod
@@ -186,14 +202,11 @@ class CacheKeys:
     
     # ================================== USER ==================================
     @staticmethod
-    def user_profile(user_id: str) -> str:
-        """User profile data"""
-        return f"user:profile:{user_id}"
-    
-    @staticmethod
-    def user_permissions(user_id: str) -> str:
-        """User permissions/role"""
-        return f"user:permissions:{user_id}"
+    def user_profile_pattern(user_id: str = None) -> str:
+        """Pattern để invalidate user profile cache"""
+        if user_id:
+            return f"user:profile:*:{user_id}"
+        return f"user:profile:*"
     
     # ================================== ANALYTICS ==================================
     @staticmethod

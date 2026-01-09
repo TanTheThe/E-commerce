@@ -1,9 +1,9 @@
 import uuid
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, update
-from src.database.models import Warehouse, StockTransaction
+from src.database.models import Warehouse
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, and_, func, or_
+from sqlmodel import select, and_, func
 from datetime import datetime
 
 

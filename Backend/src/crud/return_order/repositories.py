@@ -1,24 +1,11 @@
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, update
-from sqlalchemy.orm import noload, load_only
-
-from src.database.models import Color, Notification, ReturnOrder
+from src.database.models import ReturnOrder
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, and_, func, desc, or_
-from datetime import datetime
-from src.errors.color import ColorException
+from sqlmodel import select, and_, func
 
 
 class ReturnOrderRepository:
-    async def create_notification(self, notification_dict, session: AsyncSession):
-        new_notification = Notification(
-            **notification_dict,
-            created_at=datetime.now()
-        )
-        session.add(new_notification)
-        return new_notification
-
-
     async def get_all_return_orders(self, session: AsyncSession,
                                        select_columns: Optional[List[Any]] = None,
                                        joins: Optional[List[Tuple[Any, dict]]] = None,

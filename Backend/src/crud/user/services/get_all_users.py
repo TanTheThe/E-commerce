@@ -1,13 +1,9 @@
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from sqlalchemy.orm import selectinload
-
 from src.crud.warehouse.repositories import WareHouseRepository
-from src.database.models import User, UserSpecialOffer, Warehouse
-from src.errors.authentication import AuthException
-from src.errors.warehouse import WareHouseException
-from src.schemas.user import UserDeleteModel, \
-    FilterUserInputModel, UserRole, SortOrder
-from sqlmodel import and_, or_, func, desc, asc, select
+from src.database.models import User, Warehouse
+from src.schemas.user import FilterUserInputModel, UserRole, SortOrder
+from sqlmodel import or_, func, desc, asc
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.user.repositories import UserRepository
 

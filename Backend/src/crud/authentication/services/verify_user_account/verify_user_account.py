@@ -60,7 +60,6 @@ class VerifyUserAccountService:
                     token=token,
                     role=role.value,
                     purpose="create_account",
-                    request=request,
                     metadata={
                         "reason": "already_verified",
                         "user_id": str(user.id)
@@ -99,7 +98,6 @@ class VerifyUserAccountService:
                 token=token,
                 role=role.value,
                 purpose="create_account",
-                request=request,
                 metadata={
                     "user_id": str(user.id),
                     "email": user.email,

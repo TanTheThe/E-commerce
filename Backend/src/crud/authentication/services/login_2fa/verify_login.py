@@ -94,7 +94,6 @@ class VerifyLoginService:
             token=token,
             role=role.value,
             purpose="first_class_login",
-            request=request,
             metadata={
                 "user_id": str(user.id),
                 "action": "otp_verified"

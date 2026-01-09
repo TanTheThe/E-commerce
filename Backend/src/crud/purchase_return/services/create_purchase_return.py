@@ -130,6 +130,8 @@ class CreatePurchaseReturnService:
         validated_items = []
         gr_details_map = {str(d.id): d for d in gr.receipt_details}
 
+        variant_ids = list(set(str(d.product_variant_id) for d in gr.receipt_details))
+
         for item in return_items:
             gr_detail_id = item['gr_detail_id']
             return_quantity = item['return_quantity']

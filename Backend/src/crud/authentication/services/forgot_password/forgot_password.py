@@ -1,15 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.config import Config
 from src.crud.authentication.services.forgot_password.forgot_password_security import ForgotPasswordSecurityService
-from src.crud.authentication.utils import create_url_safe_token, generate_password_hash
+from src.crud.authentication.utils import create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
 from src.errors.authentication import AuthException
 from src.mail import mail, create_message
 from src.schemas.user import ResetMethod, UserRole
 import re
-import secrets
 import logging
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'

@@ -4,7 +4,6 @@ from src.schemas.special_offer import SpecialOfferCreateModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.special_offer.repositories import SpecialOfferRepository
 from datetime import datetime
-from typing import Any
 
 special_offer_repository = SpecialOfferRepository()
 

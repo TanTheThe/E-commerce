@@ -1,8 +1,8 @@
 from datetime import datetime
 from fastapi import HTTPException
-from redis import Redis
 from sqlalchemy.orm import selectinload
 from sqlmodel import and_
+from src.cache import cache_service, CacheKeys
 from src.crud.order.repositories import OrderRepository
 from src.crud.user.repositories import UserRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -25,8 +25,7 @@ cash_repository = CashRepository()
 
 
 class WebhookShippingService:
-    def __init__(self, redis_client: Redis):
-        self.redis_client = redis_client
+    def __init__(self):
         self.valid_transitions = {
             OrderStatus.PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
             OrderStatus.CONFIRMED: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
@@ -37,6 +36,7 @@ class WebhookShippingService:
         }
         self.IDEMPOTENCY_TTL = 86400
 
+
     def verify_webhook_signature(self, payload: str, signature: str, secret: str) -> bool:
         expected_signature = hmac.new(
             secret.encode(),
@@ -45,25 +45,24 @@ class WebhookShippingService:
         ).hexdigest()
         return hmac.compare_digest(expected_signature, signature)
 
+
     async def check_idempotency(self, webhook_id: str) -> bool:
         if not webhook_id:
             return False
 
-        key = f"webhook:processed:{webhook_id}"
-        return self.redis_client.exists(key) > 0
+        cache_key = f"webhook:processed:{webhook_id}"
+        return await cache_service.check_exists_with_ttl(cache_key, self.IDEMPOTENCY_TTL)
 
-    async def mark_processed(self, webhook_id: str):
-        if webhook_id:
-            key = f"webhook:processed:{webhook_id}"
-            await self.redis_client.setex(key, self.IDEMPOTENCY_TTL, "1")
 
     async def acquire_order_lock(self, order_code: str, timeout: int = 10) -> bool:
         lock_key = f"order:lock:{order_code}"
-        return self.redis_client.set(lock_key, "1", nx=True, ex=timeout)
+        return await cache_service.acquire_lock(lock_key, timeout)
+
 
     async def release_order_lock(self, order_code: str):
         lock_key = f"order:lock:{order_code}"
-        await self.redis_client.delete(lock_key)
+        await cache_service.release_lock(lock_key)
+
 
     async def update_shipping_status(self, webhook_data: ShippingWebhookRequest, session: AsyncSession):
         if await self.check_idempotency(webhook_data.webhook_id):
@@ -75,8 +74,12 @@ class WebhookShippingService:
         try:
             conditions = [Order.code == webhook_data.order_code, Order.deleted_at.is_(None)]
             options = [selectinload(Order.user)]
-            order = await order_repository.get_order(session=session, where_conditions=conditions, options=options,
-                                                     for_update=True)
+            order = await order_repository.get_order(
+                session=session,
+                where_conditions=conditions,
+                options=options,
+                for_update=True
+            )
 
             if not order:
                 OrderException.not_found()
@@ -118,7 +121,9 @@ class WebhookShippingService:
 
             await session.commit()
 
-            await self.mark_processed(webhook_data.webhook_id)
+            if hasattr(CacheKeys, 'order_detail'):
+                await cache_service.delete(CacheKeys.order_detail(order.code))
+                await cache_service.delete(CacheKeys.order_detail(str(order.id)))
 
             if new_status == OrderStatus.DELIVERED:
                 try:

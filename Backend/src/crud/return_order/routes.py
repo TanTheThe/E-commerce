@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from src.dependencies import admin_role_middleware
 from src.errors.payment import PaymentException
 from src.schemas.return_order import CreateReturnRequest, ProcessReturnRequest, CompleteReturnRequest, \
-    UpdateRefundStatusRequest, ReturnOrderStatus, ReturnOrderSortBy
+    UpdateRefundStatusRequest, ReturnOrderStatus, ReturnOrderSortBy, RefundRetrySource
 
 return_order_admin_router = APIRouter(prefix="/return-order")
 return_order_customer_router = APIRouter(prefix="/return-order")
@@ -172,9 +172,9 @@ async def process_return_request(request: Request,
 async def complete_return_order(return_order_id: str = Path(..., description="ID của return order", min_length=36, max_length=36),
                                 request_data: CompleteReturnRequest = ...,
                                 request: Request = ...,
-                                background_tasks: BackgroundTasks = ...,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
+
     message, result = await complete_return_order_service.complete_return(
         return_order_id=return_order_id,
         restore_stock=request_data.restore_stock,
@@ -191,14 +191,15 @@ async def complete_return_order(return_order_id: str = Path(..., description="ID
     )
 
 @return_order_admin_router.post("/retry-refund/{refund_id}", dependencies=[Depends(admin_role_middleware)])
-async def retry_refund(refund_id: str,
-                       request: Request,
+async def retry_refund(request: Request,
+                       refund_id: str = Path(..., description="ID của payment refund", min_length=36, max_length=36),
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     result = await retry_refund_service.retry_refund_payment(
         refund_id=refund_id,
         request=request,
-        session=session
+        session=session,
+        source=RefundRetrySource.MANUAL,
     )
 
     return JSONResponse(

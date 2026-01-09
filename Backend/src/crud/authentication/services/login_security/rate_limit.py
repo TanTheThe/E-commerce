@@ -1,6 +1,6 @@
 import logging
 from typing import Tuple
-from fastapi import Request, HTTPException, status
+from fastapi import Request
 from src.cache import CacheService
 from src.errors.authentication import AuthException
 

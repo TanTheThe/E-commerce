@@ -23,6 +23,7 @@ class OrderDetailRepository:
         session.add_all(new_order_details)
         await session.flush()
 
+
     async def get_all_order_detail(self, session: AsyncSession,
                             select_columns: Optional[List[Any]] = None,
                             joins: Optional[List[Tuple[Any, dict]]] = None,
@@ -69,6 +70,7 @@ class OrderDetailRepository:
         details = result.all()
 
         return details, total
+
 
     async def get_order_detail(self, session: AsyncSession,
                         select_columns: Optional[List[Any]] = None,

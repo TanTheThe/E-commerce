@@ -22,7 +22,7 @@ class LogoutService:
         if not jti:
             AuthException.token_invalid()
 
-        is_blacklisted = await token_blacklist_service.jwt_in_blocklist(jti, request)
+        is_blacklisted = await token_blacklist_service.jwt_in_blocklist(jti)
 
         if is_blacklisted:
             logger.warning(f"Token already blacklisted: jti={jti}")
@@ -43,7 +43,7 @@ class LogoutService:
         }
 
         success = await token_blacklist_service.add_jwt_to_blocklist(
-            jti, request, ttl, meta_data
+            jti, ttl, meta_data
         )
 
         if not success:

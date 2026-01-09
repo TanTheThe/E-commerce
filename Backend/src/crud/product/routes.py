@@ -15,6 +15,7 @@ from src.crud.product.services.search_product import SearchProductService
 from src.crud.product.services.services import ProductService
 from src.crud.product.services.update_product.update_product import UpdateProductService
 from src.crud.product.services.update_product_status import UpdateProductStatusService
+from src.crud.product.utils import invalidate_all_product_caches
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
@@ -58,6 +59,9 @@ async def create_product(product_data: ProductCreateModel,
                          token_details: dict = Depends(access_token_bearer),
                          session: AsyncSession = Depends(get_session)):
     product_dict = await create_product_service.create_product(product_data, session)
+
+    await invalidate_all_product_caches()
+
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={
@@ -111,7 +115,7 @@ async def get_all_products_customer(category_identifier: str = Path(..., descrip
     filter_hash = hashlib.md5(json.dumps(filter_dict, sort_keys=True).encode()).hexdigest()[:12]
     
     category_identifier=category_identifier.strip()
-    cache_key = "product:list:category:{category_identifier}:filter:{filter_hash}:skip:{skip}:limit:{limit}"
+    cache_key = f"product:list:category:{category_identifier}:filter:{filter_hash}:skip:{skip}:limit:{limit}"
     cached_products = await cache_service.get(cache_key)
     
     if cached_products is not None:
@@ -144,7 +148,7 @@ async def get_products_popular(parent_category_id: str = Path(
                                limit_per_category: int = Query(
                                 default=12, ge=1, le=50, description="Số sản phẩm tối đa cho mỗi category con"), 
                                session: AsyncSession = Depends(get_session)):
-    cache_key = "product:popular:parent:{parent_category_id}:limit:{limit_per_category}"
+    cache_key = f"product:popular:parent:{parent_category_id}:limit:{limit_per_category}"
     
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -225,7 +229,24 @@ async def get_products_offer(categories_id: str = Query(..., description="Danh s
 @product_customer_router.get('/latest')
 async def get_products_latest(limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm mới nhất cần lấy"), 
                               session: AsyncSession = Depends(get_session)):
+    cache_key = f"product:latest:limit:{limit_per_category}"
+
+    cached_products = await cache_service.get(cache_key)
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các sản phẩm",
+                "content": cached_products
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     products = await get_latest_products_service.get_latest_products(session, limit_per_category)
+
+    await cache_service.set(cache_key, products, ttl=600)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -239,8 +260,26 @@ async def get_products_latest(limit_per_category: int = Query(default=12, ge=1, 
 @product_customer_router.get('/related')
 async def get_products_related(product_id: str = Query(..., description="ID của sản phẩm cần tìm related products"), 
                                price_range: float = Query(default=0.4, ge=0.1, le=1.0, description="Khoảng giá tương đối (0.4 = ±40%)"),
-                               limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm tối đa"), session: AsyncSession = Depends(get_session)):
+                               limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm tối đa"),
+                               session: AsyncSession = Depends(get_session)):
+    cache_key = f"product:related:{product_id}:range:{price_range}:limit:{limit_per_category}"
+
+    cached_products = await cache_service.get(cache_key)
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các sản phẩm",
+                "content": cached_products
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     products = await get_related_products_service.get_related_products(product_id, session, limit_per_category, price_range)
+
+    await cache_service.set(cache_key, products, ttl=1200)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -254,7 +293,24 @@ async def get_products_related(product_id: str = Query(..., description="ID củ
 @product_customer_router.get('/top-discount')
 async def get_products_top_discount(limit: int = Query(default=12, ge=1, le=50, description="Số sản phẩm giảm giá nhiều nhất"),
                                     session: AsyncSession = Depends(get_session)):
+    cache_key = f"product:top_discount:limit:{limit}"
+
+    cached_products = await cache_service.get(cache_key)
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các sản phẩm",
+                "content": cached_products
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     products = await get_top_discount_service.get_top_discount(session, limit)
+
+    await cache_service.set(cache_key, products, ttl=1800)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -267,7 +323,24 @@ async def get_products_top_discount(limit: int = Query(default=12, ge=1, le=50, 
 
 @product_customer_router.get('/filter-info')
 async def get_filters_info(category_id: str, session: AsyncSession = Depends(get_session)):
+    cache_key = f"product:filter_info:category:{category_id}"
+
+    cached_filters = await cache_service.get(cache_key)
+    if cached_filters is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin của các bộ lọc",
+                "content": cached_filters
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     filters = await get_filters_info_service.get_filters_info(category_id, session)
+
+    await cache_service.set(cache_key, filters, ttl=1800)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -348,8 +421,27 @@ async def get_detail_product_customer(identifier: str = Path(..., min_length=1, 
                                       session: AsyncSession = Depends(get_session)):
     if not identifier or not identifier.strip():
         ProductException.identifier_must_not_be_empty()
+
+    identifier = identifier.strip()
+
+    cache_key = f"product:detail:customer:{identifier}"
+
+    cached_product = await cache_service.get(cache_key)
+    if cached_product is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin chi tiết của sản phẩm",
+                "content": cached_product
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
         
     product_dict = await get_detail_product_service.get_detail_product_customer(identifier.strip(), session)
+
+    await cache_service.set(cache_key, product_dict, ttl=900)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -398,7 +490,26 @@ async def get_products_selectbox(category_id: Optional[str] = None,
                                  supplier_id: Optional[str] = None,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
+    cat_part = f"cat:{category_id}" if category_id else "cat:all"
+    sup_part = f"sup:{supplier_id}" if supplier_id else "sup:all"
+    cache_key = f"product:selectbox:{cat_part}:{sup_part}"
+
+    cached_products = await cache_service.get(cache_key)
+    if cached_products is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin các sản phẩm",
+                "content": cached_products
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     product_dict = await get_product_variant_select_box_service.get_products_select_box(session, category_id, supplier_id)
+
+    await cache_service.set(cache_key, product_dict, ttl=900)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -413,7 +524,24 @@ async def get_products_selectbox(category_id: Optional[str] = None,
 async def get_variants_selectbox(product_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
+    cache_key = f"product:variants_selectbox:product:{product_id}"
+
+    cached_variants = await cache_service.get(cache_key)
+    if cached_variants is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thông tin các biến thể",
+                "content": cached_variants
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     variant_dict = await get_product_variant_select_box_service.get_variants_select_box(product_id, session)
+
+    await cache_service.set(cache_key, variant_dict, ttl=900)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -430,6 +558,8 @@ async def update_product(id: str, product_data: ProductUpdateModel,
                          session: AsyncSession = Depends(get_session)):
     product = await update_product_service.update_product(id, product_data, session)
 
+    await invalidate_all_product_caches()
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -444,6 +574,8 @@ async def update_product_status(id: str,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
     await update_product_status_service.update_product_status(id, status_data, session)
+
+    await invalidate_all_product_caches()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -461,6 +593,8 @@ async def bulk_update_product_status(bulk_data: BulkUpdateStatusModel,
                                      token_details: dict = Depends(access_token_bearer),
                                      session: AsyncSession = Depends(get_session)):
     await update_product_status_service.bulk_update_product_status(bulk_data, session)
+
+    await invalidate_all_product_caches()
     
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -478,6 +612,8 @@ async def delete_product(id: str, token_details: dict = Depends(access_token_bea
                          session: AsyncSession = Depends(get_session)):
     product = await product_service.delete_product(id, session)
 
+    await invalidate_all_product_caches()
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -491,6 +627,8 @@ async def delete_product(id: str, token_details: dict = Depends(access_token_bea
 async def delete_multiple_product(data: DeleteMultipleProductModel, token_details: dict = Depends(access_token_bearer),
                                   session: AsyncSession = Depends(get_session)):
     product_ids = await product_service.delete_multiple_product(data, session)
+
+    await invalidate_all_product_caches()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

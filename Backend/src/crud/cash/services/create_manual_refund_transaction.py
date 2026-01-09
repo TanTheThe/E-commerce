@@ -62,6 +62,7 @@ class ManualRefundCashService:
 
         return cash.total_refunded if cash else 0
 
+
     async def calculate_refund_status(self, total_refund: int, already_refunded: int, new_amount: int):
         total_after_refund = already_refunded + new_amount
 

@@ -74,7 +74,7 @@ class CreateAccountService:
 
             token = create_url_safe_token(
                 token_payload,
-                role.value,
+                role,
                 purpose="create_account"
             )
             

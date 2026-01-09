@@ -13,7 +13,7 @@ cache_service = CacheService()
 class CartCacheService:
     async def get_cart_items_cache(self, user_id: str, skip: int, limit: int):
         try:
-            cache_key = "cart:items:user:{user_id}:page:{skip}:{limit}"
+            cache_key = f"cart:items:user:{user_id}:page:{skip}:{limit}"
             cached_data = await cache_service.get(cache_key)
             
             if cached_data:
@@ -31,7 +31,7 @@ class CartCacheService:
     async def set_cart_items_cache(self, user_id: str, skip: int, limit: int, 
                                    cart_data: Dict[str, Any]) -> bool:
         try:
-            cache_key = "cart:items:user:{user_id}:page:{skip}:{limit}"
+            cache_key = f"cart:items:user:{user_id}:page:{skip}:{limit}"
 
             success = await cache_service.set(
                 cache_key, 
@@ -40,7 +40,7 @@ class CartCacheService:
             )
             
             if success:
-                logger.info(f"Cache SET: Cart items for user {user_id}, TTL={self.CART_ITEMS_TTL}s")
+                logger.info(f"Cache SET: Cart items for user {user_id}, TTL={CART_ITEMS_TTL}s")
             
             return success
             
@@ -51,7 +51,7 @@ class CartCacheService:
         
     async def set_cart_count_cache(self, user_id: str, count: int) -> bool:
         try:
-            cache_key = "cart:count:user:{user_id}"
+            cache_key = f"cart:count:user:{user_id}"
             success = await cache_service.set(
                 cache_key,
                 count,
@@ -59,7 +59,7 @@ class CartCacheService:
             )
             
             if success:
-                logger.info(f"Cache SET: Cart count for user {user_id} = {count}, TTL={self.CART_COUNT_TTL}s")
+                logger.info(f"Cache SET: Cart count for user {user_id} = {count}, TTL={CART_COUNT_TTL}s")
             
             return success
             
@@ -88,7 +88,7 @@ class CartCacheService:
     
     async def get_cart_count_cache(self, user_id: str) -> Optional[int]:
         try:
-            cache_key = "cart:count:user:{user_id}"
+            cache_key = f"cart:count:user:{user_id}"
             count = await cache_service.get(cache_key)
             
             if count is not None:
@@ -109,7 +109,7 @@ class CartCacheService:
         Gọi khi: create/update/delete cart items, checkout success
         """
         try:
-            pattern = "cart:*:user:{user_id}*"
+            pattern = f"cart:*:user:{user_id}*"
             deleted_count = await cache_service.delete_pattern(pattern)
             
             logger.info(f"Cache INVALIDATED: Deleted {deleted_count} keys for user {user_id}")

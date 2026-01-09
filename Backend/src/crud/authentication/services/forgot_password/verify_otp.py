@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.authentication.services.forgot_password.forgot_password_security import ForgotPasswordSecurityService
-from src.crud.authentication.utils import verify_password, create_url_safe_token
+from src.crud.authentication.utils import create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
 from src.errors.authentication import AuthException

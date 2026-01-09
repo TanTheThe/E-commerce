@@ -177,7 +177,6 @@ class CartRepository:
 
         return items, total
 
-
     async def update_cart(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
                                         session: AsyncSession):
         stmt = (

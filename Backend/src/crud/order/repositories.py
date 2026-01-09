@@ -89,6 +89,7 @@ class OrderRepository:
 
         return orders, total
 
+
     async def get_order(self, session: AsyncSession,
                         select_columns: Optional[List[Any]] = None,
                         joins: Optional[List[Tuple[Any, dict]]] = None,
@@ -136,41 +137,13 @@ class OrderRepository:
         return order
 
 
-    async def count_orders(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        base_condition = Order.deleted_at.is_(None)
-
-        if conditions is not None:
-            base_condition = and_(base_condition, conditions)
-
-        statement = (
-            select(Order)
-            .options(
-                load_only(Order.id),
-            )
-            .where(base_condition)
-        )
-
-        result = await session.exec(statement)
-        return result.all()
-
-    async def get_statistics(self, column_expr: ColumnElement, conditions: Optional[ColumnElement[bool]], session: AsyncSession):
-        base_condition = Order.deleted_at.is_(None)
-
-        if conditions is not None:
-            base_condition = and_(base_condition, conditions)
-
-        statement = select(column_expr).where(base_condition)
-
-        result = await session.exec(statement)
-        value = result.one_or_none()
-        return value
-
     async def get_new_status_order(self, conditions: Optional[ColumnElement[bool]], session: AsyncSession, joins: list = None):
         statement = select(OrderStatusHistory).where(conditions).order_by(desc(OrderStatusHistory.created_at)).limit(1)
 
         result = await session.exec(statement)
 
         return result.first()
+
 
     async def update_order(self, data_need_update, update_data: dict, session: AsyncSession):
         for k, v in update_data.items():
@@ -180,6 +153,7 @@ class OrderRepository:
         data_need_update.updated_at = datetime.now()
 
         return data_need_update
+
 
     async def update_order_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any],
                                       session: AsyncSession, get_result_back: bool = False):

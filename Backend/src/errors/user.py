@@ -222,3 +222,13 @@ class UserException:
                 "error_code": "user_016",
             },
         )
+
+    @staticmethod
+    def update_status_failed():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Lỗi khi cập nhật trạng thái người dùng",
+                "error_code": "user_016",
+            },
+        )

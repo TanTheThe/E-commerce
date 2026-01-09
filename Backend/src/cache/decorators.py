@@ -5,11 +5,8 @@ import hashlib
 import json
 import logging
 from src.cache import cache_service
-from src.cache.cache_service import CacheService
 
 logger = logging.getLogger(__name__)
-
-cache_service = CacheService()
 
 def cached(key_prefix: str, ttl: Optional[int] = None, key_builder: Optional[Callable] = None):
     """

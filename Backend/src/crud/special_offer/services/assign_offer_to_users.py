@@ -1,12 +1,9 @@
-from typing import List, Optional
+from typing import List
 import uuid
-from fastapi import BackgroundTasks
-
 from src.celery_tasks.send_assign_offer_notification import send_assign_offer_notifications_task
 from src.crud.product.repositories import ProductRepository
 from src.crud.user.repositories import UserRepository
 from src.database.models import Special_Offer, User, UserSpecialOffer
-from src.errors.authentication import AuthException
 from src.errors.special_offer import SpecialOfferException
 from src.schemas.special_offer import AssignOfferToUsers
 from sqlmodel.ext.asyncio.session import AsyncSession

@@ -57,7 +57,7 @@ async def create_purchase_return(request: CreatePurchaseReturnRequest,
     )
 
     return JSONResponse(
-        status_code=status.HTTP_200_OK,
+        status_code=status.HTTP_201_CREATED,
         content={
             "message": "Tạo đơn hoàn trả hàng thành công",
             "content": purchase_return

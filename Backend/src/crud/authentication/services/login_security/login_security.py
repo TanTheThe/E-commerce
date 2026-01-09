@@ -1,5 +1,5 @@
 import logging
-from fastapi import Request, HTTPException
+from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.crud.authentication.services.login_security.account_lockout import AccountLockoutService
 from src.crud.authentication.services.login_security.login_attempt_logger import AttemptLoggerService

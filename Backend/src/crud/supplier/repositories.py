@@ -4,6 +4,7 @@ from src.database.models import Supplier, SupplierPayment, Supplier_Product
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, and_, func
 from datetime import datetime
+import uuid
 
 
 class SupplierRepository:
@@ -230,7 +231,7 @@ class SupplierRepository:
 
 
     async def delete_supplier_product(self, condition: List[ColumnElement[bool]], session: AsyncSession):
-        supplier = await self.get(session=session, where_conditions=condition)
+        supplier = await self.get_supplier(session=session, where_conditions=condition)
         if not supplier:
             return False
 

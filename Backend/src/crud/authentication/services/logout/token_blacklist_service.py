@@ -1,7 +1,6 @@
 import hashlib
 from datetime import datetime
 from typing import Literal, Optional
-from fastapi import Request
 from src.crud.authentication.utils import TOKEN_CONFIG
 from src.cache.redis_manager import RedisManager
 from src.cache.cache_service import CacheService
@@ -59,7 +58,7 @@ class TokenBlacklistService:
             return False
 
 
-    async def jwt_in_blocklist(self, jti: str, request: Request):
+    async def jwt_in_blocklist(self, jti: str):
         try:
             redis = redis_manager.redis
             key = self.build_key(jti, prefix=self.PREFIX_JWT)
@@ -74,7 +73,7 @@ class TokenBlacklistService:
     
     # ================================= URL-SAFE TOKEN BLACKLIST ============================================
 
-    async def add_token_to_blocklist(self, token: str, role: RoleType, purpose: PurposeType, request: Request,
+    async def add_token_to_blocklist(self, token: str, role: RoleType, purpose: PurposeType,
                                      ttl: Optional[int] = None, metadata: Optional[dict] = None):
         try:
             redis = redis_manager.redis

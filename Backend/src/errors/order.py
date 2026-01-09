@@ -352,4 +352,14 @@ class OrderException:
                 "error_code": "order_017",
             },
         )
+
+    @staticmethod
+    def too_many_create_order(remaining_minutes):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": f"Đã có quá nhiều lần tạo đơn hàng từ địa chỉ IP này. Vui lòng thử lại sau {remaining_minutes} phút.",
+                "error_code": "auth_045",
+            },
+        )
     

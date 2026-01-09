@@ -24,12 +24,11 @@ access_token_bearer = AccessTokenBearer()
 async def handle_shipping_webhook(webhook_data: ShippingWebhookRequest,
                                   x_webhook_signature: str = Header(..., description="Chữ ký webhook"),
                                   token_details: dict = Depends(access_token_bearer),
-                                  session: AsyncSession = Depends(get_session),
-                                  redis_client: Redis = Depends(get_redis)):
+                                  session: AsyncSession = Depends(get_session)):
     result = await webhook_shipping_service.update_shipping_status(webhook_data, session)
 
     return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
+        status_code=status.HTTP_200_OK,
         content={
             "message": "Cập nhật trạng thái đơn hàng thành công",
             "content": result
@@ -59,7 +58,7 @@ async def create_manual_refund_transaction(request_data: CreateManualRefundReque
     )
 
     return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
+        status_code=status.HTTP_200_OK,
         content={
             "message": "Đã tạo giao dịch hoàn tiền thủ công thành công",
             "content": cash_transaction

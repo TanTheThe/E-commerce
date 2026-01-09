@@ -1,13 +1,10 @@
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import noload, load_only
-
-from src.database.models import Color, Notification
+from src.database.models import Notification
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, and_, func, desc, or_
+from sqlmodel import select, and_, func
 from datetime import datetime
-from src.errors.color import ColorException
 
 
 class NotificationRepository:
@@ -18,6 +15,7 @@ class NotificationRepository:
         )
         session.add(new_notification)
         return new_notification
+
 
     async def bulk_create_notifications(self, notifications: List, session: AsyncSession):
         stmt = insert(Notification).values(notifications)
@@ -115,25 +113,6 @@ class NotificationRepository:
         notification = result.one_or_none()
 
         return notification
-
-
-    async def get_notifications_by_ids(self, session: AsyncSession, notification_ids: List[str], user_id: Optional[str] = None):
-        conditions = [Notification.id.in_(notification_ids)]
-
-        if user_id:
-            conditions.append(
-                or_(
-                    Notification.recipient_type == "admin",
-                    and_(
-                        Notification.recipient_type == "customer",
-                        Notification.recipient_id == user_id
-                    )
-                )
-            )
-
-        statement = select(Notification).where(*conditions)
-        result = await session.exec(statement)
-        return result.all()
 
 
     async def update_notification(self, condition: List[Optional[ColumnElement[bool]]], values: Dict[str, Any], session: AsyncSession):

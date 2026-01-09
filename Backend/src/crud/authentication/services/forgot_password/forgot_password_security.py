@@ -1,6 +1,5 @@
 import logging
 import secrets
-from src.cache.cache_service import CacheService
 from src.errors.authentication import AuthException
 from datetime import datetime
 from typing import Tuple, Optional
@@ -17,8 +16,6 @@ MAX_OTP_ATTEMPTS = 5                # Max 5 lần nhập OTP
 OTP_TTL_SECONDS = 300               # OTP hết hạn sau 5 phút
 OTP_LENGTH = 6                      # OTP 6 chữ số
 
-
-cache_service = CacheService()
 
 class ForgotPasswordSecurityService:
     async def check_forgot_password_rate_limit(self, email: str):

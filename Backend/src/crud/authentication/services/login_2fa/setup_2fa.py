@@ -29,7 +29,7 @@ class Setup2FAService:
 
         is_blacklisted = await token_blacklist_service.token_in_blocklist(
             token=token,
-            role=str(role.value),
+            role=role.value,
             purpose="first_class_login"
         )
 

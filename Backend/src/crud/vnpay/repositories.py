@@ -2,8 +2,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement
 from src.database.models import Payment
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, update
-from sqlalchemy.orm import noload
+from sqlmodel import select, and_, update
 from datetime import datetime
 
 

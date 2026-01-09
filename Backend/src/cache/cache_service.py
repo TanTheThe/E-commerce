@@ -1,10 +1,8 @@
-from typing import Any, Optional, Union, List
+from typing import Any, Optional
 import json
-import pickle
 import logging
 from redis import asyncio as aioredis
 from src.cache.redis_manager import RedisManager
-from src.config import Settings
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -173,5 +171,42 @@ class CacheService:
         except Exception as e:
             logger.error(f"Cache decrement error for key '{key}': {e}")
             return 0
+
+    async def check_exists_with_ttl(self, key: str, ttl: int) -> bool:
+        """
+        Check if key exists, nếu không thì set với TTL
+        Dùng cho idempotency check
+
+        Returns:
+            True nếu key đã tồn tại (duplicate), False nếu chưa (first time)
+        """
+        try:
+            result = await self.redis.set(key, "1", nx=True, ex=ttl)
+            return result is None
+        except Exception as e:
+            logger.error(f"Check exists error for key '{key}': {e}")
+            return False
+
+    async def acquire_lock(self, key: str, timeout: int = 10) -> bool:
+        """
+        Giành quyền xử lý
+
+        Tránh deadlock, trường hợp worker chết giữa chừng
+        => Lock tự động bị xóa, worker khác có thể acquire
+        """
+        try:
+            result = await self.redis.set(key, "1", nx=True, ex=timeout)
+            return result is not None
+        except Exception as e:
+            logger.error(f"Lock acquire error for key '{key}': {e}")
+            return False
+
+    async def release_lock(self, key: str) -> bool:
+        """
+        Nhả quyền xử lý
+
+        => Xóa lock để worker khác có thể acquire
+        """
+        return await self.delete(key)
 
 

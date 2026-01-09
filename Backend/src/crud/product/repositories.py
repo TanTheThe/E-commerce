@@ -1,17 +1,11 @@
 from typing import Optional, List, Any, Dict, Tuple
 from sqlalchemy import ColumnElement
-from src.database.models import Product, Product_Variant, Categories, Evaluate, Order_Detail, Order, Categories_Product, \
-    Special_Offer
+from src.database.models import Product
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, update, func, and_, desc
-from sqlalchemy import select, func, and_, desc, case
-from sqlalchemy.orm import aliased
+from sqlmodel import select, update, and_
+from sqlalchemy import select, func, and_
 from datetime import datetime
 from fastapi import HTTPException, status
-from sqlalchemy.orm import noload, selectinload
-from uuid import UUID
-
-from src.errors.product import ProductException
 from src.schemas.product import DeleteMultipleProductModel
 
 

@@ -4,11 +4,13 @@ from fastapi import APIRouter, status, Depends, Query, Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request
+from src.cache import cache_service, CacheKeys
 from src.crud.order.services.cancel_order.cancel_order import CancelOrderService
 from src.crud.order.services.cancel_order.get_cancellation_requests import GetCancellationRequestService
 from src.crud.order.services.cancel_order.process_cancellation import ProcessCancellationService
 from src.crud.order.services.confirm_order_received import ConfirmOrderReceivedService
 from src.crud.order.services.create_order.create_order import CreateOrderService
+from src.crud.order.services.create_order.create_order_security import CreateOrderSecurityService
 from src.crud.order.services.get_all_orders import GetAllOrdersService
 from src.crud.order.services.get_detail_order import GetDetailOrderService
 from src.crud.order.services.statistics_order import StatisticsOrderService
@@ -20,6 +22,10 @@ from fastapi.responses import JSONResponse
 from src.schemas.order import OrderCreateModel, StatusUpdateModel, OrderFilterModel, CancelOrderRequest, \
     ProcessCancellationRequest, StatisticsPeriod, DateRangeCalculator
 from src.dependencies import admin_role_middleware, customer_role_middleware
+import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 order_admin_router = APIRouter(prefix="/order")
 order_customer_router = APIRouter(prefix="/order")
@@ -36,6 +42,7 @@ statistics_order_service = StatisticsOrderService()
 cancel_order_service = CancelOrderService()
 process_cancellation_service = ProcessCancellationService()
 get_cancellation_requests_service = GetCancellationRequestService()
+create_order_security_service = CreateOrderSecurityService()
 access_token_bearer = AccessTokenBearer()
 
 
@@ -52,21 +59,58 @@ async def get_statistics_overview(from_date: Optional[datetime] = Query(None, de
         from_date, to_date, period
     )
 
+    if from_date and to_date:
+        date_hash = hashlib.md5(
+            f"{calculated_from.isoformat()}:{calculated_to.isoformat()}".encode()
+        ).hexdigest()[:8]
+        cache_key = f"analytics:overview:custom:{date_hash}"
+        ttl = 600
+    else:
+        cache_key = f"analytics:revenue:{period}"
+        ttl_map = {
+            "today": 300,  # 5 minutes
+            "last_7_days": 900,  # 15 minutes
+            "last_30_days": 1800,  # 30 minutes
+            "last_90_days": 3600,  # 1 hour
+        }
+        ttl = ttl_map.get(period.value, 600)
+
+    cached_stats = await cache_service.get(cache_key)
+
+    if cached_stats is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Thống kê tổng quan",
+                "content": {
+                    "period": period.value if not (from_date and to_date) else "custom",
+                    "from_date": calculated_from.isoformat(),
+                    "to_date": calculated_to.isoformat(),
+                    **cached_stats
+                }
+            }
+        )
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
     stats = await statistics_order_service.get_comprehensive_statistics(
         session=session,
         from_date=calculated_from,
         to_date=calculated_to
     )
 
+    await cache_service.set(cache_key, stats, ttl=ttl)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": "Thống kê tổng quan",
             "content": {
-                    "period": period.value if not (from_date and to_date) else "custom",
-                    "from_date": calculated_from.isoformat(),
-                    "to_date": calculated_to.isoformat(),
-                    **stats
+                "period": period.value if not (from_date and to_date) else "custom",
+                "from_date": calculated_from.isoformat(),
+                "to_date": calculated_to.isoformat(),
+                **stats
             }
         }
     )
@@ -77,6 +121,20 @@ async def get_cancellation_requests(skip: int = 0, limit: int = 20,
                                     status_filter: str = "pending",
                                     token_details: dict = Depends(access_token_bearer),
                                     session: AsyncSession = Depends(get_session)):
+    should_cache = (status_filter == "pending" and skip == 0 and limit == 20)
+    cache_key = "order:cancellation:pending:page:1"
+
+    if should_cache:
+        cached_data = await cache_service.get(cache_key)
+        if cached_data is not None:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "message": f"Danh sách yêu cầu hủy đơn ({status_filter})",
+                    "content": cached_data
+                }
+            )
+
     if status_filter == "pending":
         orders, total = await get_cancellation_requests_service.get_cancellation_requests(session, skip=skip, limit=limit)
     else:
@@ -97,25 +155,41 @@ async def get_cancellation_requests(skip: int = 0, limit: int = 20,
             "created_at": str(order.created_at)
         })
 
+    result = {
+        "data": orders_data,
+        "total": total
+    }
+
+    if should_cache:
+        await cache_service.set(cache_key, result, ttl=120)
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
             "message": f"Danh sách yêu cầu hủy đơn ({status_filter})",
-            "content": {
-                "data": orders_data,
-                "total": total
-            }
+            "content": result
         }
     )
 
 @order_customer_router.post("/", status_code=status.HTTP_201_CREATED, dependencies=[Depends(customer_role_middleware)])
-@limiter.limit("3/minute")
-@limiter.limit("10/hour")
 async def create_order(request: Request, order_data: OrderCreateModel,
                        token_details: dict = Depends(access_token_bearer),
                        session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
+
+    try:
+        ip_address = create_order_security_service.get_client_ip(request)
+        await create_order_security_service.check_create_order_rate_limit(ip_address)
+    except Exception as e:
+        logger.error(f"Error checking rate limit: {str(e)}")
+
     order_dict = await create_order_service.create_order(customer_id, order_data, session)
+
+    await cache_service.delete_pattern("analytics:*")
+
+    await cache_service.delete_pattern(f"order:list:user:{customer_id}:*")
+
+    await cache_service.delete_pattern(f"cart:*:user:{customer_id}*")
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -131,7 +205,27 @@ async def get_all_order_customer(status_order: str, skip: int = Query(0, ge=0),
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
+
+    should_cache = (skip == 0 and limit == 10)
+    cache_key = CacheKeys.order_list_user(customer_id, page=1)
+
+    cache_key = f"{cache_key}:status:{status_order}"
+
+    if should_cache:
+        cached_data = await cache_service.get(cache_key)
+        if cached_data is not None:
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "message": "Thông tin các đơn hàng",
+                    "content": cached_data
+                }
+            )
+
     order_dict = await get_all_order_service.get_all_order_customer(customer_id, status_order, session, skip=skip, limit=limit)
+
+    if should_cache:
+        await cache_service.set(cache_key, order_dict, ttl=180)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -143,15 +237,29 @@ async def get_all_order_customer(status_order: str, skip: int = Query(0, ge=0),
 
 @order_customer_router.get("/{order_id}", status_code=status.HTTP_200_OK,
                            dependencies=[Depends(customer_role_middleware)])
-async def get_detail_order_customer(order_id: str = Path(
-                                        ...,
-                                        min_length=36,
-                                        max_length=36,
-                                    ),
+async def get_detail_order_customer(order_id: str = Path(..., min_length=36, max_length=36),
                                     token_details: dict = Depends(access_token_bearer),
                                     session: AsyncSession = Depends(get_session)):
     customer_id = token_details['user']['id']
+
+    cache_key = f"{CacheKeys.order_detail(order_id)}:customer:{customer_id}"
+
+    cached_order = await cache_service.get(cache_key)
+    if cached_order is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Chi tiết của đơn hàng",
+                "content": cached_order
+            }
+        )
+
     order_dict = await get_detail_order_service.get_detail_order_customer(order_id, customer_id, session)
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
+    await cache_service.set(cache_key, order_dict, ttl=300)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -163,14 +271,27 @@ async def get_detail_order_customer(order_id: str = Path(
 
 
 @order_admin_router.get("/{order_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(admin_role_middleware)])
-async def get_detail_order_admin(order_id: str = Path(
-                                        ...,
-                                        min_length=36,
-                                        max_length=36,
-                                 ),
+async def get_detail_order_admin(order_id: str = Path(..., min_length=36, max_length=36),
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
+    cache_key = f"{CacheKeys.order_detail(order_id)}:admin"
+
+    cached_order = await cache_service.get(cache_key)
+    if cached_order is not None:
+        logger.debug(f"Cache HIT: {cache_key}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "message": "Chi tiết của đơn hàng",
+                "content": cached_order
+            }
+        )
+
     order_dict = await get_detail_order_service.get_detail_order_admin(order_id, session)
+
+    logger.debug(f"Cache MISS: {cache_key}")
+
+    await cache_service.set(cache_key, order_dict, ttl=300)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -228,6 +349,16 @@ async def process_cancellation_request(order_id: str,
                                        session: AsyncSession = Depends(get_session)):
     message, order = await process_cancellation_service.process_cancellation_by_admin(order_id, data, request, session)
 
+    await cache_service.delete_pattern(f"order:detail:{order_id}:*")
+
+    await cache_service.delete("order:cancellation:pending:page:1")
+
+    customer_id = str(order.get("user_id")) if isinstance(order, dict) else str(order.user_id)
+    await cache_service.delete_pattern(f"order:list:user:{customer_id}:*")
+
+    if data.approved:
+        await cache_service.delete_pattern("analytics:*")
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -244,6 +375,14 @@ async def cancel_order(order_id: str, request: CancelOrderRequest,
     user_id = token_details['user']['id']
     message, result = await cancel_order_service.cancel_order_by_customer(order_id, user_id, request, session)
 
+    await cache_service.delete_pattern(f"order:detail:{order_id}:*")
+
+    await cache_service.delete_pattern(f"order:list:user:{user_id}:*")
+
+    await cache_service.delete("order:cancellation:pending:page:1")
+
+    await cache_service.delete_pattern("analytics:*")
+
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
@@ -259,6 +398,14 @@ async def update_status(order_id: str,
                         token_details: dict = Depends(access_token_bearer),
                         session: AsyncSession = Depends(get_session)):
     order_updated, old_status = await update_status_order_service.update_status(order_id, request, session)
+
+    await cache_service.delete_pattern(f"order:detail:{order_id}:*")
+
+    customer_id = str(order_updated.user_id)
+    await cache_service.delete_pattern(f"order:list:user:{customer_id}:*")
+
+    if request.status in ["delivered", "received", "cancelled"]:
+        await cache_service.delete_pattern("analytics:*")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -279,6 +426,12 @@ async def confirm_order_received(order_id: str,
                                  session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
     order_updated = await confirm_order_received_service.confirm_order_received_service(order_id, user_id, session)
+
+    await cache_service.delete_pattern(f"order:detail:{order_id}:*")
+
+    await cache_service.delete_pattern(f"order:list:user:{user_id}:*")
+
+    await cache_service.delete_pattern("analytics:*")
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

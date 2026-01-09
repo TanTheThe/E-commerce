@@ -41,6 +41,16 @@ class ReturnOrderException:
                 "error_code": "return_004",
             },
         )
+
+    @staticmethod
+    def refund_failed():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Hoàn tiền thất bại",
+                "error_code": "return_004",
+            },
+        )
     
     @staticmethod
     def order_not_valid_for_return():
@@ -198,6 +208,46 @@ class ReturnOrderException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": f"Đơn hàng phải ở trạng thái pending thì mới có thể thực hiện {action.value}",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def must_be_approved_to_complete(return_status):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng trả lại phải được phê duyệt mới hoàn tất. Trạng thái hiện tại: {return_status}",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def already_completed():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đơn hàng trả lại đã đang ở trạng thái hoàn tất",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def cant_refund_with_status(status_refund):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể hoàn tiền khi đơn hoàn trả đang ở trạng thái {status_refund}",
+                "error_code": "return_004",
+            },
+        )
+
+    @staticmethod
+    def max_retry_attempts_reached(max_attempts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Đã đạt số lần thử lại tối đa {max_attempts}",
                 "error_code": "return_004",
             },
         )

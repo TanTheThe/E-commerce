@@ -114,7 +114,7 @@ class ProcessReturnOrderService:
         try:
             auto_complete_return_order_task.apply_async(
                 args=[str(return_order.id)],
-                countdown=259200  # 3 days
+                countdown=259200
             )
             logger.info(f"Scheduled auto-complete for return order {return_order.id} in 3 days")
         except Exception as e:
