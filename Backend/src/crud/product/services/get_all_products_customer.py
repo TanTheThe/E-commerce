@@ -41,7 +41,7 @@ class GetAllProductsCustomerService:
             category_identifier, category_ids_to_filter, filter_data, session
         )
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
@@ -80,7 +80,7 @@ class GetAllProductsCustomerService:
 
         filters, order_by_clause = await utils_service.filter_product(filter_data, session)
         
-        products, total = await product_repository.get_all_product(session=session, where_conditions=filters, options=joins,
+        products, total = await product_repository.get_all_product(session=session, where_conditions=filters, options=options,
                                                                    skip=skip, limit=limit, order_by=order_by_clause)
 
         product_list = []

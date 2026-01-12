@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import asc, desc, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
-from src.database.models import GoodsReceipt, PurchaseReturn, Warehouse
+from src.database.models import GoodsReceipt, PurchaseReturn, PurchaseReturnDetail, Warehouse
 from src.schemas.purchase_return import SortBy
 
 
@@ -12,21 +12,20 @@ purchase_return_repository = PurchaseReturnRepository()
 
 
 class GetPurchaseReturnsService:
-    async def get_purchase_returns(self, session: AsyncSession,
-                                   warehouse_id: str, status_pr: Optional[str] = None,
-                                   purchase_order_id: Optional[str] = None,
-                                   goods_receipt_id: Optional[str] = None,
-                                   supplier_id: Optional[str] = None,
-                                   return_type: Optional[str] = None,
-                                   from_date: Optional[datetime] = None,
-                                   to_date: Optional[datetime] = None,
-                                   search: Optional[str] = None,
-                                   sort_by: Optional[SortBy] = None,
+    async def get_purchase_returns(self, session: AsyncSession, warehouse_id: str, status_pr: Optional[str] = None,
+                                   return_type: Optional[str] = None, purchase_order_id: Optional[str] = None,
+                                   goods_receipt_id: Optional[str] = None, supplier_id: Optional[str] = None,
+                                   from_date: Optional[datetime] = None, to_date: Optional[datetime] = None,
+                                   search: Optional[str] = None, sort_by: Optional[SortBy] = None,
                                    skip: int = 0, limit: int = 10):
+        
         conditions = [PurchaseReturn.warehouse_id == warehouse_id]
 
         if status_pr:
             conditions.append(PurchaseReturn.status == status_pr)
+
+        if return_type:
+            conditions.append(PurchaseReturn.return_type == return_type)
 
         if purchase_order_id:
             conditions.append(PurchaseReturn.purchase_order_id == purchase_order_id)
@@ -36,21 +35,21 @@ class GetPurchaseReturnsService:
 
         if supplier_id:
             conditions.append(PurchaseReturn.supplier_id == supplier_id)
-
-        if return_type:
-            conditions.append(PurchaseReturn.return_type == return_type)
-
+            
         if from_date:
-            conditions.append(PurchaseReturn.return_date >= from_date)
+            from_date_start = from_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            conditions.append(PurchaseReturn.return_date >= from_date_start)
 
         if to_date:
-            conditions.append(PurchaseReturn.return_date <= to_date)
+            to_date_end = to_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            conditions.append(PurchaseReturn.return_date <= to_date_end)
 
         if search:
+            search_pattern = f"%{search.strip()}%"
             conditions.append(
                 or_(
-                    PurchaseReturn.return_number.ilike(f"%{search}%"),
-                    PurchaseReturn.delivery_note_number.ilike(f"%{search}%")
+                    PurchaseReturn.return_number.ilike(search_pattern),
+                    PurchaseReturn.delivery_note_number.ilike(search_pattern)
                 )
             )
 
@@ -59,24 +58,33 @@ class GetPurchaseReturnsService:
             selectinload(PurchaseReturn.goods_receipt),
             selectinload(PurchaseReturn.supplier),
             selectinload(PurchaseReturn.warehouse),
-            selectinload(PurchaseReturn.return_details)
+            selectinload(PurchaseReturn.return_details).load_only(PurchaseReturnDetail.id)
         ]
 
-        sort_by_result = None
-        if not sort_by:
-            sort_by_result = desc(PurchaseReturn.return_date)
-        elif sort_by == "return_date_asc":
-            sort_by_result = asc(PurchaseReturn.return_date)
-        elif sort_by == "return_date_desc":
-            sort_by_result = desc(PurchaseReturn.return_date)
-        elif sort_by == "total_return_amount_asc":
-            sort_by_result = asc(PurchaseReturn.total_return_amount)
-        elif sort_by == "total_return_amount_asc":
-            sort_by_result = desc(PurchaseReturn.total_return_amount)
+        sort_by_result = desc(PurchaseReturn.return_date)
+        
+        if sort_by:
+            if sort_by == SortBy.RETURN_DATE_ASC:
+                sort_by_result = asc(PurchaseReturn.return_date)
+            elif sort_by == SortBy.RETURN_DATE_DESC:
+                sort_by_result = desc(PurchaseReturn.return_date)
+            elif sort_by == SortBy.TOTAL_AMOUNT_ASC:
+                sort_by_result = asc(PurchaseReturn.total_return_amount)
+            elif sort_by == SortBy.TOTAL_AMOUNT_DESC:
+                sort_by_result = desc(PurchaseReturn.total_return_amount)
+            elif sort_by == SortBy.CREATED_AT_ASC:
+                sort_by_result = asc(PurchaseReturn.created_at)
+            elif sort_by == SortBy.CREATED_AT_DESC:
+                sort_by_result = desc(PurchaseReturn.created_at)
 
-        prs, total = await purchase_return_repository.get_all_purchase_returns(session=session, where_conditions=conditions,
-                                                                               order_by=sort_by_result, skip=skip,
-                                                                               limit=limit, options=options)
+        prs, total = await purchase_return_repository.get_all_purchase_returns(
+            session=session, 
+            where_conditions=conditions,
+            order_by=sort_by_result, 
+            skip=skip,
+            limit=limit, 
+            options=options
+        )
 
         items = []
         for pr in prs:

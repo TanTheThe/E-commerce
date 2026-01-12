@@ -62,7 +62,7 @@ class GetProductsPopularService:
 
         order_by = desc(Product.popularity_score)
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
@@ -94,7 +94,7 @@ class GetProductsPopularService:
         products, _ = await product_repository.get_all_product(
             session=session,
             where_conditions=condition,
-            options=joins,
+            options=options,
             skip=0,
             limit=len(child_category_ids) * limit_per_category * 2,
             order_by=order_by

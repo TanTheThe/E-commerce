@@ -20,7 +20,7 @@ class GetAllProductsAdminService:
     async def get_all_product_admin(self, filter_data: ProductFilterModel, session: AsyncSession, skip: int = 0,
                                     limit: int = 10, include_status: bool = True):
 
-        joins = [
+        options = [
             selectinload(Product.categories).options(
                 joinedload(Categories.parent)
             ).load_only(
@@ -78,7 +78,7 @@ class GetAllProductsAdminService:
             skip=skip,
             limit=limit,
             order_by=order_by_clause,
-            options=joins
+            options=options
         )
 
         product_list = []

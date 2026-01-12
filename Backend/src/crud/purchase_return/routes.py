@@ -14,8 +14,9 @@ from src.dependencies import AccessTokenBearer, admin_role_middleware
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
+from src.errors.purchase_return import PurchaseReturnException
 from src.errors.user import UserException
-from src.schemas.purchase_return import CreatePurchaseReturnRequest, SortBy, UpdatePurchaseReturnRequest
+from src.schemas.purchase_return import CreatePurchaseReturnRequest, GetPurchaseReturnsQuery, PurchaseReturnStatus, ReturnType, SendEmailRequest, SortBy, UpdatePurchaseReturnRequest
 
 return_purchase_admin_router = APIRouter(prefix="/return-purchase")
 return_purchase_customer_router = APIRouter(prefix="/return-purchase")
@@ -67,8 +68,7 @@ async def create_purchase_return(request: CreatePurchaseReturnRequest,
 
 @return_purchase_admin_router.post("/{purchase_return_id}/approve", dependencies=[Depends(admin_role_middleware)])
 async def approve_purchase_return(purchase_return_id: str,
-                                  token_details: dict = Depends(
-                                      access_token_bearer),
+                                  token_details: dict = Depends(access_token_bearer),
                                   session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
 
@@ -89,8 +89,8 @@ async def approve_purchase_return(purchase_return_id: str,
 
 @return_purchase_admin_router.post("/{purchase_return_id}/confirmed", dependencies=[Depends(admin_role_middleware)])
 async def confirmed_purchase_return(purchase_return_id: str,
-                                  token_details: dict = Depends(access_token_bearer),
-                                  session: AsyncSession = Depends(get_session)):
+                                    token_details: dict = Depends(access_token_bearer),
+                                    session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
 
     purchase_return = await confirmed_purchase_return_service.confirmed_purchase_return(
@@ -102,7 +102,7 @@ async def confirmed_purchase_return(purchase_return_id: str,
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Nhận hàng thành công",
+            "message": "Xác nhận nhận hàng hoàn trả thành công",
             "content": purchase_return
         }
     )
@@ -110,15 +110,14 @@ async def confirmed_purchase_return(purchase_return_id: str,
 
 @return_purchase_admin_router.post("/{purchase_return_id}/send-email", dependencies=[Depends(admin_role_middleware)])
 async def send_return_email_to_supplier(purchase_return_id: str,
-                                        supplier_email: Optional[str] = None,
-                                        token_details: dict = Depends(
-                                            access_token_bearer),
+                                        request: SendEmailRequest,
+                                        token_details: dict = Depends(access_token_bearer),
                                         session: AsyncSession = Depends(get_session)):
 
     purchase_return = await send_purchase_return_service.send_return_email_to_supplier(
         session=session,
         purchase_return_id=purchase_return_id,
-        supplier_email=supplier_email
+        supplier_email=request.supplier_email
     )
 
     return JSONResponse(
@@ -135,9 +134,11 @@ async def complete_purchase_return(purchase_return_id: str,
                                    session: AsyncSession = Depends(get_session)):
     user_id = token_details['user']['id']
 
-    purchase_return = await complete_purchase_return_service.complete_purchase_return(session=session,
-                                                                                      purchase_return_id=purchase_return_id,
-                                                                                      completed_by=user_id)
+    purchase_return = await complete_purchase_return_service.complete_purchase_return(
+        session=session,
+        purchase_return_id=purchase_return_id,
+        completed_by=user_id
+    )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -150,34 +151,59 @@ async def complete_purchase_return(purchase_return_id: str,
     
 @return_purchase_admin_router.get("/")
 async def get_all_purchase_returns(warehouse_id: str,
-                                   status_pr: Optional[str] = Query(None, description="Trạng thái phiếu"),
+                                   status_pr: Optional[PurchaseReturnStatus] = Query(None, description="Trạng thái phiếu"),
+                                   return_type: Optional[ReturnType] = Query(None, description="Loại hoàn trả"),
                                    purchase_order_id: Optional[str] = Query(None, description="ID đơn hàng"),
                                    goods_receipt_id: Optional[str] = Query(None, description="ID phiếu nhập kho"),
                                    supplier_id: Optional[str] = Query(None, description="ID nhà cung cấp"),
                                    from_date: Optional[datetime] = Query(None, description="Từ ngày"),
                                    to_date: Optional[datetime] = Query(None, description="Đến ngày"),
-                                   search: Optional[str] = Query(None, description="Tìm kiếm theo return_number"),
-                                   sort_by: Optional[SortBy] = None,
-                                   skip: int = 0, limit: int = 10,
+                                   search: Optional[str] = Query(None, description="Tìm kiếm theo mã phiếu", max_length=100),
+                                   sort_by: Optional[SortBy] = Query(SortBy.RETURN_DATE_DESC, description="Sắp xếp"),
+                                   skip: int = Query(ge=0, description="Số bản ghi bỏ qua"), 
+                                   limit: int = Query(ge=1, le=100, description="Số bản ghi tối đa"),
                                    token_details: dict = Depends(access_token_bearer),
                                    session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
 
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
+        
+    query_params = GetPurchaseReturnsQuery(
+            warehouse_id=warehouse_id,
+            status_pr=status_pr,
+            return_type=return_type,
+            purchase_order_id=purchase_order_id,
+            goods_receipt_id=goods_receipt_id,
+            supplier_id=supplier_id,
+            from_date=from_date,
+            to_date=to_date,
+            search=search,
+            sort_by=sort_by,
+            skip=skip,
+            limit=limit
+        )
     
-    purchase_returns = await get_purchase_returns_service.get_purchase_returns(session=session, status_pr=status_pr,
-                                                                               warehouse_id=warehouse_id,
-                                                                              purchase_order_id=purchase_order_id,
-                                                                              goods_receipt_id=goods_receipt_id,
-                                                                              supplier_id=supplier_id, from_date=from_date,
-                                                                              to_date=to_date, search=search, 
-                                                                              sort_by=sort_by, skip=skip, limit=limit)
+    purchase_returns = await get_purchase_returns_service.get_purchase_returns(
+            session=session,
+            warehouse_id=query_params.warehouse_id,
+            status_pr=query_params.status_pr.value if query_params.status_pr else None,
+            return_type=query_params.return_type.value if query_params.return_type else None,
+            purchase_order_id=query_params.purchase_order_id,
+            goods_receipt_id=query_params.goods_receipt_id,
+            supplier_id=query_params.supplier_id,
+            from_date=query_params.from_date,
+            to_date=query_params.to_date,
+            search=query_params.search,
+            sort_by=query_params.sort_by,
+            skip=query_params.skip,
+            limit=query_params.limit
+        )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin các phiếu hoàn trả tại kho",
+            "message": "Lấy danh sách phiếu hoàn trả thành công",
             "content": purchase_returns
         }
     )
@@ -185,8 +211,8 @@ async def get_all_purchase_returns(warehouse_id: str,
     
 @return_purchase_admin_router.get("/{purchase_return_id}")
 async def get_detail_purchase_return(purchase_return_id: str,
-                                      token_details: dict = Depends(access_token_bearer),
-                                      session: AsyncSession = Depends(get_session)):
+                                     token_details: dict = Depends(access_token_bearer),
+                                     session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
 
     if role not in ['admin', 'staff']:
@@ -197,14 +223,15 @@ async def get_detail_purchase_return(purchase_return_id: str,
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": "Thông tin chi tiết phiếu hoàn trả",
+            "message": "Lấy chi tiết phiếu hoàn trả thành công",
             "content": purchase_return
         }
     )
 
 
 @return_purchase_admin_router.put("/{purchase_return_id}")
-async def update_purchase_return(purchase_return_id: str, request: UpdatePurchaseReturnRequest,
+async def update_purchase_return(purchase_return_id: str, 
+                                 request: UpdatePurchaseReturnRequest,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
@@ -227,12 +254,12 @@ async def update_purchase_return(purchase_return_id: str, request: UpdatePurchas
 
 @return_purchase_admin_router.delete("/{purchase_return_id}")
 async def delete_purchase_return(purchase_return_id: str,
-                               token_details: dict = Depends(access_token_bearer),
-                               session: AsyncSession = Depends(get_session)):
+                                 token_details: dict = Depends(access_token_bearer),
+                                 session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
 
-    if role not in ['admin', 'staff']:
-        UserException.role_invalid()
+    if role != 'admin':
+        PurchaseReturnException.only_admin_can_delete_pr()
 
     await delete_purchase_return_service.delete_purchase_return(session, purchase_return_id)
 

@@ -80,7 +80,7 @@ class GetAllCartsService:
             Cart_Item.deleted_at.is_(None)
         ]
 
-        joins = [
+        options = [
             joinedload(Cart_Item.product).options(
                 joinedload(Product.special_offer).load_only(
                     Special_Offer.id,
@@ -125,7 +125,7 @@ class GetAllCartsService:
         cart_items, total_count = await cart_repository.get_all_cart_items(
             session=session,
             where_conditions=condition,
-            options=joins,
+            options=options,
             skip=skip,
             limit=limit,
             order_by=order_by

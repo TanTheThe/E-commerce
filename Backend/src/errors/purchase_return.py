@@ -11,6 +11,16 @@ class PurchaseReturnException:
                 "error_code": "pr_001",
             },
         )
+        
+    @staticmethod
+    def only_admin_can_delete_pr():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "message": f"Chỉ admin mới có quyền xóa phiếu hoàn trả",
+                "error_code": "pr_001",
+            },
+        )
 
     @staticmethod
     def no_return_details_found():
@@ -131,6 +141,16 @@ class PurchaseReturnException:
                 "error_code": "pr_001",
             },
         )
+        
+    @staticmethod
+    def cant_delete_approved_return():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể xóa phiếu trả hàng khi đơn hàng đã được duyệt",
+                "error_code": "pr_001",
+            },
+        )
 
     @staticmethod
     def only_delete_when_draft():
@@ -148,6 +168,137 @@ class PurchaseReturnException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "message": f"Có lỗi xảy ra khi xóa phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_create_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi tạo phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_update_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi chỉnh sửa phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_delete_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi xóa phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_approve_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi duyệt phiếu hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_confirm_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi xác nhận nhận hàng hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_send_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi gửi email hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def error_while_complete_pr():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Có lỗi xảy ra khi hoàn tất đơn hoàn trả",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def total_returned_exceeds_amount_received(total_returned, accepted_quantity):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng hoàn trả ({total_returned}) vượt quá số lượng đã nhận ({accepted_quantity}) ",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def cant_update_return_shipped():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể cập nhật phiếu hoàn trả đã gửi hàng",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def cant_update_return_approved():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không thể cập nhật phiếu hoàn trả đã được duyệt",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def refund_amount_exceed_total_return(refund_amount, total_return_amount):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số tiền hoàn lại ({refund_amount}) không được lớn hơn tổng giá trị hoàn trả ({total_return_amount})",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def number_refunds_exceed_refund_available(return_quantity, max_returnable, already_returned, accepted_quantity):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số lượng hoàn trả ({return_quantity}) vượt quá số lượng có thể hoàn trả "
+                f"({max_returnable}). Đã hoàn trả: {already_returned}/{accepted_quantity}",
+                "error_code": "gr_001",
+            },
+        )
+        
+    @staticmethod
+    def refund_amount_exceeds_new_total_refund(refund_amount):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Số tiền hoàn lại ({refund_amount}) vượt quá tổng giá trị hoàn trả mới",
                 "error_code": "gr_001",
             },
         )

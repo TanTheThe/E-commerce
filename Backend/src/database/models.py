@@ -1479,6 +1479,7 @@ class PurchaseReturn(SQLModel, table=True):
     confirmed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     completed_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
 
     # Relationships
     purchase_order: Optional["PurchaseOrder"] = Relationship(back_populates="purchase_returns",

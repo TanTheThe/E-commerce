@@ -341,3 +341,13 @@ class GoodsReceiptException:
                 "error_code": "gr_001",
             },
         )
+        
+    @staticmethod
+    def gr_detail_not_found():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": f"Không tìm thấy goods receipt details hoặc không thuộc cùng phiếu nhập",
+                "error_code": "gr_001",
+            },
+        )

@@ -129,6 +129,55 @@ class GoodsReceiptRepository:
         grs = result.all()
 
         return grs, total
+    
+    
+    async def get_all_goods_receipt_detail(self, session: AsyncSession,
+                                    select_columns: Optional[List[Any]] = None,
+                                    joins: Optional[List[Tuple[Any, dict]]] = None,
+                                    where_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    group_by_columns: Optional[List[Any]] = None,
+                                    having_conditions: Optional[List[ColumnElement[bool]]] = None,
+                                    order_by: Optional[Any] = None,
+                                    skip: int = 0, limit: int = 10,
+                                    options: Optional[list] = None):
+
+        if select_columns is None:
+            query = select(GoodsReceiptDetail)
+        else:
+            query = select(*select_columns).select_from(GoodsReceiptDetail)
+
+        if joins:
+            for table, config in joins:
+                if config.get('type') == 'outer':
+                    query = query.outerjoin(table, config['on'])
+                else:
+                    query = query.join(table, config['on'])
+
+        if where_conditions:
+            query = query.where(and_(*where_conditions))
+
+        if group_by_columns:
+            query = query.group_by(*group_by_columns)
+
+        if having_conditions:
+            query = query.having(and_(*having_conditions))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await session.exec(count_query)
+        total = count_result.one() or 0
+
+        if options:
+            query = query.options(*options)
+
+        if order_by is not None:
+            query = query.order_by(order_by)
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.exec(query)
+        grs_details = result.all()
+
+        return grs_details, total
 
 
     async def get_goods_receipt_detail(self, session: AsyncSession,
@@ -171,67 +220,3 @@ class GoodsReceiptRepository:
         gr_detail = result.one_or_none()
 
         return gr_detail
-
-
-    async def update_purchase_order(self, session: AsyncSession, po: PurchaseOrder,
-                                    new_details: Optional[List[PurchaseOrderDetail]] = None):
-        if new_details is not None:
-            if po.po_details:
-                for detail in po.po_details:
-                    session.expunge(detail)
-                po.po_details.clear()
-
-            statement = delete(PurchaseOrderDetail).where(
-                and_(PurchaseOrderDetail.purchase_order_id == po.id)
-            )
-            await session.exec(statement)
-            await session.flush()
-
-            for d in new_details:
-                new_detail = PurchaseOrderDetail(
-                    purchase_order_id=po.id,
-                    product_variant_id=d.product_variant_id,
-                    quantity=d.quantity,
-                    received_quantity=0,
-                    unit_cost=d.unit_cost,
-                    total_cost=d.total_cost,
-                    product_snapshot=d.product_snapshot,
-                    created_at=datetime.now(),
-                    notes=d.notes,
-                )
-                session.add(new_detail)
-
-        po.updated_at = datetime.now()
-        session.add(po)
-
-        await session.commit()
-        await session.refresh(po)
-
-        return po
-
-
-    async def update_gr_detail_some_field(self, condition: Optional[ColumnElement[bool]], values: Dict[str, Any], session: AsyncSession):
-        stmt = (
-            update(GoodsReceiptDetail)
-            .where(condition)
-            .values(**values)
-        )
-        await session.exec(stmt)
-
-
-    async def delete_goods_receipt(self, session: AsyncSession, goods_receipt_id: str):
-        condition = [GoodsReceipt.id == goods_receipt_id]
-        gr = await self.get_goods_receipt(session=session, where_conditions=condition)
-        if not gr:
-            return False
-
-        delete_details_stmt = delete(GoodsReceiptDetail).where(
-            and_(GoodsReceiptDetail.goods_receipt_id == goods_receipt_id)
-        )
-        await session.exec(delete_details_stmt)
-
-        await session.delete(gr)
-
-        await session.commit()
-
-        return True

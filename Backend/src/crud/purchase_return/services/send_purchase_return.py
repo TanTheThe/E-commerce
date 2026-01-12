@@ -3,14 +3,19 @@ from typing import Optional
 from src.crud.purchase_return.services.utils_service import UtilsPRService
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.models import PurchaseReturn
+from src.errors.authentication import AuthException
 from src.errors.purchase_return import PurchaseReturnException
 from src.mail import create_message, mail
+import re
+import logging
 
+logger = logging.getLogger(__name__)
 
 utils_pr_service = UtilsPRService()
 
-
 class SendPurchaseReturnService:
+    MAX_NOTES_LENGTH = 5000
+    
     async def send_return_email_to_supplier(self, session: AsyncSession, purchase_return_id: str,
                                             supplier_email: Optional[str] = None):
         pr = await utils_pr_service.validate_and_get_pr(session, purchase_return_id)
@@ -18,31 +23,50 @@ class SendPurchaseReturnService:
         if pr.status != "approved":
             PurchaseReturnException.only_send_mail_when_approved()
 
-        if not supplier_email:
-            if pr.supplier and pr.supplier.email:
-                supplier_email = pr.supplier.email
-            else:
-                PurchaseReturnException.supplier_email_not_found()
+        final_email = await self.resolve_supplier_email(pr, supplier_email)
+        
+        try:
+            await self.send_pr_email_to_supplier(pr=pr, supplier_email=final_email)
+            
+            await self.update_pr_after_email_sent(session, pr, final_email)
 
-        await self.send_pr_email_to_supplier(
-            pr=pr,
-            supplier_email=supplier_email
-        )
-
-        pr.status = "sent"
-        pr.notes = (pr.notes or "") + \
-            f"\n[{datetime.now().strftime('%d/%m/%Y %H:%M')}] Đã gửi email cho NCC: {supplier_email}"
-        pr.updated_at = datetime.now()
-
-        await session.commit()
-
-        return {
-            "id": str(pr.id),
-            "return_number": pr.return_number,
-            "supplier_email": supplier_email,
-            "delivery_note_number": pr.delivery_note_number,
-            "status": pr.status
-        }
+            await session.commit()
+        
+            return {
+                "id": str(pr.id),
+                "return_number": pr.return_number,
+                "supplier_email": final_email,
+                "delivery_note_number": pr.delivery_note_number,
+                "status": pr.status,
+                "sent_at": pr.updated_at.isoformat()
+            }
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error("Error send purchase return: ", e)
+            PurchaseReturnException.error_while_send_pr()
+            
+        
+    async def resolve_supplier_email(self, pr: PurchaseReturn, supplier_email: Optional[str]):
+        if supplier_email:
+            if not self._is_valid_email(supplier_email):
+                AuthException.invalid_email_format()
+            return supplier_email
+        
+        if pr.supplier and pr.supplier.email:
+            if not self._is_valid_email(pr.supplier.email):
+                AuthException.invalid_email_format()
+            return pr.supplier.email
+        
+        PurchaseReturnException.supplier_email_not_found()
+        
+        
+    def _is_valid_email(self, email: str):
+        if not email or len(email) > 255:
+            return False
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email))
+    
 
     async def send_pr_email_to_supplier(self, pr: PurchaseReturn, supplier_email: str):
         def format_currency(amount: int):
@@ -267,3 +291,18 @@ class SendPurchaseReturnService:
         )
 
         await mail.send_message(message)
+
+    
+    async def update_pr_after_email_sent(self, session: AsyncSession, pr: PurchaseReturn, email: str):
+        timestamp = datetime.now()
+        note_entry = f"\n[{timestamp.strftime('%d/%m/%Y %H:%M')}] Đã gửi email cho NCC: {email}"
+        
+        current_notes = pr.notes or ""
+        if len(current_notes) + len(note_entry) > self.MAX_NOTES_LENGTH:
+            lines = current_notes.split('\n')
+            current_notes = '\n'.join(lines[-50:])
+        
+        pr.status = "sent"
+        pr.notes = current_notes + note_entry
+        pr.updated_at = timestamp
+    
