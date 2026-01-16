@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
-from unittest import skip
+from typing import Optional, Dict, List
 from sqlalchemy.orm import selectinload
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.stock.repositories import StockRepository
@@ -17,11 +16,11 @@ stock_transaction_repository = StockTransactionRepository()
 
 
 class GetStockDetailService:
-    async def get_stock_detail(self, stock_id: str, session: AsyncSession):
-        condition_stock = [
-            Stock.id == stock_id
-        ]
+    TRANSACTION_LIMIT = 100  # Limit cho recent transactions
+    ANALYTICS_DAYS = 30  # Số ngày để tính analytics
 
+    async def get_stock_detail(self, stock_id: str, session: AsyncSession):
+        condition_stock = [Stock.id == stock_id]
         option_stock = [
             selectinload(Stock.warehouse),
             selectinload(Stock.product_variant).selectinload(Product_Variant.product),
@@ -36,17 +35,14 @@ class GetStockDetailService:
         
         if not stock:
             StockException.stock_not_found()
-            
-        condition_transaction = [
-            StockTransaction.stock_id == stock_id
-        ]
-        
+
+        condition_transaction = [StockTransaction.stock_id == stock_id]
         option_transaction = [
             selectinload(StockTransaction.user),
             selectinload(StockTransaction.warehouse)
         ]
-        
-        transactions, total = await stock_transaction_repository.get_all_stock_transactions(
+
+        transactions, total_transactions = await stock_transaction_repository.get_all_stock_transactions(
             session=session,
             where_conditions=condition_transaction,
             skip=0,
@@ -54,84 +50,118 @@ class GetStockDetailService:
             options=option_transaction
         )
 
-        transaction_responses = []
-        for txn in transactions:
-            transaction_responses.append(
-                {
-                    "id": str(txn.id),
-                    "transaction_type": txn.transaction_type,
-                    "quantity": txn.quantity,
-                    "previous_quantity": txn.previous_quantity,
-                    "new_quantity": txn.new_quantity,
-                    "unit_cost": txn.unit_cost,
-                    "total_cost": txn.total_cost,
-                    "reference_id": str(txn.reference_id),
-                    "reference_type": txn.reference_type,
-                    "reason": txn.reason,
-                    "note": txn.note,
-                    "performed_by": str(txn.performed_by),
-                    "performed_by_name": txn.user.first_name + txn.user.last_name if txn.user else None,
-                    "created_at": str(txn.created_at)
-                }
-            )
+        transaction_responses = [
+            self.build_transaction_response(txn)
+            for txn in transactions[:self.TRANSACTION_LIMIT]
+        ]
 
-        variant_color_name = None
-        variant_color_code = None
+        analytics = self.calculate_analytics(transactions)
 
-        if stock.product_variant:
-            if stock.product_variant.color_name:
-                variant_color_name = stock.product_variant.color_name
-                variant_color_code = stock.product_variant.color_code
-            elif stock.product_variant.color:
-                variant_color_name = stock.product_variant.color.name
-                variant_color_code = stock.product_variant.color.code
-            
-        thirty_days_ago = datetime.now() - timedelta(days=30)
-        total_inbound = 0
-        total_outbound = 0
-        
-        for txn in transactions:
-            if txn.created_at >= thirty_days_ago:
-                if txn.transaction_type == 'inbound':
-                    total_inbound += txn.quantity
-                elif txn.transaction_type == 'outbound':
-                    total_outbound += abs(txn.quantity)
-        
-        avg_daily_outbound = total_outbound / 30 if total_outbound > 0 else 0
-        
-        estimated_days_remaining = None
-        if avg_daily_outbound > 0:
-            estimated_days_remaining = int(stock.available_quantity / avg_daily_outbound)
-            
-        
+        estimated_days_remaining = self.estimate_days_remaining(
+            stock.available_quantity,
+            analytics['avg_daily_outbound']
+        )
+
+        variant_color_name, variant_color_code = self.get_variant_color(stock)
+
         return {
             "stock_id": str(stock.id),
             "warehouse_id": str(stock.warehouse_id),
             "warehouse_name": stock.warehouse.name if stock.warehouse else None,
             "warehouse_code": stock.warehouse.code if stock.warehouse else None,
             "product_variant_id": str(stock.product_variant_id),
-            "product_name": stock.product_variant.product.name if stock.product_variant and stock.product_variant.product else None,
+            "product_name": (
+                stock.product_variant.product.name
+                if stock.product_variant and stock.product_variant.product
+                else None
+            ),
             "variant_sku": stock.product_variant.sku if stock.product_variant else None,
             "variant_size": stock.product_variant.size if stock.product_variant else None,
             "variant_color_name": variant_color_name,
             "variant_color_code": variant_color_code,
             "variant_image": stock.product_variant.image if stock.product_variant else None,
-            "variant_price": stock.product_variant.price if stock.product_variant else None,
+            "variant_price": float(
+                stock.product_variant.price) if stock.product_variant and stock.product_variant.price else None,
             "available_quantity": stock.available_quantity,
             "reserved_quantity": stock.reserved_quantity,
             "total_quantity": stock.quantity,
             "min_stock_level": stock.min_stock_level,
             "max_stock_level": stock.max_stock_level,
-            "cost_price": stock.cost_price,
-            "last_cost_price": stock.last_cost_price,
+            "cost_price": float(stock.cost_price) if stock.cost_price else None,
+            "last_cost_price": float(stock.last_cost_price) if stock.last_cost_price else None,
             "status": stock.status,
-            "last_inbound_date": str(stock.last_inbound_date),
-            "last_outbound_date": str(stock.last_outbound_date),
-            "created_at": str(stock.created_at),
-            "updated_at": str(stock.updated_at),
+            "last_inbound_date": stock.last_inbound_date.isoformat() if stock.last_inbound_date else None,
+            "last_outbound_date": stock.last_outbound_date.isoformat() if stock.last_outbound_date else None,
+            "created_at": stock.created_at.isoformat() if stock.created_at else None,
+            "updated_at": stock.updated_at.isoformat() if stock.updated_at else None,
+            "total_inbound_30d": analytics['total_inbound'],
+            "total_outbound_30d": analytics['total_outbound'],
+            "avg_daily_outbound": analytics['avg_daily_outbound'],
+            "estimated_days_remaining": estimated_days_remaining,
             "recent_transactions": transaction_responses,
+            "total_transactions": total_transactions
+        }
+
+    def get_variant_color(self, stock) -> tuple[Optional[str], Optional[str]]:
+        if not stock.product_variant:
+            return None, None
+
+        if stock.product_variant.color_name:
+            return stock.product_variant.color_name, stock.product_variant.color_code
+        elif stock.product_variant.color:
+            return stock.product_variant.color.name, stock.product_variant.color.code
+
+        return None, None
+
+    def build_transaction_response(self, txn) -> Dict:
+        performed_by_name = None
+        if txn.user:
+            first_name = txn.user.first_name or ""
+            last_name = txn.user.last_name or ""
+            performed_by_name = f"{first_name} {last_name}".strip() or None
+
+        return {
+            "id": str(txn.id),
+            "transaction_type": txn.transaction_type,
+            "quantity": txn.quantity,
+            "previous_quantity": txn.previous_quantity,
+            "new_quantity": txn.new_quantity,
+            "unit_cost": float(txn.unit_cost) if txn.unit_cost else None,
+            "total_cost": float(txn.total_cost) if txn.total_cost else None,
+            "reference_id": str(txn.reference_id) if txn.reference_id else None,
+            "reference_type": txn.reference_type,
+            "reason": txn.reason,
+            "note": txn.note,
+            "performed_by": str(txn.performed_by),
+            "performed_by_name": performed_by_name,
+            "created_at": txn.created_at.isoformat() if txn.created_at else None
+        }
+
+    def calculate_analytics(self, transactions: List) -> Dict:
+        """Tính toán analytics từ transactions trong 30 ngày"""
+        thirty_days_ago = datetime.now() - timedelta(days=self.ANALYTICS_DAYS)
+
+        total_inbound = 0
+        total_outbound = 0
+
+        for txn in transactions:
+            if txn.created_at and txn.created_at >= thirty_days_ago:
+                if txn.transaction_type == 'inbound':
+                    total_inbound += txn.quantity
+                elif txn.transaction_type == 'outbound':
+                    total_outbound += abs(txn.quantity)
+
+        avg_daily_outbound = total_outbound / self.ANALYTICS_DAYS if total_outbound > 0 else 0
+
+        return {
             "total_inbound": total_inbound,
             "total_outbound": total_outbound,
-            "avg_daily_outbound": round(avg_daily_outbound, 2),
-            "estimated_days_remaining": str(estimated_days_remaining)
+            "avg_daily_outbound": round(avg_daily_outbound, 2)
         }
+
+    def estimate_days_remaining(self, available_quantity: int, avg_daily_outbound: float) -> Optional[int]:
+        """Ước tính số ngày còn lại trước khi hết hàng"""
+        if avg_daily_outbound > 0:
+            return int(available_quantity / avg_daily_outbound)
+        return None
+

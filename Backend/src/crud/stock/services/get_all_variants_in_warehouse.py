@@ -1,7 +1,4 @@
-from typing import Optional
-
-from sqlalchemy.orm import selectinload
-from sqlmodel import and_
+from typing import Optional, Dict
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.categories_product.repositories import CategoriesProductRepository
 from src.crud.product.repositories import ProductRepository
@@ -20,14 +17,18 @@ product_repository = ProductRepository()
 
 class GetVariantsInWarehouseService:
     async def get_product_variants_detail(self, session: AsyncSession, warehouse_id: str, product_id: str):
-        condition = and_(Warehouse.id == warehouse_id)
-        warehouse = await warehouse_repository.get_warehouse(condition, session)
+        warehouse_conditions = [Warehouse.id == warehouse_id, Warehouse.deleted_at.is_(None)]
+        warehouse = await warehouse_repository.get_warehouse(session=session, where_conditions=warehouse_conditions)
         if not warehouse:
             WareHouseException.warehouse_not_found()
 
-        product_condition = and_(Product.id == product_id, Product.deleted_at.is_(None), Product.status == "active")
-        product_tuple = await product_repository.get_product(product_condition, session)
-        product = product_tuple[0]
+        product_conditions = [
+            Product.id == product_id,
+            Product.deleted_at.is_(None),
+            Product.status == "active"
+        ]
+        product_tuple = await product_repository.get_product(session=session, where_conditions=product_conditions)
+        product = product_tuple[0] if product_tuple else None
         if not product:
             ProductException.not_found()
 
@@ -73,41 +74,13 @@ class GetVariantsInWarehouseService:
             limit=1000
         )
 
-        variants = []
-        for row in results:
-            stock_status = self.determine_variant_status(
-                row.quantity,
-                row.available_quantity,
-                row.min_stock_level
-            )
-
-            variants.append({
-                'id': str(row.variant_id),
-                'sku': row.sku,
-                'size': row.size,
-                'color_name': row.color_name if row.color_name else row.color_table_name,
-                'color_code': row.color_code if row.color_code else row.color_table_code,
-                'image': row.image,
-                'price': float(row.price) if row.price else None,
-                'stock': {
-                    'id': str(row.stock_id),
-                    'quantity': int(row.quantity),
-                    'reserved_quantity': int(row.reserved_quantity),
-                    'available_quantity': int(row.available_quantity),
-                    'min_stock_level': int(row.min_stock_level) if row.min_stock_level else None,
-                    'max_stock_level': int(row.max_stock_level) if row.max_stock_level else None,
-                    'cost_price': float(row.cost_price) if row.cost_price else None,
-                    'last_cost_price': float(row.last_cost_price) if row.last_cost_price else None,
-                    'status': stock_status,
-                    'last_inbound_date': row.last_inbound_date.isoformat() if row.last_inbound_date else None,
-                    'last_outbound_date': row.last_outbound_date.isoformat() if row.last_outbound_date else None
-                }
-            })
+        variants = [self.build_variant_response(row) for row in results]
 
         return {
             'product_id': str(product_id),
             'product_name': product.name,
-            'variants': variants
+            'variants': variants,
+            'total_variants': len(variants)
         }
 
 
@@ -118,6 +91,37 @@ class GetVariantsInWarehouseService:
         elif min_stock_level is not None and available_quantity <= min_stock_level:
             return "low"
         return "available"
+
+
+    def build_variant_response(self, row) -> Dict:
+        stock_status = self.determine_variant_status(
+            row.quantity,
+            row.available_quantity,
+            row.min_stock_level
+        )
+
+        return {
+            'id': str(row.variant_id),
+            'sku': row.sku,
+            'size': row.size,
+            'color_name': row.color_name if row.color_name else row.color_table_name,
+            'color_code': row.color_code if row.color_code else row.color_table_code,
+            'image': row.image,
+            'price': float(row.price) if row.price else None,
+            'stock': {
+                'id': str(row.stock_id),
+                'quantity': int(row.quantity),
+                'reserved_quantity': int(row.reserved_quantity),
+                'available_quantity': int(row.available_quantity),
+                'min_stock_level': int(row.min_stock_level) if row.min_stock_level else None,
+                'max_stock_level': int(row.max_stock_level) if row.max_stock_level else None,
+                'cost_price': float(row.cost_price) if row.cost_price else None,
+                'last_cost_price': float(row.last_cost_price) if row.last_cost_price else None,
+                'status': stock_status,
+                'last_inbound_date': row.last_inbound_date.isoformat() if row.last_inbound_date else None,
+                'last_outbound_date': row.last_outbound_date.isoformat() if row.last_outbound_date else None
+            }
+        }
 
 
 

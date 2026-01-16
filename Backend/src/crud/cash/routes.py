@@ -1,13 +1,10 @@
 from fastapi import APIRouter, status, Depends, Header
-from redis import Redis
-
 from src.crud.cash.services.create_manual_refund_transaction import ManualRefundCashService
 from src.crud.cash.services.update_shipping_status import WebhookShippingService
 from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
-
 from src.errors.return_order import ReturnOrderException
 from src.schemas.cash import CreateManualRefundRequest
 from src.schemas.webhook import ShippingWebhookRequest

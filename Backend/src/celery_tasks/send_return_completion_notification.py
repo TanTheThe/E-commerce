@@ -1,4 +1,3 @@
-from typing import List, Optional
 from src.celery_app import celery_app
 from src.crud.notification.services.create_notification import CreateNotificationService
 from src.database.main import async_session_maker

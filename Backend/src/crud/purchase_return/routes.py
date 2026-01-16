@@ -180,8 +180,6 @@ async def get_all_purchase_returns(warehouse_id: str,
             to_date=to_date,
             search=search,
             sort_by=sort_by,
-            skip=skip,
-            limit=limit
         )
     
     purchase_returns = await get_purchase_returns_service.get_purchase_returns(
@@ -196,8 +194,8 @@ async def get_all_purchase_returns(warehouse_id: str,
             to_date=query_params.to_date,
             search=query_params.search,
             sort_by=query_params.sort_by,
-            skip=query_params.skip,
-            limit=query_params.limit
+            skip=skip,
+            limit=limit
         )
 
     return JSONResponse(

@@ -62,8 +62,8 @@ const CreateStaffDialog = ({ open, onClose, onSuccess }) => {
 
         if (!formData.password) {
             newErrors.password = 'Vui lòng nhập mật khẩu';
-        } else if (formData.password.length < 6) {
-            newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+        } else if (formData.password.length < 8) {
+            newErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
         }
 
         setErrors(newErrors);
@@ -181,7 +181,7 @@ const CreateStaffDialog = ({ open, onClose, onSuccess }) => {
                         fullWidth
                         required
                         error={!!errors.password}
-                        helperText={errors.password || "Mật khẩu phải có ít nhất 6 ký tự"}
+                        helperText={errors.password || "Mật khẩu phải có ít nhất 8 ký tự"}
                         disabled={loading}
                         InputProps={{
                             endAdornment: (

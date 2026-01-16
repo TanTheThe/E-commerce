@@ -1,7 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.stock.repositories import StockRepository
 from src.crud.stock.services.utils_service import UtilsStockService

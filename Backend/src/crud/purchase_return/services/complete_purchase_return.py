@@ -1,5 +1,7 @@
 from datetime import datetime
 from typing import Optional
+
+from src.cache import cache_service
 from src.crud.purchase_return.services.utils_service import UtilsPRService
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.stock.repositories import StockRepository
@@ -49,6 +51,12 @@ class CompletePurchaseReturnService:
             
             if pr.warehouse_id:
                 await self.adjust_stock_for_return(session, pr, completed_by)
+
+                cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:summary"),
+                cache_service.delete_pattern(f"stock:low_stock:warehouse:{str(pr.warehouse_id)}:*"),
+                cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:filters")
+
+                logger.info(f"Invalidated stock caches for warehouse {pr.warehouse_id} after purchase return")
             
             await session.commit()
             await session.refresh(pr)

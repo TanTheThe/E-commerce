@@ -1,13 +1,11 @@
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy import ColumnElement
 from sqlalchemy.dialects.postgresql import insert
-
 from src.database.models import Special_Offer, UserSpecialOffer
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, and_, func, update
+from sqlmodel import select, and_, func, update
 import uuid
 from datetime import datetime
-import time
 from src.errors.special_offer import SpecialOfferException
 
 

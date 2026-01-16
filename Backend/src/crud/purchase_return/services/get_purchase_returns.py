@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import asc, desc, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
-from src.database.models import GoodsReceipt, PurchaseReturn, PurchaseReturnDetail, Warehouse
+from src.database.models import PurchaseReturn, PurchaseReturnDetail
 from src.schemas.purchase_return import SortBy
 
 

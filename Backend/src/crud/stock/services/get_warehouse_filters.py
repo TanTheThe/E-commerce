@@ -22,11 +22,11 @@ brand_repository = BrandRepository()
 
 class GetWarehouseFiltersService:
     async def get_warehouse_filters(self, session: AsyncSession, warehouse_id: str):
-        condition_warehouse = and_(
+        condition_warehouse = [
             Warehouse.id == warehouse_id,
             Warehouse.is_active == True
-        )
-        warehouse = await warehouse_repository.get_warehouse(condition_warehouse, session)
+        ]
+        warehouse = await warehouse_repository.get_warehouse(session=session, where_conditions=condition_warehouse)
         if not warehouse:
             WareHouseException.warehouse_not_found()
 

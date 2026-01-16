@@ -199,7 +199,7 @@ const AddressManager = ({ isOpen, onClose, selectedAddress, onSelectAddress }) =
             const response = await getDataApi('/customer/address');
 
             if (response.success) {
-                const addressList = response.data?.data || response.data || [];
+                const addressList = response.data || [];
                 setAddresses(addressList);
 
                 if (!selectedAddress && addressList.length > 0) {
@@ -240,7 +240,7 @@ const AddressManager = ({ isOpen, onClose, selectedAddress, onSelectAddress }) =
             if (response.success) {
                 toast.success('Tạo địa chỉ thành công!');
 
-                const newAddressData = response.data?.data || response.data;
+                const newAddressData = response.data;
                 setAddresses(prev => [...prev, newAddressData]);
 
                 resetForm();
@@ -284,7 +284,7 @@ const AddressManager = ({ isOpen, onClose, selectedAddress, onSelectAddress }) =
             if (response.success) {
                 toast.success('Cập nhật địa chỉ thành công!');
 
-                const updatedAddressData = response.data?.data || response.data;
+                const updatedAddressData = response.data;
 
                 setAddresses(prev => prev.map(addr =>
                     addr.id === editingAddressId ? updatedAddressData : addr

@@ -1,9 +1,8 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from sqlalchemy import func
-from sqlalchemy.orm import selectinload, aliased
-from sqlmodel import select
+from sqlalchemy.orm import selectinload
+from sqlmodel import select, and_
 from sqlmodel.ext.asyncio.session import AsyncSession
-
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
 from src.database.models import PurchaseReturn, PurchaseReturnDetail, GoodsReceiptDetail, Product_Variant
@@ -16,7 +15,7 @@ goods_receipt_repository = GoodsReceiptRepository()
 class UtilsPRService:
     async def validate_and_get_pr(self, session: AsyncSession, purchase_return_id: str, minimal: bool = False):
         condition = [PurchaseReturn.id == purchase_return_id]
-        
+
         options = []
         if not minimal:
             options = [
@@ -58,50 +57,33 @@ class UtilsPRService:
 
         return pr
 
-    async def get_already_returned_quantity(self, session: AsyncSession, gr_detail_id: str, include_draft: bool = False):
+    async def get_already_returned_quantity(self, session: AsyncSession, gr_detail_id: str, include_draft: bool = False,
+                                            exclude_detail_id: Optional[str] = None):
         if include_draft:
             status_filter = PurchaseReturn.status != 'cancelled'
         else:
-            status_filter = PurchaseReturn.status.in_(['approved', 'completed'])
+            status_filter = PurchaseReturn.status.in_(['approved', 'sent', 'confirmed', 'completed'])
 
-        query = select(func.coalesce(func.sum(PurchaseReturnDetail.return_quantity), 0)) \
-            .select_from(PurchaseReturnDetail) \
-            .join(PurchaseReturn, PurchaseReturnDetail.purchase_return_id == PurchaseReturn.id) \
-            .where(
+        conditions = [
             PurchaseReturnDetail.goods_receipt_detail_id == gr_detail_id,
             status_filter
+        ]
+
+        if exclude_detail_id:
+            conditions.append(PurchaseReturnDetail.id != exclude_detail_id)
+
+        query = (
+            select(func.coalesce(func.sum(PurchaseReturnDetail.return_quantity), 0))
+            .select_from(PurchaseReturnDetail)
+            .join(PurchaseReturn, PurchaseReturnDetail.purchase_return_id == PurchaseReturn.id)
+            .where(and_(*conditions))
         )
 
         result = await session.execute(query)
         return result.scalar()
-
-    async def sync_returned_quantity(self, session: AsyncSession, gr_detail_id: str):
-        total_returned = await self.get_already_returned_quantity(
-            session,
-            gr_detail_id,
-            include_draft=False
-        )
-
-        gr_detail = await goods_receipt_repository.get_goods_receipt_detail(
-            session=session,
-            where_conditions=[GoodsReceiptDetail.id == gr_detail_id]
-        )
-
-        if not gr_detail:
-            GoodsReceiptException.gr_detail_not_found()
-
-        if total_returned > gr_detail.rejected_quantity:
-            GoodsReceiptException.total_returned_greater_than_accepted_quantity()
-
-        if total_returned > gr_detail.accepted_quantity:
-            GoodsReceiptException.total_returned_greater_than_accepted_quantity()
-
-        gr_detail.returned_quantity = total_returned
-        session.add(gr_detail)
-        await session.flush()
         
         
-    async def get_already_returned_quantities_batch(session: AsyncSession, gr_detail_ids: List[str], 
+    async def get_already_returned_quantities_batch(self, session: AsyncSession, gr_detail_ids: List[str],
                                                     include_draft: bool = False) -> Dict[str, int]:
         conditions = [PurchaseReturnDetail.goods_receipt_detail_id.in_(gr_detail_ids)]
     

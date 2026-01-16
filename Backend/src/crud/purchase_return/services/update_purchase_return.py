@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.purchase_return.services.utils_service import UtilsPRService
-from src.database.models import GoodsReceipt, GoodsReceiptDetail, Product_Variant, PurchaseReturn, PurchaseReturnDetail
+from src.database.models import GoodsReceiptDetail, Product_Variant, PurchaseReturn, PurchaseReturnDetail
 from sqlalchemy.orm import selectinload
 from src.errors.goods_receipt import GoodsReceiptException
 from src.errors.product import ProductException
@@ -93,9 +93,7 @@ class UpdatePurchaseReturnService:
         variants_map = await self.batch_validate_variants(session, variant_ids)
         
         if gr_detail_ids:
-            gr_details_map = await self.batch_validate_gr_details(
-                session, pr.goods_receipt_id, gr_detail_ids
-            )
+            gr_details_map = await self.batch_validate_gr_details(session, str(pr.goods_receipt_id), gr_detail_ids)
         else:
             gr_details_map = {}
 

@@ -1,15 +1,7 @@
 from enum import Enum
 from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
 
-from pydantic import BaseModel, Field
-
-
-class StockStatus(str, Enum):
-    AVAILABLE = "available"   # Có sẵn
-    RESERVED = "reserved"     # Đã đặt trước
-    DAMAGED = "damaged"       # Hỏng
-    EXPIRED = "expired"       # Hết hạn
-    QUARANTINE = "quarantine" # Cách ly
     
 class TransactionType(str, Enum):
     INBOUND = "inbound"      # Nhập kho
@@ -19,23 +11,6 @@ class TransactionType(str, Enum):
     RETURN = "return"         # Trả hàng
     DAMAGED = "damaged"       # Hàng hỏng
     EXPIRED = "expired"       # Hàng hết hạn
-    
-class StockTransferStatus(str, Enum):
-    PENDING = "pending"      
-    SHIPPING = "shipping"    
-    RECEIVED = "received" 
-    CANCELLED = "cancelled"     
-    
-class StockAdjustmentStatus(str, Enum):
-    DRAFT = "draft"         # mới tạo, chưa duyệt
-    APPROVED = "approved"   # đã được duyệt
-    APPLIED = "applied"     # đã áp dụng, hệ thống cập nhật tồn kho thực tế
-    
-class StockReservationStatus(str, Enum):
-    ACTIVE = "active"         # đang giữ hàng
-    FULFILLED = "fulfilled"   # đã được xử lý (xuất kho / đơn hàng đã thanh toán)
-    CANCELLED = "cancelled"   # đã hủy (khách không mua nữa)
-    EXPIRED = "expired"       # hết hạn tự động (khách không thanh toán trong thời gian cho phép)
 
 class WarehouseRole(str, Enum):
     MANAGER = "manager"  # Quản lý kho
@@ -65,31 +40,76 @@ class SortOrder(str, Enum):
     ASC = "asc"
     DESC = "desc"
 
-class StockFilterParams(BaseModel):
-    status: Optional[StockStatusFilter] = Field(None, description="Lọc theo trạng thái")
-    min_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối thiểu")
-    max_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối đa")
-    low_stock_only: bool = Field(False, description="Chỉ hiện sản phẩm sắp hết")
-    out_of_stock_only: bool = Field(False, description="Chỉ hiện sản phẩm hết hàng")
+class ProductVariantStockStatus(str, Enum):
+    AVAILABLE = "available"
+    LOW = "low"
+    OUT = "out"
 
-class TotalInventoryFilterParams(BaseModel):
-    brand_id: Optional[str] = Field(None, description="Lọc theo thương hiệu")
-    material_id: Optional[str] = Field(None, description="Lọc theo chất liệu")
-    tag_id: Optional[str] = Field(None, description="Lọc theo tag")
-    status: Optional[StockStatusFilter] = Field(None, description="Lọc theo trạng thái")
-    min_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối thiểu")
-    max_quantity: Optional[int] = Field(None, ge=0, description="Số lượng tối đa")
-    search: Optional[str] = Field(None, description="Tìm kiếm theo tên/SKU sản phẩm")
+class StockSeverity(str, Enum):
+    CRITICAL = "critical"  # Hết hàng (available = 0)
+    HIGH = "high"          # Thiếu >= 80%
+    MEDIUM = "medium"      # Thiếu >= 50%
+    LOW = "low"            # Thiếu < 50%
+
     
 class StockInboundItemCreate(BaseModel):
     product_variant_id: str
     quantity: int = Field(gt=0, description="Số lượng nhập vào phải > 0")
     unit_cost: int = Field(gt=0, description="Giá vốn đơn vị phải > 0")
     note: Optional[str] = None
-    
-class StockInboundCreate(BaseModel):
-    warehouse_id: str
-    items: List[StockInboundItemCreate] = Field(min_length=1, description="Phải có ít nhất 1 sản phẩm")
-    reason: Optional[str] = Field(default="Nhập hàng mới", description="Lý do nhập hàng")
-    note: Optional[str] = None
-    performed_by: str
+
+class ProductsSummaryQueryParams(BaseModel):
+    search: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Tìm kiếm theo tên, slug, SKU"
+    )
+    category_ids: Optional[List[str]] = Field(
+        default=None,
+        max_length=50,
+        description="Danh sách category IDs để filter"
+    )
+    brand_ids: Optional[List[str]] = Field(
+        default=None,
+        max_length=50,
+        description="Danh sách brand IDs để filter"
+    )
+    stock_status: ProductStockStatus = Field(
+        default=ProductStockStatus.ALL,
+        description="Lọc theo trạng thái stock"
+    )
+    sort_by: SortBy = Field(
+        default=SortBy.NAME,
+        description="Sắp xếp theo field nào"
+    )
+    sort_order: SortOrder = Field(
+        default=SortOrder.ASC,
+        description="Thứ tự sắp xếp"
+    )
+
+    @field_validator('search')
+    @classmethod
+    def validate_search(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+
+        v = v.strip()
+        if not v:
+            return None
+
+        v = v.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+        return v
+
+
+class LowStockQueryParams(BaseModel):
+    warehouse_id: Optional[str] = Field(
+        default=None,
+        description="Lọc theo warehouse ID (UUID)"
+    )
+    severity: Optional[StockSeverity] = Field(
+        default=None,
+        description="Lọc theo mức độ nghiêm trọng"
+    )
+
+

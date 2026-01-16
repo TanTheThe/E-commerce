@@ -59,26 +59,19 @@ const ResetPassword = () => {
     }
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (
-                confirmPasswordRef.current &&
-                !confirmPasswordRef.current.contains(event.target)
-            ) {
-                if (confirmPassword && confirmPassword !== newPassword) {
-                    setError("Mật khẩu xác nhận không khớp");
-                    setIsSubmitDisabled(true);
-                } else {
-                    setError("");
-                    setIsSubmitDisabled(false);
-                }
-            }
-        };
+        const isValid =
+            newPassword.trim() !== "" &&
+            confirmPassword.trim() !== "" &&
+            confirmPassword === newPassword;
 
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [confirmPassword, newPassword]);
+        setIsSubmitDisabled(!isValid);
+
+        if (confirmPassword && confirmPassword !== newPassword) {
+            setError("Mật khẩu xác nhận không khớp");
+        } else {
+            setError("");
+        }
+    }, [newPassword, confirmPassword]);
 
     return (
         <section className="bg-white w-full">

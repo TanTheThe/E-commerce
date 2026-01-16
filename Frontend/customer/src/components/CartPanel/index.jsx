@@ -117,14 +117,30 @@ const CartPanel = () => {
         try {
             const response = await getDataApi(`/customer/cart/?skip=${(pageNum - 1) * 30}&limit=30`);
             if (response.success) {
-                if (pageNum === 1) {
-                    setCartData(response.data);
-                    setAllVariants(response.data.products || []);
-                } else {
-                    setAllVariants(prev => [...prev, ...(response.data.products || [])]);
+                const cartContent = response.data?.content || response.data;
+
+                if (!cartContent.cart_id || cartContent.total_items_in_cart === 0) {
+                    setCartData({
+                        cart_id: null,
+                        total_items_in_cart: 0,
+                        items_count: 0,
+                        products: []
+                    });
+                    setAllVariants([]);
+                    setHasMore(false);
+                    setLoading(false);
+                    setLoadingMore(false);
+                    return;
                 }
 
-                const { has_more, total_items_in_cart } = response.data;
+                if (pageNum === 1) {
+                    setCartData(cartContent);
+                    setAllVariants(cartContent.products || []);
+                } else {
+                    setAllVariants(prev => [...prev, ...(cartContent.products || [])]);
+                }
+
+                const { has_more } = cartContent;
                 setHasMore(has_more);
             } else {
                 console.error('Failed to fetch cart:', response.message);
@@ -189,12 +205,23 @@ const CartPanel = () => {
             if (response.success) {
                 const {
                     deleted_items_count,
+                    requested_items_count,
                     not_found_items_count,
                     not_found_item_ids,
                 } = response.data;
 
                 if (not_found_items_count > 0) {
-                    toast.warning(warning || `Có ${not_found_items_count} sản phẩm không tìm thấy`);
+                    toast.warning(
+                        `Đã xóa ${deleted_items_count}/${requested_items_count} sản phẩm. ` +
+                        `${not_found_items_count} sản phẩm không tìm thấy (có thể đã bị xóa trước đó).`,
+                        { duration: 5000 }
+                    );
+
+                    if (not_found_item_ids && not_found_item_ids.length > 0) {
+                        console.warn('Items not found:', not_found_item_ids);
+                    }
+                } else {
+                    toast.success(`Đã xóa ${deleted_items_count} sản phẩm thành công`);
                 }
 
                 setSelectedVariants(prev => {
@@ -224,6 +251,29 @@ const CartPanel = () => {
                         total_items_in_cart: (prev.total_items_in_cart || 0) - deleted_items_count,
                         items_count: prev.items_count - deleted_items_count
                     }));
+                }
+
+                const remainingVariants = allVariants
+                    .map(product => ({
+                        ...product,
+                        variants: product.variants.filter(
+                            variant => !itemIds.includes(variant.cart_item_id)
+                        )
+                    }))
+                    .filter(product => product.variants.length > 0);
+
+                if (remainingVariants.length === 0) {
+                    await fetchCartData(1);
+                } else {
+                    setAllVariants(remainingVariants);
+
+                    if (cartData) {
+                        setCartData(prev => ({
+                            ...prev,
+                            total_items_in_cart: (prev.total_items_in_cart || 0) - deleted_items_count,
+                            items_count: prev.items_count - deleted_items_count
+                        }));
+                    }
                 }
 
                 toast.success(`Đã xóa ${deleted_items_count} sản phẩm`);
@@ -355,6 +405,21 @@ const CartPanel = () => {
                     </div>
                 ) : (
                     <>
+                        {!loading && cartData && (
+                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                                <div className="flex items-center justify-between text-sm text-gray-600">
+                                    <span>
+                                        Tổng cả giỏ hàng: <strong>{cartData.total_items_in_cart || 0}</strong> sản phẩm
+                                    </span>
+                                    {cartData.total_pages > 1 && (
+                                        <span>
+                                            Trang {cartData.current_page || 1}/{cartData.total_pages || 1}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {allVariants.map((product) => (
                             <div key={product.product_id} className="product-group mb-6">
                                 <div className="product-header mb-3 pb-2 border-b-2 border-gray-200 flex items-center gap-3">
@@ -455,10 +520,19 @@ const CartPanel = () => {
             <br />
 
             <div className="bottomInfo py-3 px-4 w-full border-t border-[rgba(0,0,0,0.1)]">
+                <div className="mb-2 text-sm text-gray-600">
+                    {cartData && (
+                        <div className="flex items-center justify-between">
+                            <span>Tổng giỏ hàng: {cartData.total_items_in_cart || 0} sản phẩm</span>
+                            <span>Đang hiển thị: {allVariants.reduce((sum, p) => sum + p.variants.length, 0)} sản phẩm</span>
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center justify-between w-full mb-3">
                     <div className="flex items-center gap-4">
                         <span className="text-[#ff5252] font-bold text-[16px]">
-                            Tổng: {getTotalPrice()?.toLocaleString('vi-VN')}đ
+                            Tổng thanh toán: {getTotalPrice()?.toLocaleString('vi-VN')}đ
                         </span>
                         {selectedVariants.size > 0 && (
                             <span className="text-sm text-gray-600">
@@ -473,7 +547,7 @@ const CartPanel = () => {
                                 disabled={isDeleting.size > 0}
                                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md font-[500] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Xóa đã chọn
+                                Xóa đã chọn ({selectedVariants.size})
                             </button>
                         )}
                         <button

@@ -1,14 +1,12 @@
 from datetime import datetime
 from typing import Dict, List, Optional
-from sqlalchemy import func
 from sqlalchemy.orm import selectinload
-from sqlmodel import and_, select
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.product_variant.repositories import ProductVariantRepository
 from src.crud.purchase_return.repositories import PurchaseReturnRepository
 from src.crud.purchase_return.services.utils_service import UtilsPRService
-from src.database.models import GoodsReceipt, Product_Variant, PurchaseReturn, PurchaseReturnDetail
+from src.database.models import GoodsReceipt, Product_Variant
 from src.errors.goods_receipt import GoodsReceiptException
 from src.errors.product import ProductException
 from src.errors.purchase_return import PurchaseReturnException

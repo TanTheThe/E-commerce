@@ -2,121 +2,26 @@ import React, { useContext, useState } from "react";
 import TextField from '@mui/material/TextField';
 import Button from "@mui/material/Button";
 import { BsFillBagCheckFill } from "react-icons/bs";
-import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
-import CloseIcon from "@mui/icons-material/Close";
-import IconButton from "@mui/material/IconButton";
-import { deleteDataApi, getDataApi, postDataApi, putDataApi } from "../../utils/api";
 import { MyContext } from "../../App";
+import AddressManager from "../../components/Address";
 
 const Checkout = () => {
     const [openAddressDialog, setOpenAddressDialog] = useState(false);
-    const [addresses, setAddresses] = useState([]);
     const [selectedAddress, setSelectedAddress] = useState(null);
-    const [addingNew, setAddingNew] = useState(false);
-    const [newAddress, setNewAddress] = useState({
-        line: "",
-        street: "",
-        ward: "",
-        district: "",
-        city: ""
-    });
-    const [editingId, setEditingId] = useState(null);
 
-    const context = useContext(MyContext)
-
-    const resetForm = () => {
-        setNewAddress({
-            line: "",
-            street: "",
-            ward: "",
-            district: "",
-            city: ""
-        });
-        setEditingId(null);
-        setAddingNew(false);
-    };
-
-    const fetchAddresses = async () => {
-        const res = await getDataApi("/customer/address");
-        if (res.success) {
-            setAddresses(res.data);
-        }
-    };
+    const context = useContext(MyContext);
 
     const handleOpenDialog = () => {
         setOpenAddressDialog(true);
-        fetchAddresses();
     };
 
     const handleCloseDialog = () => {
         setOpenAddressDialog(false);
-        resetForm();
     };
 
     const handleSelectAddress = (addr) => {
         setSelectedAddress(addr);
-        handleCloseDialog();
-    };
-
-    const handleDelete = async (id) => {
-        const res = await deleteDataApi(`/customer/address/${id}`);
-        if (res.success) {
-            setAddresses((prev) => prev.filter((a) => a.id !== id));
-            context.openAlertBox(
-                "success", res?.message
-            )
-        } else {
-            context.openAlertBox("error", res?.data?.detail?.message)
-        }
-    };
-
-    const handleAddAddress = async () => {
-        const res = await postDataApi("/customer/address", newAddress);
-        if (res.success) {
-            setAddresses([...addresses, res.data]);
-            resetForm();
-            context.openAlertBox(
-                "success", res?.message
-            )
-        } else {
-            context.openAlertBox("error", res?.data?.detail?.message)
-        }
-    };
-
-    const handleUpdateAddress = async () => {
-        const res = await putDataApi(`/customer/address/${editingId}`, newAddress);
-        if (res.success) {
-            const updated = res.data;
-
-            setAddresses(prev => prev.map(addr => addr.id === editingId ? updated : addr));
-
-            if (selectedAddress?.id === editingId) {
-                setSelectedAddress(updated);
-            }
-
-            resetForm();
-            context.openAlertBox("success", res?.message);
-        } else {
-            context.openAlertBox("error", res?.data?.detail?.message);
-        }
-    };
-
-    const handleAddNewClick = () => {
-        resetForm();
-        setAddingNew(true);
-    };
-
-    const handleEditClick = (addr) => {
-        setEditingId(addr.id);
-        setNewAddress({ ...addr });
-        setAddingNew(true);
-    };
-
-    const handleCancelClick = () => {
-        resetForm();
+        context.openAlertBox("success", "Đã chọn địa chỉ giao hàng");
     };
 
     return (
@@ -137,20 +42,21 @@ const Checkout = () => {
                             </div>
 
                             <h6 className="text-[14px] font-[500]">Địa chỉ được chọn</h6>
-                            <div className="p-3 rounded text-sm">
+                            <div className="p-3 rounded text-sm bg-gray-50">
                                 {selectedAddress ? (
                                     <>
-                                        <p>{selectedAddress.line}, {selectedAddress.street}</p>
-                                        <p>{selectedAddress.ward}, {selectedAddress.district}, {selectedAddress.city}</p>
+                                        <p className="font-medium">{selectedAddress.line}</p>
+                                        <p>{selectedAddress.ward_info?.name}, {selectedAddress.province_info?.name}</p>
+                                        <p>{selectedAddress.country}</p>
                                     </>
                                 ) : (
-                                    <p>Chưa chọn địa chỉ giao hàng</p>
+                                    <p className="text-gray-500">Chưa chọn địa chỉ giao hàng</p>
                                 )}
                             </div>
 
                             <div className="flex items-center justify-center p-5 border border-dashed border-[rgba(0,0,0,0.2)] bg-[#f1faff] cursor-pointer
-                                hover:bg-[#e7f3f9]" onClick={handleOpenDialog}>
-                                <span className="text-[14px] font-[500]">Choose Address</span>
+                                hover:bg-[#e7f3f9] mt-3" onClick={handleOpenDialog}>
+                                <span className="text-[14px] font-[500]">Chọn địa chỉ giao hàng</span>
                             </div>
                         </form>
                     </div>
@@ -234,119 +140,12 @@ const Checkout = () => {
                 </div>
             </div>
 
-            <Dialog open={openAddressDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {editingId ? 'Cập nhật địa chỉ' : addingNew ? 'Thêm địa chỉ mới' : 'Chọn địa chỉ'}
-                    <IconButton onClick={handleCloseDialog} size="small">
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers>
-                    {!addingNew && (
-                        <>
-                            <div className="max-h-[300px] overflow-y-auto pr-2">
-                                {addresses.map((addr) => (
-                                    <div key={addr.id} className="border-b py-2">
-                                        <div onClick={() => handleSelectAddress(addr)} className="cursor-pointer hover:bg-gray-100 p-2 rounded">
-                                            <p>{addr.line}, {addr.street}</p>
-                                            <p>{addr.ward}, {addr.district}, {addr.city}</p>
-                                        </div>
-                                        <div className="flex gap-3 mt-2 text-sm text-blue-600">
-                                            <Button
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleEditClick(addr);
-                                                }}
-                                            >
-                                                Cập nhật
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                color="error"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(addr.id);
-                                                }}
-                                            >
-                                                Xóa
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-5">
-                                <Button fullWidth className="btn-org btn-lg" onClick={handleAddNewClick}>
-                                    + Thêm địa chỉ mới
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                    {addingNew && (
-                        <div className="space-y-5 mt-2">
-                            <div className="flex items-center gap-5">
-                                <div className="col w-[100%]">
-                                    <TextField className="w-full" label="Tỉnh/Thành phố" variant="outlined" size="small"
-                                        value={newAddress.city}
-                                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })} />
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-5">
-                                <div className="col w-[100%]">
-                                    <TextField
-                                        className="w-full" label="Quận/Huyện" variant="outlined" size="small"
-                                        value={newAddress.district}
-                                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-5">
-                                <div className="col w-[100%]">
-                                    <TextField
-                                        className="w-full" label="Phường/Xã" variant="outlined" size="small"
-                                        value={newAddress.ward}
-                                        onChange={(e) => setNewAddress({ ...newAddress, ward: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-5">
-                                <div className="col w-[100%]">
-                                    <TextField
-                                        className="w-full" label="Tên đường" variant="outlined" size="small"
-                                        value={newAddress.street}
-                                        onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-5">
-                                <div className="col w-[100%]">
-                                    <TextField
-                                        className="w-full" label="Chi tiết (Số nhà, Tòa nhà...)" variant="outlined" size="small"
-                                        value={newAddress.line}
-                                        onChange={(e) => setNewAddress({ ...newAddress, line: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    {addingNew && (
-                        <>
-                            <Button onClick={handleCancelClick} className="btn-org btn-border btn-lg">Hủy</Button>
-
-                            {editingId ? (
-                                <Button onClick={handleUpdateAddress} className="btn-org btn-lg">Cập nhật địa chỉ</Button>
-                            ) : (
-                                <Button onClick={handleAddAddress} className="btn-org btn-lg">Lưu địa chỉ</Button>
-                            )}
-                        </>
-                    )}
-                </DialogActions>
-            </Dialog>
+            <AddressManager
+                isOpen={openAddressDialog}
+                onClose={handleCloseDialog}
+                selectedAddress={selectedAddress}
+                onSelectAddress={handleSelectAddress}
+            />
         </section>
     )
 }

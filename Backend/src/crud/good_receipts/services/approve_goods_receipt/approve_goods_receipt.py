@@ -2,19 +2,21 @@ from datetime import datetime
 from typing import Dict, List
 from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.cache import cache_service
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.good_receipts.services.approve_goods_receipt.approval_calculation import ApprovalCalculationService
 from src.crud.good_receipts.services.approve_goods_receipt.approval_validation import ApproveGRValidationService
-from src.crud.good_receipts.services.approve_goods_receipt.stock_update_for_approval import \
-    StockUpdateForApprovalService
 from src.crud.good_receipts.services.get_approval_preview.receipt_tree import ReceiptTreeService
+from src.crud.stock.services.update_stock_completed_receipts import StockUpdateCompletedReceiptService
 from src.database.models import GoodsReceipt, PurchaseOrder
+import logging
 
+logger = logging.getLogger(__name__)
 goods_receipt_repository = GoodsReceiptRepository()
 validation_service = ApproveGRValidationService()
 receipt_tree_service = ReceiptTreeService()
 calculation_service = ApprovalCalculationService()
-stock_update_service = StockUpdateForApprovalService()
+stock_update_service = StockUpdateCompletedReceiptService()
 
 
 class ApproveGoodsReceiptService:
@@ -100,6 +102,13 @@ class ApproveGoodsReceiptService:
             approved_by=approved_by,
             session=session
         )
+
+        cache_service.delete(f"stock:warehouse:{str(gr.warehouse_id)}:summary")
+        cache_service.delete_pattern(f"stock:low_stock:warehouse:{str(gr.warehouse_id)}:*")
+        cache_service.delete_pattern(f"stock:warehouse:{str(gr.warehouse_id)}:product:*")
+        cache_service.delete(f"stock:warehouse:{str(gr.warehouse_id)}:filters")
+
+        logger.info(f"Invalidated stock caches for warehouse {gr.warehouse_id} after goods receipt approval")
 
         po.status = "completed"
         po.updated_at = datetime.now()

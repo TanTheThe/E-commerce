@@ -54,23 +54,34 @@ const Login = () => {
         setIsLoading(true)
 
         const response = await postDataApi("/admin/auth/login", formFields);
-        console.log(response);
 
         if (response?.success === true) {
-            sessionStorage.setItem("loginToken", response?.data?.token)
-            sessionStorage.setItem("isFirstLogin", response?.data?.isFirstLogin)
+            if (response?.data?.access_token) {
+                localStorage.setItem("accesstoken", response?.data?.access_token);
+                localStorage.setItem("refreshtoken", response?.data?.refresh_token);
 
-            setIsLoading(false)
-            context.openAlertBox(
-                "success", response?.message
-            )
+                setIsLoading(false);
+                context.openAlertBox("success", response?.message);
 
-            setFormFields({
-                email: "",
-                password: ""
-            })
+                setFormFields({
+                    email: "",
+                    password: ""
+                });
 
-            history("/verify")
+                history("/");
+            } else {
+                sessionStorage.setItem("loginToken", response?.data?.token);
+
+                setIsLoading(false);
+                context.openAlertBox("success", response?.message);
+
+                setFormFields({
+                    email: "",
+                    password: ""
+                });
+
+                history("/verify");
+            }
         } else {
             setIsLoading(false)
             context.openAlertBox("error", response?.data?.detail?.message)

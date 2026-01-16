@@ -339,10 +339,6 @@ class UserDeleteModel(BaseModel):
             raise ValueError('Danh sách user_ids không được chứa ID trùng lặp')
 
         return v
-
-class CustomerStatusType:
-    ACTIVE = "active"
-    INACTIVE = "inactive"
     
 class UserRole(str, Enum):
     CUSTOMER = "customer"
