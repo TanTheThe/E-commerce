@@ -50,11 +50,11 @@ class TokenBlacklistService:
             }
 
             await redis.set(key, json.dumps(value), ex=ttl)
-            logger.info(f"JWT added to blacklist: jti={jti}, ttl={ttl}")
+            logger.info(f"JWT đã được thêm vào blacklist: jti={jti}, ttl={ttl}")
             return True
 
         except Exception as e:
-            logger.error(f"Error add JWT blocklist: {str(e)}")
+            logger.error(f"Lỗi khi thêm JWT vào blocklist: {str(e)}")
             return False
 
 
@@ -66,7 +66,7 @@ class TokenBlacklistService:
             return exists == 1
         
         except Exception as e:
-            logger.error(f"Error checking JWT blocklist for jti={jti}: {str(e)}")
+            logger.error(f"Lỗi khi kiểm tra JWT blocklist cho jti={jti}: {str(e)}")
             return False
 
     
@@ -98,11 +98,11 @@ class TokenBlacklistService:
 
             await redis.set(key, json.dumps(value), ex=ttl)
 
-            logger.info(f"Token added to blacklist: role={role}, purpose={purpose}, ttl={ttl}")
+            logger.info(f"Token đã được thêm vào blacklist: role={role}, purpose={purpose}, ttl={ttl}")
             return True
 
         except Exception as e:
-            logger.error(f"Error add token to blocklist: {str(e)}")
+            logger.error(f"Lỗi khi thêm token vào blocklist: {str(e)}")
             return False
 
 
@@ -116,12 +116,12 @@ class TokenBlacklistService:
             return exists == 1
 
         except Exception as e:
-            logger.error(f"Error check token in blocklist: {str(e)}")
+            logger.error(f"Lỗi khi check token trong blocklist: {str(e)}")
             return False
 
 
-    
-    
+
+
     def hash_token(self, token: str):
         return hashlib.sha256(token.encode()).hexdigest()
     
@@ -131,8 +131,8 @@ class TokenBlacklistService:
         if not prefix:
             valid_combinations = list(self.PREFIX_MAP.keys())
             raise ValueError(
-                f"Invalid token combination: role='{role}', purpose='{purpose}'. "
-                f"Valid combinations: {valid_combinations}"
+                f"Token combination không hợp lệ: role='{role}', purpose='{purpose}'. "
+                f"combinations hợp lệ: {valid_combinations}"
             )
         
         return prefix

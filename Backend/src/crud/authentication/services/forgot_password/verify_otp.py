@@ -41,11 +41,11 @@ class VerifyOtpService:
             )
             
             if not is_valid:
-                if "expired" in error_message.lower():
+                if "hết hạn" in error_message.lower():
                     AuthException.otp_expired()
-                elif "exceeded" in error_message.lower():
+                elif "vượt" in error_message.lower():
                     AuthException.otp_max_attempts_exceeded()
-                elif "remaining" in error_message:
+                elif "còn lại" in error_message:
                     try:
                         attempts_left = int(error_message.split()[2])
                         AuthException.invalid_otp_attempts(attempts_left)

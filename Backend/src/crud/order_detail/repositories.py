@@ -1,8 +1,8 @@
 from typing import Optional, List, Any, Tuple
 from sqlalchemy import ColumnElement
-from src.database.models import Product, Order_Detail, Order
+from src.database.models import Order_Detail
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, desc, func, and_
+from sqlmodel import select, func, and_
 from datetime import datetime
 
 

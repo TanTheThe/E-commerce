@@ -62,18 +62,30 @@ class PaymentProcessingService:
             order_items_map
         )
 
-        await inventory_service.update_inventory_batch(
-            order_items_map, variant_map, session
-        )
-
         await offer_service.update_offers_usage(
             product_offers_to_update,
             order_offer,
-            str(order.order_id),
+            str(order.user_id),
             session
         )
 
         await inventory_service.update_product_stats(
+            order_items_map,
+            variant_map,
+            session
+        )
+
+
+    async def process_failed_payment(self, order: Order, session: AsyncSession) -> None:
+        order_items_map = {
+            str(od.product_variant_id): od.quantity
+            for od in order.order_detail
+        }
+
+        variant_ids = set(order_items_map.keys())
+        variant_map = await data_loader_service.load_variants_with_relations(variant_ids, session)
+
+        await inventory_service.restore_inventory_batch(
             order_items_map,
             variant_map,
             session
@@ -116,6 +128,11 @@ class PaymentProcessingService:
                 order,
                 session
             )
+        elif order.payment_method == "vnpay":
+            await self.process_failed_payment(
+                order,
+                session
+            )
 
         payment = await self.create_payment_record(
             order,
@@ -146,7 +163,12 @@ class PaymentProcessingService:
         condition = [Order.code == order_code, Order.deleted_at.is_(None)]
         options = [selectinload(Order.order_detail), selectinload(Order.user)]
 
-        order = await order_repository.get_order(session=session, where_conditions=condition, options=options)
+        order = await order_repository.get_order(
+            session=session,
+            where_conditions=condition,
+            options=options,
+            for_update=True
+        )
 
         if not order:
             OrderException.not_found()

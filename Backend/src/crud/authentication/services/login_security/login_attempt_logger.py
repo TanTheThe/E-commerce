@@ -19,10 +19,10 @@ class AttemptLoggerService:
             session.add(login_attempt)
             await session.commit()
             
-            logger.info(f"Logged failed attempt: {email} from {ip_address}")
+            logger.info(f"Logged số lần đăng nhập thất bại tại: {email} từ {ip_address}")
         except Exception as e:
             await session.rollback()
-            logger.error(f"Failed to log failed attempt to database: {str(e)}")
+            logger.error(f"Thất bại khi log số lần đăng nhập thất bại vào database: {str(e)}")
             
         
     async def log_successful_attempt(self, email: str, ip_address: str, session: AsyncSession):
@@ -36,7 +36,7 @@ class AttemptLoggerService:
             session.add(login_attempt)
             await session.commit()
             
-            logger.info(f"Logged successful attempt: {email} from {ip_address}")
+            logger.info(f"Logged số lần đăng nhập thành công tại: {email} từ {ip_address}")
         except Exception as e:
             await session.rollback()
-            logger.error(f"Failed to log successful attempt to database: {str(e)}")
+            logger.error(f"Thất bại khi log số lần đăng nhập thành công vào database: {str(e)}")

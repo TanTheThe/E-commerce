@@ -41,7 +41,7 @@ class ForgotPasswordService:
                 AuthException.invalid_reset_method()
 
         except Exception as e:
-            logger.error(f"Forgot password failed for email {email}: {str(e)}")
+            logger.error(f"Quên mật khẩu thất bại cho email {email}: {str(e)}")
             AuthException.forgot_password_failed()
 
 

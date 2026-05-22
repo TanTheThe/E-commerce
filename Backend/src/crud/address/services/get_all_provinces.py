@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlmodel import desc, asc
+from sqlmodel import asc
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.address.repositories import AddressRepository
 from src.database.models import Province

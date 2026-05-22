@@ -88,7 +88,7 @@ class ForgotPasswordConfirmService:
             return f"Đổi mật khẩu {role_display} thành công"
 
         except Exception as e:
-            logger.error(f"Password reset confirmation failed: {str(e)}")
+            logger.error(f"Reset password confirm thất bại: {str(e)}")
             await session.rollback()
             raise
 

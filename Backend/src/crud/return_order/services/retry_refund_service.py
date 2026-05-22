@@ -4,7 +4,6 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import Request
-from src.celery_tasks.return_order_tasks import retry_failed_refund_task
 from src.crud.order.repositories import OrderRepository
 from src.crud.payment_refund.repositories import PaymentRefundRepository
 from src.crud.payment_refund.services import PaymentRefundService
@@ -251,6 +250,8 @@ class RetryRefundService:
         countdown = 3600 * (2 ** (refund.attempt_count - 1))
 
         try:
+            from src.celery_tasks.return_order_tasks import retry_failed_refund_task
+
             retry_failed_refund_task.apply_async(
                 args=[refund_id],
                 countdown=countdown

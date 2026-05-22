@@ -1,5 +1,5 @@
 import logging
-from src.cache import CacheService
+from src.cache import CacheService, CacheKeys
 from src.errors.authentication import AuthException
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ VERIFICATION_WINDOW_MINUTES = 60    # Trong 1 giờ
 class VerificationSecurityService:
     async def check_verification_rate_limit(self, user_id: str):
         try:
-            rate_key = f"auth:verification:rate:{user_id}"
+            rate_key = CacheKeys.check_verify_rate_limit(user_id)
             
             attempts = await cache_service.get(rate_key, default=0)
             

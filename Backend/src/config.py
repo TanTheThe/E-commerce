@@ -74,10 +74,21 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_KEY: str
     BUCKET_NAME: str
+
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:8000,http://127.0.0.1:8000"
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1"
     
     @property
     def redis_url(self):
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def allowed_hosts(self) -> list[str]:
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
 
     model_config = SettingsConfigDict(
         env_file='../.env',

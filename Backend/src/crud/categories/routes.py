@@ -33,7 +33,7 @@ async def create_categories(categories_data: CategoriesCreateModel,
     new_categories_dict = await create_category_service.create_category(categories_data, session)
 
     await cache_service.delete(CacheKeys.category_tree())
-    await cache_service.delete_pattern("category:list:customer:*")
+    await cache_service.delete_pattern(CacheKeys.category_list_customer_pattern())
 
     if categories_data.parent_id:
         await cache_service.delete(CacheKeys.category_detail(str(categories_data.parent_id)))
@@ -84,7 +84,7 @@ async def get_all_categories_customer(search: Optional[str] = Query(None, descri
     )
 
     should_cache = search is None and skip == 0 and limit == 10
-    cache_key = f"category:list:customer:skip:{skip}:limit:{limit}"
+    cache_key = CacheKeys.category_list_customer(skip, limit)
 
     if should_cache:
         cached_data = await cache_service.get(cache_key)
@@ -114,7 +114,7 @@ async def get_all_categories_customer(search: Optional[str] = Query(None, descri
 
 @categories_customer_router.get('/{category_identifier}/id')
 async def get_category_id(category_identifier: str, session: AsyncSession = Depends(get_session)):
-    cache_key = f"category:resolve:{category_identifier}"
+    cache_key = CacheKeys.category_resolve(category_identifier)
     cached_id = await cache_service.get(cache_key)
 
     if cached_id is not None:
@@ -151,7 +151,7 @@ async def get_category_id(category_identifier: str, session: AsyncSession = Depe
 async def get_detail_category(id: str,
                               token_details: dict = Depends(access_token_bearer),
                               session: AsyncSession = Depends(get_session)):
-    cache_key = f"category:detail:{id}"
+    cache_key = CacheKeys.category_detail(id)
     cached_data = await cache_service.get(cache_key)
 
     if cached_data is not None:
@@ -182,7 +182,7 @@ async def get_detail_category(id: str,
 @categories_admin_router.get('/all/select-box')
 async def get_categories_select_box(session: AsyncSession = Depends(get_session),
                                     token_details: dict = Depends(access_token_bearer)):
-    cache_key = "category:tree:all"
+    cache_key = CacheKeys.category_tree()
     cached_data = await cache_service.get(cache_key)
 
     if cached_data is not None:
@@ -218,8 +218,8 @@ async def update_categories(id: str, categories_update: CategoryUpdateModel,
 
     await cache_service.delete(CacheKeys.category_tree())  # select-box
     await cache_service.delete(CacheKeys.category_detail(id))  # detail cache
-    await cache_service.delete_pattern("category:list:customer:*")  # customer list
-    await cache_service.delete_pattern(f"category:resolve:*")  # slug/id mapping
+    await cache_service.delete_pattern(CacheKeys.category_list_customer_pattern())  # customer list
+    await cache_service.delete_pattern(CacheKeys.category_resolve_pattern())  # slug/id mapping
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -237,8 +237,8 @@ async def delete_categories(id: str, token_details: dict = Depends(access_token_
 
     await cache_service.delete(CacheKeys.category_tree())  # select-box
     await cache_service.delete(CacheKeys.category_detail(id))  # detail
-    await cache_service.delete_pattern("category:list:customer:*")  # lists
-    await cache_service.delete_pattern(f"category:resolve:*")  # mappings
+    await cache_service.delete_pattern(CacheKeys.category_list_customer_pattern())  # lists
+    await cache_service.delete_pattern(CacheKeys.category_resolve_pattern())  # mappings
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

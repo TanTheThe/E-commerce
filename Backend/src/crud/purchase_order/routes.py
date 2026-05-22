@@ -12,7 +12,7 @@ from src.crud.purchase_order.services.get_purchase_orders_with_returns import Ge
 from src.crud.purchase_order.services.send_purchase_order import SendPurchaseOrderService
 from src.crud.purchase_order.services.update_po_after_negotiation import UpdatePOAfterNegotiationService
 from src.crud.purchase_order.services.update_purchase_order import UpdatePurchaseOrderService
-from src.dependencies import AccessTokenBearer, admin_role_middleware
+from src.dependencies import AccessTokenBearer, admin_role_middleware, require_staff
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -39,7 +39,7 @@ get_purchase_orders_with_returns_service = GetPurchaseOrdersWithReturnsService()
 access_token_bearer = AccessTokenBearer()
 
 
-@purchase_orders_admin_router.post("/")
+@purchase_orders_admin_router.post("/", dependencies=[Depends(require_staff)])
 async def create_purchase_order(request: CreatePurchaseOrderRequest,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
@@ -61,7 +61,7 @@ async def create_purchase_order(request: CreatePurchaseOrderRequest,
     )
 
 
-@purchase_orders_admin_router.get("/all")
+@purchase_orders_admin_router.get("/all", dependencies=[Depends(require_staff)])
 async def get_purchase_orders(po_status: Optional[str] = Query(None,
                                                                description="Lọc theo trạng thái (phân tách bằng dấu phẩy): draft, sent, confirmed, completed, partial_received",
                                                                max_length=200),
@@ -114,7 +114,7 @@ async def get_purchase_orders(po_status: Optional[str] = Query(None,
     )
 
 
-@purchase_orders_admin_router.get("/purchase-orders-with-receipts")
+@purchase_orders_admin_router.get("/purchase-orders-with-receipts", dependencies=[Depends(require_staff)])
 async def get_purchase_orders_with_receipts(warehouse_id: str = Query(..., description="ID kho (bắt buộc)"),
                                             status_po: Optional[str] = Query(None, description="Lọc theo trạng thái PO",
                                                                              pattern="^(draft|sent|confirmed|completed|partial_received|cancelled)$"),
@@ -147,7 +147,7 @@ async def get_purchase_orders_with_receipts(warehouse_id: str = Query(..., descr
     )
 
 
-@purchase_orders_admin_router.get("/purchase-orders-with-returns")
+@purchase_orders_admin_router.get("/purchase-orders-with-returns", dependencies=[Depends(require_staff)])
 async def get_purchase_orders_with_returns(warehouse_id: str = Query(..., description="ID kho (bắt buộc)"),
                                            status_po: Optional[str] = Query(None, description="Lọc theo trạng thái PO",
                                                                             pattern="^(draft|sent|confirmed|completed|partial_received|cancelled)$"),
@@ -180,7 +180,7 @@ async def get_purchase_orders_with_returns(warehouse_id: str = Query(..., descri
     )
 
 
-@purchase_orders_admin_router.get("/{po_id}")
+@purchase_orders_admin_router.get("/{po_id}", dependencies=[Depends(require_staff)])
 async def get_purchase_order_by_id(po_id: str, token_details: dict = Depends(access_token_bearer),
                                    session: AsyncSession = Depends(get_session)):
     role = token_details.get('role')
@@ -199,7 +199,7 @@ async def get_purchase_order_by_id(po_id: str, token_details: dict = Depends(acc
     )
 
 
-@purchase_orders_admin_router.put("/{po_id}")
+@purchase_orders_admin_router.put("/{po_id}", dependencies=[Depends(require_staff)])
 async def update_purchase_order(po_id: str, request: UpdatePurchaseOrderRequest,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
@@ -308,7 +308,7 @@ async def send_purchase_order_to_supplier(po_id: str, request: Optional[SendPurc
     )
 
 
-@purchase_orders_admin_router.delete("/{po_id}")
+@purchase_orders_admin_router.delete("/{po_id}", dependencies=[Depends(require_staff)])
 async def delete_purchase_order(po_id: str,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):

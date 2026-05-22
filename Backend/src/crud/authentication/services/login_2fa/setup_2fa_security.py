@@ -1,6 +1,8 @@
 from datetime import datetime
 from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.cache import CacheKeys
 from src.database.models import Setup2FAAttempt
 from src.cache.cache_service import CacheService
 import logging
@@ -18,7 +20,8 @@ SETUP_WINDOW_SECONDS = SETUP_WINDOW_MINUTES * 60
 class Setup2FASecurityService:
     async def check_rate_limit_setup_2fa(self, user_id: str, session: AsyncSession):
         try:
-            rate_key = f"auth:2fa_setup:{user_id}"
+
+            rate_key = CacheKeys.setup_2fa_rate_limit(user_id)
             
             attempts = await cache_service.get(rate_key, default=0)
             
@@ -43,7 +46,7 @@ class Setup2FASecurityService:
 
     async def log_setup_2fa_attempt(self, user_id: str, session: AsyncSession):
         try:
-            rate_key = f"auth:2fa_setup:{user_id}"
+            rate_key = CacheKeys.setup_2fa(user_id)
             attempts = await cache_service.increment(rate_key)
             
             if attempts == 1:
@@ -66,7 +69,7 @@ class Setup2FASecurityService:
     
     async def reset_setup_attempts(self, user_id: str) -> bool:
         try:
-            rate_key = f"auth:2fa_setup:{user_id}"
+            rate_key = CacheKeys.setup_2fa(user_id)
             await cache_service.delete(rate_key)
             logger.info(f"2FA setup attempts reset for user: {user_id}")
             return True

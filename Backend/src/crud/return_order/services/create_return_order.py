@@ -136,8 +136,18 @@ class CreateReturnOrderService:
                 ReturnOrderException.order_not_valid_for_return()
 
             order_details_dict = {str(detail.id): detail for detail in order.order_detail}
+            discount_percent = order.discount_percent or 0
 
-            refund_amount = await self.calculate_refund_amount(return_items, order, order_details_dict)
+            item_refund_map = {
+                item['order_detail_id']: self.calculate_item_refund(
+                    order_details_dict[item['order_detail_id']].price,
+                    item['quantity'],
+                    discount_percent
+                )
+                for item in return_items
+            }
+
+            refund_amount = sum(item_refund_map.values())
 
             if refund_amount <= 0:
                 ReturnOrderException.refund_amount_greater_than_0()
@@ -156,19 +166,11 @@ class CreateReturnOrderService:
             await session.flush()
 
             for item_data in return_items:
-                order_detail = order_details_dict[item_data['order_detail_id']]
-
-                item_refund = self.calculate_item_refund(
-                    order_detail.price,
-                    item_data['quantity'],
-                    order.discount_percent or 0
-                )
-
                 return_item = ReturnItem(
                     return_order_id=return_order.id,
                     order_detail_id=item_data['order_detail_id'],
                     quantity=item_data['quantity'],
-                    refund_amount=item_refund,
+                    refund_amount=item_refund_map[item_data['order_detail_id']],
                     images=[str(img) for img in item_data.get('images', [])],
                     created_at=datetime.now()
                 )

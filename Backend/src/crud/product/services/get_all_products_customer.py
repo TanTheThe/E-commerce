@@ -144,7 +144,13 @@ class GetAllProductsCustomerService:
 
         return {
             "data": product_list,
-            "total": len(product_list)
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "current_page": (skip // limit) + 1 if limit else 1,
+            "total_pages": ((total + limit - 1) // limit) if limit else 1,
+            "has_next": (skip + limit) < total,
+            "has_prev": skip > 0
         }
 
 

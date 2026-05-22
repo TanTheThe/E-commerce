@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Path, status, Depends, Query
+from src.cache import CacheKeys
 from src.cache.cache_service import CacheService
 from src.crud.product.services.create_product import CreateProductService
 from src.crud.product.services.get_all_products_admin import GetAllProductsAdminService
@@ -115,7 +116,7 @@ async def get_all_products_customer(category_identifier: str = Path(..., descrip
     filter_hash = hashlib.md5(json.dumps(filter_dict, sort_keys=True).encode()).hexdigest()[:12]
     
     category_identifier=category_identifier.strip()
-    cache_key = f"product:list:category:{category_identifier}:filter:{filter_hash}:skip:{skip}:limit:{limit}"
+    cache_key = CacheKeys.product_list_params(category_identifier, filter_hash, skip, limit)
     cached_products = await cache_service.get(cache_key)
     
     if cached_products is not None:
@@ -148,7 +149,7 @@ async def get_products_popular(parent_category_id: str = Path(
                                limit_per_category: int = Query(
                                 default=12, ge=1, le=50, description="Số sản phẩm tối đa cho mỗi category con"), 
                                session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:popular:parent:{parent_category_id}:limit:{limit_per_category}"
+    cache_key = CacheKeys.product_popular(parent_category_id, limit_per_category)
     
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -202,7 +203,7 @@ async def search_product(search: str = Query(
         }
     )
 
-@product_admin_router.get('/offer')
+@product_admin_router.get('/offer', dependencies=[Depends(admin_role_middleware)])
 async def get_products_offer(categories_id: str = Query(..., description="Danh sách category IDs cách nhau bởi dấu phẩy"), 
                              session: AsyncSession = Depends(get_session)):
     categories_list = [cat.strip() for cat in categories_id.split(',') if cat.strip()]
@@ -229,7 +230,7 @@ async def get_products_offer(categories_id: str = Query(..., description="Danh s
 @product_customer_router.get('/latest')
 async def get_products_latest(limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm mới nhất cần lấy"), 
                               session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:latest:limit:{limit_per_category}"
+    cache_key = CacheKeys.product_latest(limit_per_category)
 
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -262,7 +263,7 @@ async def get_products_related(product_id: str = Query(..., description="ID củ
                                price_range: float = Query(default=0.4, ge=0.1, le=1.0, description="Khoảng giá tương đối (0.4 = ±40%)"),
                                limit_per_category: int = Query(default=12, ge=1, le=50, description="Số sản phẩm tối đa"),
                                session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:related:{product_id}:range:{price_range}:limit:{limit_per_category}"
+    cache_key = CacheKeys.product_related(product_id, price_range, limit_per_category)
 
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -293,7 +294,7 @@ async def get_products_related(product_id: str = Query(..., description="ID củ
 @product_customer_router.get('/top-discount')
 async def get_products_top_discount(limit: int = Query(default=12, ge=1, le=50, description="Số sản phẩm giảm giá nhiều nhất"),
                                     session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:top_discount:limit:{limit}"
+    cache_key = CacheKeys.product_top_discount(limit)
 
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -323,7 +324,7 @@ async def get_products_top_discount(limit: int = Query(default=12, ge=1, le=50, 
 
 @product_customer_router.get('/filter-info')
 async def get_filters_info(category_id: str, session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:filter_info:category:{category_id}"
+    cache_key = CacheKeys.product_filter_info(category_id)
 
     cached_filters = await cache_service.get(cache_key)
     if cached_filters is not None:
@@ -424,7 +425,7 @@ async def get_detail_product_customer(identifier: str = Path(..., min_length=1, 
 
     identifier = identifier.strip()
 
-    cache_key = f"product:detail:customer:{identifier}"
+    cache_key = CacheKeys.product_detail_customer(identifier)
 
     cached_product = await cache_service.get(cache_key)
     if cached_product is not None:
@@ -485,14 +486,12 @@ async def get_detail_product_admin(identifier: str = Path(..., min_length=1, max
     )
 
 
-@product_admin_router.get('/all/select-box')
+@product_admin_router.get('/all/select-box', dependencies=[Depends(admin_role_middleware)])
 async def get_products_selectbox(category_id: Optional[str] = None,
                                  supplier_id: Optional[str] = None,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    cat_part = f"cat:{category_id}" if category_id else "cat:all"
-    sup_part = f"sup:{supplier_id}" if supplier_id else "sup:all"
-    cache_key = f"product:selectbox:{cat_part}:{sup_part}"
+    cache_key = CacheKeys.product_selectbox(category_id, supplier_id)
 
     cached_products = await cache_service.get(cache_key)
     if cached_products is not None:
@@ -520,11 +519,11 @@ async def get_products_selectbox(category_id: Optional[str] = None,
     )
 
 
-@product_admin_router.get('/variants/all/select-box')
+@product_admin_router.get('/variants/all/select-box', dependencies=[Depends(admin_role_middleware)])
 async def get_variants_selectbox(product_id: str,
                                  token_details: dict = Depends(access_token_bearer),
                                  session: AsyncSession = Depends(get_session)):
-    cache_key = f"product:variants_selectbox:product:{product_id}"
+    cache_key = CacheKeys.variants_selectbox(product_id)
 
     cached_variants = await cache_service.get(cache_key)
     if cached_variants is not None:

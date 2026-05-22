@@ -31,6 +31,25 @@ class InventoryService:
             await session.execute(statement, updates)
 
 
+    async def restore_inventory_batch(self, order_items_map: Dict[str, int],
+                                      variant_map, session: AsyncSession):
+        updates = []
+
+        for variant_id, quantity in order_items_map.items():
+            variant = variant_map.get(variant_id)
+            if not variant:
+                ProductException.not_found_variant()
+
+            updates.append({
+                "id": str(variant.id),
+                "quantity": variant.quantity + quantity
+            })
+
+        if updates:
+            statement = update(Product_Variant)
+            await session.execute(statement, updates)
+
+
     async def update_product_stats(self,
                                    order_items_map: Dict[str, int],  # {variant_id: quantity}
                                    variant_map, session: AsyncSession):

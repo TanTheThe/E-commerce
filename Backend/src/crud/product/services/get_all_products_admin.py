@@ -126,7 +126,7 @@ class GetAllProductsAdminService:
                 for product_material in p.product_materials:
                     if product_material.deleted_at is None:
                         material = next(
-                            (m for m in product.materials
+                            (m for m in p.materials
                              if m.id == product_material.material_id and m.deleted_at is None),
                             None
                         )
@@ -168,7 +168,13 @@ class GetAllProductsAdminService:
 
         return {
             "data": product_list,
-            "total": total[0]
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "current_page": (skip // limit) + 1 if limit else 1,
+            "total_pages": ((total + limit - 1) // limit) if limit else 1,
+            "has_next": (skip + limit) < total,
+            "has_prev": skip > 0
         }
 
     

@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 from sqlalchemy.orm import selectinload
 from src.crud.notification.services.create_notification import CreateNotificationService
 from src.crud.order.services.cancel_order.notification_cancel_service import NotificationCancelService

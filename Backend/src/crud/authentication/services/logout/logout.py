@@ -25,13 +25,13 @@ class LogoutService:
         is_blacklisted = await token_blacklist_service.jwt_in_blocklist(jti)
 
         if is_blacklisted:
-            logger.warning(f"Token already blacklisted: jti={jti}")
+            logger.warning(f"Token đã nằm trong blacklist: jti={jti}")
             return True
 
         ttl = int(exp - datetime.now().timestamp())
 
         if ttl <= 0:
-            logger.warning(f"Token already expired: jti={jti}")
+            logger.warning(f"Token đã hết hạn: jti={jti}")
             return True
 
         ttl += 60

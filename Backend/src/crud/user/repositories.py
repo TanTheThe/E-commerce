@@ -1,16 +1,13 @@
 from datetime import datetime
 from typing import Any, Dict, Optional, List, Tuple
-from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement
 from src.database.models import User
-from src.crud.authentication.utils import generate_password_hash
 from sqlmodel import select, update, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import and_
-
 from src.errors.authentication import AuthException
 from src.errors.user import UserException
-from src.schemas.user import UserCreateModel, UserDeleteModel, UserRole
+from src.schemas.user import UserDeleteModel
 
 
 class UserRepository:

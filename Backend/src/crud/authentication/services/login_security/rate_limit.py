@@ -1,7 +1,7 @@
 import logging
 from typing import Tuple
 from fastapi import Request
-from src.cache import CacheService
+from src.cache import CacheService, CacheKeys
 from src.errors.authentication import AuthException
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ MAX_REQUESTS_PER_IP_HOUR = 30
 
 class RateLimiterService:
     async def check_ip_rate_limit(self, ip_address: str):
-        minute_key = f"rate_limit:login:ip:{ip_address}:minute"
+        minute_key = CacheKeys.check_ip_rate_limit_minute_key(ip_address)
         is_allowed_minute, attempts_minute, retry_after = await self.check_rate_limit_key(
             minute_key,
             max_requests=MAX_REQUESTS_PER_IP_MINUTE,
@@ -22,10 +22,10 @@ class RateLimiterService:
         )
         
         if not is_allowed_minute:
-            logger.warning(f"IP rate limit exceeded (minute): {ip_address}")
+            logger.warning(f"IP đã vượt quá giới hạn (phút): {ip_address}")
             AuthException.too_many_login_attempts(retry_after)
             
-        hour_key = f"rate_limit:login:ip:{ip_address}:hour"
+        hour_key = CacheKeys.check_ip_rate_limit_hour_key(ip_address)
         is_allowed_hour, attempts_hour, retry_after = await self.check_rate_limit_key(
             hour_key,
             max_requests=MAX_REQUESTS_PER_IP_HOUR,
@@ -33,7 +33,7 @@ class RateLimiterService:
         )
         
         if not is_allowed_hour:
-            logger.warning(f"IP rate limit exceeded (hour): {ip_address}")
+            logger.warning(f"IP đã vượt quá giới hạn (giờ): {ip_address}")
             AuthException.too_many_login_attempts(retry_after)
             
         

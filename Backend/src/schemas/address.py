@@ -1,17 +1,5 @@
 from typing import Optional
 from pydantic import BaseModel, Field, model_validator, field_validator
-import uuid
-
-class AddressModel(BaseModel):
-    id: uuid.UUID
-    line: str
-    street: str
-    ward: str
-    city: str
-    district: str
-    country: str = Field(default="Việt Nam")
-    user_id: uuid.UUID
-
 
 class AddressCreateModel(BaseModel):
     line: str = Field(..., min_length=1, max_length=255, description="Số nhà, tòa nhà, tên đường")

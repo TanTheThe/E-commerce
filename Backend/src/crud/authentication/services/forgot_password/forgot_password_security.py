@@ -3,7 +3,7 @@ import secrets
 from src.errors.authentication import AuthException
 from datetime import datetime
 from typing import Tuple, Optional
-from src.cache import cache_service
+from src.cache import cache_service, CacheKeys
 from src.crud.authentication.utils import generate_password_hash, verify_password
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ OTP_LENGTH = 6                      # OTP 6 chữ số
 class ForgotPasswordSecurityService:
     async def check_forgot_password_rate_limit(self, email: str):
         try:
-            rate_key = f"auth:forgot_password:rate:{email}"
+            rate_key = CacheKeys.forgot_password_rate_limit(email)
             
             attempts = await cache_service.get(rate_key, default=0)
             
@@ -32,8 +32,8 @@ class ForgotPasswordSecurityService:
                 remaining_minutes = max(1, int(ttl / 60))
                 
                 logger.warning(
-                    f"Forgot password rate limit exceeded for email: {email}, "
-                    f"attempts: {attempts}"
+                    f"Đã vượt qua số lần quên mật khẩu cho email: {email}, "
+                    f"số lần: {attempts}"
                 )
                 
                 AuthException.too_many_password_reset(remaining_minutes)
@@ -44,7 +44,7 @@ class ForgotPasswordSecurityService:
                 await cache_service.expire(rate_key, FORGOT_PASSWORD_WINDOW_SECONDS)
 
         except Exception as e:
-            logger.error(f"Error checking forgot password rate limit: {str(e)}")
+            logger.error(f"Lỗi khi kiểm tra forgot password rate limit: {str(e)}")
             
     
     # Lưu vào cache thay vì DB
@@ -54,7 +54,7 @@ class ForgotPasswordSecurityService:
             
             otp_hash = generate_password_hash(otp)
             
-            otp_key = f"auth:otp:{user_id}"
+            otp_key = CacheKeys.otp(user_id)
             
             otp_data = {
                 "otp_hash": otp_hash,
@@ -72,26 +72,26 @@ class ForgotPasswordSecurityService:
             return otp
         
         except Exception as e:
-            logger.error(f"Failed to generate OTP: {str(e)}")
+            logger.error(f"Lỗi khi tạo OTP: {str(e)}")
             raise
         
     
     async def verify_otp(self, user_id: str, otp: str) -> Tuple[bool, Optional[str]]:
         try:
-            otp_key = f"auth:otp:{user_id}"
+            otp_key = CacheKeys.otp(user_id)
             
             otp_data = await cache_service.get(otp_key)
             
             if not otp_data:
-                logger.warning(f"OTP not found or expired for user: {user_id}")
-                return False, "OTP expired or not found"
+                logger.warning(f"OTP không tìm thấy hoặc đã hết hạn với người dùng: {user_id}")
+                return False, "OTP không tìm thấy hoặc đã hết hạn"
             
             attempts = otp_data.get("attempts", 0)
             
             if attempts >= MAX_OTP_ATTEMPTS:
-                logger.warning(f"Max OTP attempts exceeded for user: {user_id}")
+                logger.warning(f"Số lượng OTP đã vượt max cho user: {user_id}")
                 await cache_service.delete(otp_key)
-                return False, f"Maximum {MAX_OTP_ATTEMPTS} attempts exceeded"
+                return False, f"Số lượng {MAX_OTP_ATTEMPTS} đã vượt max"
             
             otp_hash = otp_data.get("otp_hash")
             
@@ -103,18 +103,18 @@ class ForgotPasswordSecurityService:
                 
                 attempts_left = MAX_OTP_ATTEMPTS - attempts - 1
                 logger.warning(
-                    f"Invalid OTP for user: {user_id}, "
-                    f"attempts left: {attempts_left}"
+                    f"OTP không phù hợp cho user: {user_id}, "
+                    f"số lần còn lại: {attempts_left}"
                 )
                 
-                return False, f"Invalid OTP. {attempts_left} attempts remaining"
+                return False, f"OTP không hợp lệ. {attempts_left} số lần còn lại"
             
             await cache_service.delete(otp_key)
             
-            logger.info(f"OTP verified successfully for user: {user_id}")
+            logger.info(f"OTP verify thành công cho user: {user_id}")
             return True, None
             
         except Exception as e:
-            logger.error(f"Error verifying OTP: {str(e)}")
-            return False, "OTP verification failed"
+            logger.error(f"Lỗi khi verify OTP: {str(e)}")
+            return False, "OTP verify thất bại"
 

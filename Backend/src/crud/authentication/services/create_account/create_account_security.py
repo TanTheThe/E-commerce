@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-from src.cache import CacheService
+from src.cache import CacheService, CacheKeys
 from src.errors.authentication import AuthException
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,8 @@ VERIFICATION_WINDOW_MINUTES = 60    # Trong 1 giờ
 class CreateAccountSecurityService:
     async def check_signup_rate_limit(self, ip_address: str):
         try:
-            rate_key = f"auth:signup:rate:{ip_address}"
+
+            rate_key = CacheKeys.check_signup_rate_limit(ip_address)
             
             attempts = await cache_service.get(rate_key, default=0)
             
@@ -30,8 +31,8 @@ class CreateAccountSecurityService:
                 remaining_minutes = max(1, int(ttl / 60))
                 
                 logger.warning(
-                    f"Signup rate limit exceeded for IP: {ip_address}, "
-                    f"attempts: {attempts}"
+                    f"Vượt mức đăng ký cho IP: {ip_address}, "
+                    f"số lần: {attempts}"
                 )
                 
                 AuthException.too_many_signup_attempts(remaining_minutes)
@@ -42,12 +43,12 @@ class CreateAccountSecurityService:
                 await cache_service.expire(rate_key, SIGNUP_WINDOW_SECONDS)
                 
         except Exception as e:
-            logger.error(f"Error checking signup rate limit: {str(e)}")
+            logger.error(f"Lỗi khi kiểm tra signup rate limit: {str(e)}")
             
             
     async def check_email_signup_cooldown(self, email: str, cooldown_minutes: int = 5):
         try:
-            cooldown_key = f"auth:signup:cooldown:{email}"
+            cooldown_key = CacheKeys.signup_cooldown(email)
             
             exists = await cache_service.exists(cooldown_key)
             
@@ -65,7 +66,7 @@ class CreateAccountSecurityService:
     
     async def set_email_signup_cooldown(self, email: str, cooldown_minutes: int = 5):
         try:
-            cooldown_key = f"auth:signup:cooldown:{email}"
+            cooldown_key = CacheKeys.signup_cooldown(email)
             
             await cache_service.set(
                 cooldown_key,
@@ -81,7 +82,7 @@ class CreateAccountSecurityService:
             
     async def cache_verification_token(self, token: str, user_id: str, email: str, ttl: int = 86400):
         try:
-            token_key = f"auth:verification:token:{token}"
+            token_key = CacheKeys.verify_token(token)
             
             token_data = {
                 "user_id": user_id,

@@ -44,7 +44,7 @@ async def create_special_offer(special_offer_data: SpecialOfferCreateModel,
                                session: AsyncSession = Depends(get_session)):
     new_special_offer_dict = await create_special_offer_service.create_special_offer(special_offer_data, session)
 
-    await cache_service.delete_pattern(f"special_offer:admin:*")
+    await cache_service.delete_pattern(CacheKeys.special_offer_admin_list_pattern())
     logger.info("Invalidated admin offer list cache after creating new offer")
 
     return JSONResponse(
@@ -92,7 +92,7 @@ async def get_all_special_offer_admin(skip: int = Query(0, ge=0, description="S�
         json.dumps(filter_dict, sort_keys=True, default=str).encode()
     ).hexdigest()[:12]
 
-    cache_key = f"special_offer:admin:filter:{filter_hash}:skip:{skip}:limit:{limit}"
+    cache_key = CacheKeys.special_offer_admin_filters(filter_hash, skip, limit)
 
     cached_offers = await cache_service.get(cache_key)
     if cached_offers is not None:
@@ -127,7 +127,7 @@ async def set_offer_to_product(data: SetOfferToProduct,
 
     result = await set_offer_to_product_service.set_offer_to_product(data, session)
 
-    # CRITICAL: Gắn offer vào products → giá products thay đổi
+    # Gắn offer vào products → giá products thay đổi
     # Phải invalidate TẤT CẢ product caches!
     await invalidate_all_product_caches()
     logger.info(f"Invalidated all product caches after setting offer to {result['updated_count']} products")
@@ -154,7 +154,7 @@ async def get_all_special_offer_customer(session: AsyncSession = Depends(get_ses
         (search or "all").encode()
     ).hexdigest()[:8]
 
-    cache_key = f"special_offer:customer:user:{user_id}:search:{search_hash}:skip:{skip}:limit:{limit}"
+    cache_key = CacheKeys.special_offer_customer_filters(user_id, search_hash, skip, limit)
 
     cached_offers = await cache_service.get(cache_key)
     if cached_offers is not None:

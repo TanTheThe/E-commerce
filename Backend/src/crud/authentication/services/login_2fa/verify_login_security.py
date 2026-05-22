@@ -2,6 +2,8 @@ import logging
 from datetime import datetime
 from fastapi import HTTPException, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from src.cache import CacheKeys
 from src.cache.cache_service import CacheService
 from src.database.models import OTPVerificationAttempt
 from src.errors.authentication import AuthException
@@ -17,7 +19,7 @@ OTP_WINDOW_SECONDS = OTP_WINDOW_MINUTES * 60
 class VerifyLoginSecurityService:
     async def check_otp_rate_limit(self, user_id: str, session: AsyncSession):
         try:
-            rate_key = f"auth:otp_verify_attempts:{user_id}"
+            rate_key = CacheKeys.otp_verify_attempts(user_id)
             
             attempts = await cache_service.get(rate_key, default=0)
             
@@ -43,7 +45,7 @@ class VerifyLoginSecurityService:
 
     async def log_otp_attempt(self, user_id: str, is_successful: bool, request: Request, session: AsyncSession):
         try:
-            rate_key = f"auth:otp_verify_attempts:{user_id}"
+            rate_key = CacheKeys.otp_verify_attempts(user_id)
             
             if is_successful:
                 await cache_service.delete(rate_key)
@@ -80,7 +82,7 @@ class VerifyLoginSecurityService:
             
     async def reset_otp_attempts(self, user_id: str) -> bool:
         try:
-            rate_key = f"auth:otp_verify_attempts:{user_id}"
+            rate_key = CacheKeys.otp_verify_attempts(user_id)
             await cache_service.delete(rate_key)
             logger.info(f"OTP verification attempts reset for user: {user_id}")
             return True

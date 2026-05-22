@@ -2,7 +2,8 @@ from datetime import datetime
 import select
 from typing import List, Set
 from sqlalchemy import func, update, delete
-from sqlmodel import and_, selectinload
+from sqlalchemy.orm import selectinload
+from sqlmodel import and_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.product.repositories import ProductRepository
 from src.crud.supplier.repositories import SupplierRepository

@@ -43,7 +43,7 @@ async def create_supplier(supplier_data: SupplierCreate,
     )
 
 
-@suppliers_admin_router.get("/")
+@suppliers_admin_router.get("/", dependencies=[Depends(admin_role_middleware)])
 async def get_all_suppliers(is_active: Optional[bool] = Query(None, description="Lọc theo trạng thái"),
                             search: Optional[str] = Query(None, description="Tìm kiếm theo tên, mã, người liên hệ", max_length=255),
                             skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
@@ -66,7 +66,7 @@ async def get_all_suppliers(is_active: Optional[bool] = Query(None, description=
     )
 
 
-@suppliers_admin_router.get("/{supplier_id}")
+@suppliers_admin_router.get("/{supplier_id}", dependencies=[Depends(admin_role_middleware)])
 async def get_detail_supplier(supplier_id: str,
                             token_details: dict = Depends(access_token_bearer),
                             session: AsyncSession = Depends(get_session)):

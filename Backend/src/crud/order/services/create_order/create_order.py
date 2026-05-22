@@ -122,13 +122,14 @@ class CreateOrderService:
 
             await order_detail_repository.create_order_detail(order_detail_objs, session)
 
-            if order_data.payment_method == "direct":
+            if order_data.payment_method in ["direct", "vnpay"]:
                 await inventory_service.update_inventory_batch(
                     order_items_map,
                     variant_map,
                     session
                 )
 
+            if order_data.payment_method == "direct":
                 await offer_service.update_offers_usage(
                     product_offers_to_update,
                     order_offer,

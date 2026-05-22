@@ -2,15 +2,13 @@ from typing import Tuple
 from fastapi import Request
 from src.cache import redis_manager
 from src.cache.cache_keys import CacheKeys
-from src.cache.redis_manager import RedisManager
 from src.config import Config
-from src.crud.authentication.services.token_blacklist_service import TokenBlacklistService
 import logging
+from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 
 logger = logging.getLogger(__name__)
 
 token_blacklist_service = TokenBlacklistService()
-redis_manager = RedisManager()
 
 async def token_in_blocklist(jti: str, request: Request) -> bool:
     """

@@ -10,7 +10,7 @@ from src.crud.good_receipts.services.get_detail_goods_receipt import GetDetailGo
 from src.crud.good_receipts.services.get_gr_for_create import GetGRForCreateService
 from src.crud.good_receipts.services.get_gr_tree_by_po import GetGRTreeByPOService
 from src.crud.good_receipts.services.update_goods_receipt.update_goods_receipt import UpdateGoodsReceiptService
-from src.dependencies import AccessTokenBearer, admin_role_middleware
+from src.dependencies import AccessTokenBearer, admin_role_middleware, require_staff
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
@@ -34,7 +34,7 @@ access_token_bearer = AccessTokenBearer()
 approval_review_service = ApprovalPreviewService()
 
 
-@goods_receipt_admin_router.post("/")
+@goods_receipt_admin_router.post("/", dependencies=[Depends(require_staff)])
 async def create_goods_receipt(request: CreateGoodsReceiptRequest,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
@@ -56,7 +56,7 @@ async def create_goods_receipt(request: CreateGoodsReceiptRequest,
     )
 
 
-@goods_receipt_admin_router.get("/{goods_receipt_id}/approval-preview")
+@goods_receipt_admin_router.get("/{goods_receipt_id}/approval-preview", dependencies=[Depends(require_staff)])
 async def get_approval_preview(goods_receipt_id: str,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
@@ -76,7 +76,7 @@ async def get_approval_preview(goods_receipt_id: str,
     )
 
 
-@goods_receipt_admin_router.get("/")
+@goods_receipt_admin_router.get("/", dependencies=[Depends(require_staff)])
 async def get_all_goods_receipts(warehouse_id: str = Query(..., description="ID warehouse (bắt buộc)"),
                                  status_gr: Optional[str] = Query(None, description="Trạng thái phiếu"),
                                  purchase_order_id: Optional[str] = Query(None, description="ID đơn hàng"),
@@ -121,7 +121,7 @@ async def get_all_goods_receipts(warehouse_id: str = Query(..., description="ID 
     )
 
 
-@goods_receipt_admin_router.get("/{goods_receipt_id}")
+@goods_receipt_admin_router.get("/{goods_receipt_id}", dependencies=[Depends(require_staff)])
 async def get_goods_receipt_detail(goods_receipt_id: str,
                                    token_details: dict = Depends(access_token_bearer),
                                    session: AsyncSession = Depends(get_session)):
@@ -144,7 +144,7 @@ async def get_goods_receipt_detail(goods_receipt_id: str,
     )
     
     
-@goods_receipt_admin_router.get("/create-info/{parent_goods_receipt_id}")
+@goods_receipt_admin_router.get("/create-info/{parent_goods_receipt_id}", dependencies=[Depends(require_staff)])
 async def get_goods_receipt_for_create(parent_goods_receipt_id: str,
                                        token_details: dict = Depends(access_token_bearer),
                                        session: AsyncSession = Depends(get_session)):
@@ -167,7 +167,7 @@ async def get_goods_receipt_for_create(parent_goods_receipt_id: str,
     )
 
 
-@goods_receipt_admin_router.get("/{purchase_order_id}/receipts-tree")
+@goods_receipt_admin_router.get("/{purchase_order_id}/receipts-tree", dependencies=[Depends(require_staff)])
 async def get_gr_tree_by_po(purchase_order_id: str,
                             warehouse_id: str = Query(..., description="Warehouse ID to filter receipts"),
                             token_details: dict = Depends(access_token_bearer),
@@ -209,7 +209,7 @@ async def approve_goods_receipt(goods_receipt_id: str,
     )
     
     
-@goods_receipt_admin_router.put("/{goods_receipt_id}")
+@goods_receipt_admin_router.put("/{goods_receipt_id}", dependencies=[Depends(require_staff)])
 async def update_goods_receipt(goods_receipt_id: str, request: UpdateGoodsReceiptRequest,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):
@@ -231,7 +231,7 @@ async def update_goods_receipt(goods_receipt_id: str, request: UpdateGoodsReceip
     )
     
 
-@goods_receipt_admin_router.delete("/{goods_receipt_id}")
+@goods_receipt_admin_router.delete("/{goods_receipt_id}", dependencies=[Depends(require_staff)])
 async def delete_goods_receipt(goods_receipt_id: str,
                                token_details: dict = Depends(access_token_bearer),
                                session: AsyncSession = Depends(get_session)):

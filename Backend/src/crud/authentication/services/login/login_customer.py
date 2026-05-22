@@ -79,7 +79,7 @@ class LoginCustomerService:
             }
 
         except Exception as e:
-            logger.error(f"Login failed for {email}: {str(e)}")
+            logger.error(f"Đăng nhập thất bại cho {email}: {str(e)}")
             AuthException.login_failed()
 
 

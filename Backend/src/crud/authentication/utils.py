@@ -132,7 +132,7 @@ def get_serializer(role: str, purpose: str) -> URLSafeTimedSerializer:
 
     secret = getattr(Config, config["secret"], None)
     if not secret:
-        raise ValueError(f"Secret key not found: {config['secret']}")
+        raise ValueError(f"Không tìm thấy secret key: {config['secret']}")
 
     return URLSafeTimedSerializer(secret_key=secret, salt=config["salt"])
 
@@ -158,5 +158,5 @@ def decode_url_safe_token(token: str, role: str, purpose: str) -> dict | None:
         logging.warning(f"Invalid token for role={role}, purpose={purpose}")
         return None
     except Exception as e:
-        logging.error(f"Token decode error for role={role}, purpose={purpose}: {str(e)}")
+        logging.error(f"Lỗi decode token cho role={role}, purpose={purpose}: {str(e)}")
         return None

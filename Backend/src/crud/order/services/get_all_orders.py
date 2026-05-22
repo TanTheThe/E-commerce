@@ -127,7 +127,16 @@ class GetAllOrdersService:
                 "order_detail": list(product_map.values())
             })
 
-        return {"total": total, "data": order_response}
+        return {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "current_page": (skip // limit) + 1 if limit else 1,
+            "total_pages": ((total + limit - 1) // limit) if limit else 1,
+            "has_next": (skip + limit) < total,
+            "has_prev": skip > 0,
+            "data": order_response
+        }
 
     def can_show_cancel_button(self, order: Order) -> bool:
         if order.status in ["cancelled", "delivered", "shipping", "received"]:
@@ -231,4 +240,10 @@ class GetAllOrdersService:
         return {
             "data": response,
             "total": total,
+            "skip": skip,
+            "limit": limit,
+            "current_page": (skip // limit) + 1 if limit else 1,
+            "total_pages": ((total + limit - 1) // limit) if limit else 1,
+            "has_next": (skip + limit) < total,
+            "has_prev": skip > 0
         }

@@ -52,9 +52,9 @@ class CompletePurchaseReturnService:
             if pr.warehouse_id:
                 await self.adjust_stock_for_return(session, pr, completed_by)
 
-                cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:summary"),
-                cache_service.delete_pattern(f"stock:low_stock:warehouse:{str(pr.warehouse_id)}:*"),
-                cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:filters")
+                await cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:summary")
+                await cache_service.delete_pattern(f"stock:low_stock:warehouse:{str(pr.warehouse_id)}:*")
+                await cache_service.delete(f"stock:warehouse:{str(pr.warehouse_id)}:filters")
 
                 logger.info(f"Invalidated stock caches for warehouse {pr.warehouse_id} after purchase return")
             

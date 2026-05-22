@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends, Query, Path
 from typing import Optional, List
-from src.cache import cache_service
+from src.cache import cache_service, CacheKeys
 from src.crud.stock.services.get_all_variants_in_warehouse import GetVariantsInWarehouseService
 from src.crud.stock.services.get_low_stock_items import GetLowStockItemsService
 from src.crud.stock.services.get_products_summary import GetProductsSummaryService
@@ -11,7 +11,7 @@ from src.dependencies import AccessTokenBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.database.main import get_session
 from fastapi.responses import JSONResponse
-from src.dependencies import admin_role_middleware
+from src.dependencies import admin_role_middleware, require_staff
 from src.errors.user import UserException
 from src.schemas.stock import ProductStockStatus, SortBy, SortOrder, ProductsSummaryQueryParams, LowStockQueryParams, \
     StockSeverity
@@ -33,7 +33,7 @@ get_warehouse_filters_service = GetWarehouseFiltersService()
 access_token_bearer = AccessTokenBearer()
 
 
-@stock_admin_router.get("/warehouse/{warehouse_id}/products")
+@stock_admin_router.get("/warehouse/{warehouse_id}/products", dependencies=[Depends(require_staff)])
 async def get_products_in_warehouse(warehouse_id: str,
                                     skip: int = Query(ge=0, description="Số bản ghi bỏ qua"),
                                     limit: int = Query(ge=1, le=100, description="Số bản ghi tối đa"),
@@ -70,7 +70,7 @@ async def get_products_in_warehouse(warehouse_id: str,
     )
 
 
-@stock_admin_router.get("/warehouse/{warehouse_id}/products/{product_id}/variants")
+@stock_admin_router.get("/warehouse/{warehouse_id}/products/{product_id}/variants", dependencies=[Depends(require_staff)])
 async def get_product_variants_in_warehouse(warehouse_id: str = Path(..., description="UUID của warehouse"),
                                             product_id: str = Path(..., description="UUID của product"),
                                             token_details: dict = Depends(access_token_bearer),
@@ -91,7 +91,7 @@ async def get_product_variants_in_warehouse(warehouse_id: str = Path(..., descri
     )
 
 
-@stock_admin_router.get("/warehouse/{warehouse_id}/stocks/summary")
+@stock_admin_router.get("/warehouse/{warehouse_id}/stocks/summary", dependencies=[Depends(require_staff)])
 async def get_warehouse_summary(warehouse_id: str = Path(..., description="UUID của warehouse"),
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
@@ -100,7 +100,7 @@ async def get_warehouse_summary(warehouse_id: str = Path(..., description="UUID 
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    cache_key = f"stock:warehouse:{warehouse_id}:summary"
+    cache_key = CacheKeys.stock_warehouse_summary(warehouse_id)
 
     cached_summary = await cache_service.get(cache_key)
     if cached_summary is not None:
@@ -137,10 +137,7 @@ async def get_low_stock_items(warehouse_id: Optional[str] = Query(None, descript
                               session: AsyncSession = Depends(get_session)):
     severity_str = severity.value if severity else None
 
-    warehouse_part = f"warehouse:{warehouse_id}" if warehouse_id else "all_warehouses"
-    severity_part = f"severity:{severity_str}" if severity_str else "all_severity"
-
-    cache_key = f"stock:low_stock:{warehouse_part}:{severity_part}:skip:{skip}:limit:{limit}"
+    cache_key = CacheKeys.low_stock_items(warehouse_id, severity_str, skip, limit)
 
     cached_stocks = await cache_service.get(cache_key)
     if cached_stocks is not None:
@@ -187,7 +184,7 @@ async def get_stock_detail(stock_id: str = Path(..., description="UUID của sto
     )
 
 
-@stock_admin_router.get("/warehouse/{warehouse_id}/filters")
+@stock_admin_router.get("/warehouse/{warehouse_id}/filters", dependencies=[Depends(require_staff)])
 async def get_warehouse_filters(warehouse_id: str,
                                 token_details: dict = Depends(access_token_bearer),
                                 session: AsyncSession = Depends(get_session)):
@@ -196,7 +193,7 @@ async def get_warehouse_filters(warehouse_id: str,
     if role not in ['admin', 'staff']:
         UserException.role_invalid()
 
-    cache_key = f"stock:warehouse:{warehouse_id}:filters"
+    cache_key = CacheKeys.stock_warehouse_filters(warehouse_id)
 
     cached_filters = await cache_service.get(cache_key)
     if cached_filters is not None:

@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import Request
 from src.crud.order.services.cancel_order.cancellation_notification import CancelNotificationService
 from src.crud.order.services.cancel_order.inventory_restoration import InventoryRestorationService
-from src.crud.order.services.cancel_order.refund_processing import RefundProcessingService
+from src.crud.order.services.process_cancellation.refund_processing import RefundProcessingService
 from src.database.models import Order
 from src.crud.order.repositories import OrderRepository
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -79,16 +79,13 @@ class ProcessCancellationService:
             "updated_at": datetime.now()
         }, session)
 
-        success = await refund_processing_service.process_refund_if_paid(session, order, request)
-
-        if success:
-            await cancellation_notification_service.notify_cancellation_rejected(
-                session=session,
-                order_id=order_id,
-                customer_id=str(order.user_id),
-                order_code=order.code,
-                reject_reason=reject_reason
-            )
+        await cancellation_notification_service.notify_cancellation_rejected(
+            session=session,
+            order_id=order_id,
+            customer_id=str(order.user_id),
+            order_code=order.code,
+            reject_reason=reject_reason
+        )
 
 
     async def process_cancellation_by_admin(self, order_id: str, data: ProcessCancellationRequest, request: Request,

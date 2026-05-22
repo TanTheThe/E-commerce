@@ -1,5 +1,4 @@
 from fastapi import APIRouter, status, Depends, Query
-from pydantic import Field
 from src.crud.tag.services.assign_tags_to_product import AssignTagsToProductService
 from src.crud.tag.services.create_tag import CreateTagService
 from src.crud.tag.services.delete_tag import DeleteTagService
@@ -40,8 +39,8 @@ async def create_tag(tag_data: TagCreateModel,
 
 @tag_admin_router.get("/all", dependencies=[Depends(admin_role_middleware)])
 async def get_all_tags_admin(params: TagAdminQueryParams = Depends(),
-                             skip: int = Field(0, ge=0, description="Số bản ghi bỏ qua"),
-                             limit: int = Field(10, ge=1, le=100, description="Số bản ghi trả về"),
+                             skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                             limit: int = Query(10, ge=1, le=100, description="Số bản ghi trả về"),
                              token_details: dict = Depends(access_token_bearer),
                              session: AsyncSession = Depends(get_session)):
     tags = await get_all_tags_service.get_all_tags_admin(params, skip, limit, session)
@@ -117,8 +116,8 @@ async def delete_multiple_tags(data: DeleteMultipleTagsModel,
 
 @tag_customer_router.get("/all")
 async def get_all_tags_customer(params: TagQueryParams = Depends(),
-                                skip: int = Field(0, ge=0, description="Số bản ghi bỏ qua"),
-                                limit: int = Field(20, ge=1, le=50, description="Số bản ghi trả về"),
+                                skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua"),
+                                limit: int = Query(20, ge=1, le=50, description="Số bản ghi trả về"),
                                 session: AsyncSession = Depends(get_session)):
     tags = await get_all_tags_service.get_all_tags_customer(params, skip, limit, session)
     return JSONResponse(

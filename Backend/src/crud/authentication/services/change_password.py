@@ -42,7 +42,8 @@ class ChangePasswordService:
             raise
         except Exception as e:
             await session.rollback()
-            logger.error("Error change password: ", e)
+            logger.error("Lỗi khi đổi mật khẩu: ", e)
+
             AuthException.password_change_failed()
 
 
@@ -106,6 +107,7 @@ class ChangePasswordService:
         if verify_password(new_password, user.password):
             AuthException.same_password_error()
 
+
     def validate_password_strength(self, password: str):
         if len(password) < 8:
             AuthException.password_too_short()
@@ -158,7 +160,7 @@ class ChangePasswordService:
             await user_repository.update_user(condition, update_data, session)
 
         except Exception as e:
-            logger.error("Error update user password: ", e)
+            logger.error("Lỗi update mật khẩu user: ", e)
             raise
 
 

@@ -1248,62 +1248,6 @@ class Warehouse(SQLModel, table=True):
     stock_transactions: List["StockTransaction"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
 
 
-class User(SQLModel, table=True):
-    __tablename__ = 'user'
-
-    id: uuid.UUID = Field(
-        sa_column=Column(
-            pg.UUID,
-            nullable=False,
-            primary_key=True,
-            default=uuid.uuid4
-        )
-    )
-
-    first_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    last_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    email: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
-    password: str = Field(sa_column=Column(pg.VARCHAR, nullable=False), exclude=True)
-    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    customer_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
-    staff_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
-    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
-    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
-    is_verified: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_admin: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_customer: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-    two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
-    two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
-
-    warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
-    warehouse_role: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "manager", "staff", "picker", "checker"
-
-    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    cash_transactions: List["CashTransaction"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
-    user_special_offer: List["UserSpecialOffer"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={'lazy': 'noload'}
-    )
-    managed_warehouses: List["Warehouse"] = Relationship(
-        back_populates="manager",
-        sa_relationship_kwargs={
-            'lazy': 'noload',
-            'foreign_keys': '[Warehouse.manager_id]'
-        }
-    )
-    warehouse: Optional["Warehouse"] = Relationship(
-        back_populates="staff_members",
-        sa_relationship_kwargs={
-            'lazy': 'noload',
-            'foreign_keys': '[User.warehouse_id]'
-        }
-    )
-
-
 class CashTransaction(SQLModel, table=True):
     """Giao dịch thu chi tiền mặt"""
     __tablename__ = 'cash_transaction'
@@ -1904,6 +1848,241 @@ class OTPVerificationAttempt(SQLModel, table=True):
         default=datetime.now
     )
 
+class Permission(SQLModel, table=True):
+    __tablename__ = 'permission'
+    __table_args__ = (
+        Index(
+            'ix_permission_code_unique_not_deleted',
+            'code',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    # VD: "order:approve_cancel", "stock:adjust", "product:edit"
+    code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # Tên hiển thị. VD: "Duyệt hủy đơn hàng"
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    # Nhóm quyền. VD: "order", "stock", "product", "finance", "warehouse"
+    group: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, index=True))
+
+    description: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")),
+        default=True
+    )
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    role_permissions: List["RolePermission"] = Relationship(
+        back_populates="permission",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+
+
+class Role(SQLModel, table=True):
+    __tablename__ = 'role'
+    __table_args__ = (
+        Index(
+            'ix_role_name_unique_not_deleted',
+            'name',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    # VD: "warehouse_manager", "order_manager", "accountant"
+    name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+
+    description: Optional[str] = Field(sa_column=Column(pg.TEXT, nullable=True))
+
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")),
+        default=True
+    )
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+    updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+
+    role_permissions: List["RolePermission"] = Relationship(
+        back_populates="role",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+    user_roles: List["UserRole"] = Relationship(
+        back_populates="role",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+
+
+class RolePermission(SQLModel, table=True):
+    __tablename__ = 'role_permission'
+    __table_args__ = (
+        UniqueConstraint(
+            'role_id', 'permission_id',
+            name='uq_role_permission_role_permission'
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    role_id: uuid.UUID = Field(foreign_key="role.id", nullable=False, index=True)
+    permission_id: uuid.UUID = Field(foreign_key="permission.id", nullable=False, index=True)
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+
+    role: Optional["Role"] = Relationship(
+        back_populates="role_permissions",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+    permission: Optional["Permission"] = Relationship(
+        back_populates="role_permissions",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+
+
+class UserRole(SQLModel, table=True):
+    __tablename__ = 'user_role'
+    __table_args__ = (
+        UniqueConstraint(
+            'user_id', 'role_id',
+            name='uq_user_role_user_role'
+        ),
+    )
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    user_id: uuid.UUID = Field(foreign_key="user.id", nullable=False, index=True)
+    role_id: uuid.UUID = Field(foreign_key="role.id", nullable=False, index=True)
+
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
+        default=datetime.now
+    )
+
+    # null = đang active, có giá trị = đã bị thu hồi
+    is_active: bool = Field(
+        sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("true")),
+        default=True
+    )
+
+    user: Optional["User"] = Relationship(
+        back_populates="user_roles",
+        sa_relationship_kwargs={"lazy": "noload", "foreign_keys": "[UserRole.user_id]"}
+    )
+    role: Optional["Role"] = Relationship(
+        back_populates="user_roles",
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+
+
+class User(SQLModel, table=True):
+    __tablename__ = 'user'
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID,
+            nullable=False,
+            primary_key=True,
+            default=uuid.uuid4
+        )
+    )
+
+    first_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    last_name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    email: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
+    password: str = Field(sa_column=Column(pg.VARCHAR, nullable=False), exclude=True)
+    phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    customer_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    staff_status: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, server_default="active"), default="active")
+    created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")), default=datetime.now)
+    updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    deleted_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, nullable=True))
+    is_verified: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_admin: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_customer: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    is_staff: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+    two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
+    two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
+
+    warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
+    warehouse_role: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "manager", "staff", "picker", "checker"
+
+    address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    evaluate: List["Evaluate"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    cash_transactions: List["CashTransaction"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
+    user_special_offer: List["UserSpecialOffer"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={'lazy': 'noload'}
+    )
+    managed_warehouses: List["Warehouse"] = Relationship(
+        back_populates="manager",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[Warehouse.manager_id]'
+        }
+    )
+    warehouse: Optional["Warehouse"] = Relationship(
+        back_populates="staff_members",
+        sa_relationship_kwargs={
+            'lazy': 'noload',
+            'foreign_keys': '[User.warehouse_id]'
+        }
+    )
+    user_roles: List["UserRole"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={
+            "lazy": "noload",
+            "foreign_keys": "[UserRole.user_id]"
+        }
+    )
 
 
 

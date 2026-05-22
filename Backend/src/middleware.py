@@ -6,7 +6,7 @@ from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 from src.database.redis import check_login_rate_limit, check_rate_limit
-from src.cache.cache_keys import CacheKeys
+from src.config import Config
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):
@@ -48,7 +48,7 @@ def register_middleware(app: FastAPI):
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=Config.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -56,7 +56,7 @@ def register_middleware(app: FastAPI):
 
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["localhost", "127.0.0.1"]
+        allowed_hosts=Config.allowed_hosts
     )
     
 class RateLimitMiddleware:

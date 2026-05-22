@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Dict, List
 from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.cache import cache_service
+from src.cache import cache_service, CacheKeys
 from src.crud.good_receipts.repositories import GoodsReceiptRepository
 from src.crud.good_receipts.services.approve_goods_receipt.approval_calculation import ApprovalCalculationService
 from src.crud.good_receipts.services.approve_goods_receipt.approval_validation import ApproveGRValidationService
@@ -103,10 +103,10 @@ class ApproveGoodsReceiptService:
             session=session
         )
 
-        cache_service.delete(f"stock:warehouse:{str(gr.warehouse_id)}:summary")
-        cache_service.delete_pattern(f"stock:low_stock:warehouse:{str(gr.warehouse_id)}:*")
-        cache_service.delete_pattern(f"stock:warehouse:{str(gr.warehouse_id)}:product:*")
-        cache_service.delete(f"stock:warehouse:{str(gr.warehouse_id)}:filters")
+        await cache_service.delete(CacheKeys.stock_warehouse_summary(str(gr.warehouse_id)))
+        await cache_service.delete_pattern(CacheKeys.low_stock_items_without_filter(str(gr.warehouse_id)))
+        await cache_service.delete_pattern(CacheKeys.stock_warehouse_products(str(gr.warehouse_id)))
+        await cache_service.delete(CacheKeys.stock_warehouse_filters(str(gr.warehouse_id)))
 
         logger.info(f"Invalidated stock caches for warehouse {gr.warehouse_id} after goods receipt approval")
 
