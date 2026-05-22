@@ -39,6 +39,7 @@ class VerificationSecurityService:
             
         except Exception as e:
             logger.error(f"Error checking verification rate limit: {str(e)}")
+            raise
     
     
     

@@ -4,6 +4,7 @@ from src.crud.authentication.services.logout.token_blacklist_service import Toke
 from src.crud.authentication.utils import decode_url_safe_token, verify_password, generate_password_hash
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
+from fastapi import HTTPException
 from src.errors.authentication import AuthException
 from src.schemas.user import ForgotPasswordConfirmModel, UserRole
 from fastapi import Request
@@ -22,6 +23,9 @@ class ForgotPasswordConfirmService:
                 role.value,
                 purpose="reset_password",
             )
+
+            if token_data is None:
+                AuthException.token_invalid()
 
             is_blacklisted = await token_blacklist_service.token_in_blocklist(
                 token=data.token,
@@ -87,6 +91,9 @@ class ForgotPasswordConfirmService:
 
             return f"Đổi mật khẩu {role_display} thành công"
 
+        except HTTPException:
+            await session.rollback()
+            raise
         except Exception as e:
             logger.error(f"Reset password confirm thất bại: {str(e)}")
             await session.rollback()

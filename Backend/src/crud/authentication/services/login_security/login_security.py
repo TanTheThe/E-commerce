@@ -19,6 +19,7 @@ class LoginSecurityService:
             await rate_limit_service.check_ip_rate_limit(ip_address)
         except Exception as e:
             logger.error(f"Lỗi khi check giới hạn đăng nhập: {str(e)}")
+            raise
             
             
     async def handle_failed_login(self, email: str, request: Request, session: AsyncSession):
@@ -28,6 +29,7 @@ class LoginSecurityService:
             await attempt_logger_service.log_failed_attempt(email, ip_address, session)
         except Exception as e:
             logger.error(f"Lỗi xử lý đăng nhập không thành công: {str(e)}")
+            raise
             
             
     async def handle_successful_login(self, email: str, request: Request, session: AsyncSession):
@@ -38,6 +40,7 @@ class LoginSecurityService:
             
         except Exception as e:
             logger.error(f"Lỗi xử lý đăng nhập thành công: {str(e)}")
+            raise
             
     
     

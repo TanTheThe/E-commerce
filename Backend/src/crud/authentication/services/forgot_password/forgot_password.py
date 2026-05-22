@@ -5,6 +5,7 @@ from src.crud.authentication.services.forgot_password.forgot_password_security i
 from src.crud.authentication.utils import create_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
+from fastapi import HTTPException
 from src.errors.authentication import AuthException
 from src.mail import mail, create_message
 from src.schemas.user import ResetMethod, UserRole
@@ -40,6 +41,8 @@ class ForgotPasswordService:
             else:
                 AuthException.invalid_reset_method()
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Quên mật khẩu thất bại cho email {email}: {str(e)}")
             AuthException.forgot_password_failed()
@@ -47,7 +50,8 @@ class ForgotPasswordService:
 
     async def find_and_validate_user(self, email: str, role: UserRole, session: AsyncSession):
         condition = [
-            User.email == email, User.deleted_at.is_(None), User.customer_status == "active"
+            User.email == email,
+            User.deleted_at.is_(None),
         ]
 
         user = await user_repository.get_user(session=session, where_conditions=condition)

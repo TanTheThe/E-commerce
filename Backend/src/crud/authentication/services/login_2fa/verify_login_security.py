@@ -41,6 +41,7 @@ class VerifyLoginSecurityService:
             raise
         except Exception as e:
             logger.error(f"Error checking login rate limit: {str(e)}")
+            raise
 
 
     async def log_otp_attempt(self, user_id: str, is_successful: bool, request: Request, session: AsyncSession):
@@ -78,6 +79,7 @@ class VerifyLoginSecurityService:
                 
         except Exception as e:
             logger.error(f"Error logging OTP attempt: {str(e)}")
+            raise
             
             
     async def reset_otp_attempts(self, user_id: str) -> bool:

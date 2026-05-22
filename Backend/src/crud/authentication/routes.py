@@ -141,12 +141,12 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 async def change_password_customer(passwords: ChangePasswordModel, request: Request, session: AsyncSession = Depends(get_session),
                                    token_details: dict = Depends(access_token_bearer)):
     user_id = token_details['user']['id']
-    role_display, result = await change_password_service.change_password(user_id, passwords, UserRole.CUSTOMER, session)
+    result = await change_password_service.change_password(user_id, passwords, UserRole.CUSTOMER, session)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "message": f"Đổi mật khẩu {result['role_display']} thành công",
             "content": result["data"]
         }
     )
@@ -328,7 +328,7 @@ async def change_password_admin(request: Request, passwords: ChangePasswordModel
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "message": f"Đổi mật khẩu {result['role_display']} thành công",
             "content": result["data"]
         }
     )
@@ -385,7 +385,7 @@ async def change_password_staff(request: Request, passwords: ChangePasswordModel
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={
-            "message": f"Đổi mật khẩu {result["role_display"]} thành công",
+            "message": f"Đổi mật khẩu {result['role_display']} thành công",
             "content": result["data"]
         }
     )

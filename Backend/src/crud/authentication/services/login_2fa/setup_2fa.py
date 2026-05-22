@@ -99,8 +99,8 @@ class Setup2FAService:
         cached_qr = await cache_service.get(qr_cache_key)
 
         if cached_qr:
-                logger.info(f"QR code retrieved from cache for user: {user_id}")
-                qr_base64 = cached_qr
+            logger.info(f"QR code retrieved from cache for user: {user_id}")
+            qr_base64 = cached_qr
         else:
             otp_url = pyotp.totp.TOTP(secret).provisioning_uri(
                 name=account_name,

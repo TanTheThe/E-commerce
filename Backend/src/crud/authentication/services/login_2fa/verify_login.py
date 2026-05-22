@@ -7,6 +7,7 @@ from src.crud.authentication.services.logout.token_blacklist_service import Toke
 from src.crud.authentication.utils import decode_url_safe_token, create_access_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
+from fastapi import HTTPException
 from src.errors.authentication import AuthException
 from src.schemas.user import VerifyLoginAdminModel, AdminStaffRole
 from fastapi import Request
@@ -52,7 +53,7 @@ class VerifyLoginService:
             AuthException.user_not_found()
 
         token_email = token_data.get('email')
-        if not token_email:
+        if not token_email or token_email != user.email:
             await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
             AuthException.token_invalid()
 

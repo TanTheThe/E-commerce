@@ -44,6 +44,7 @@ class CreateAccountSecurityService:
                 
         except Exception as e:
             logger.error(f"Lỗi khi kiểm tra signup rate limit: {str(e)}")
+            raise
             
             
     async def check_email_signup_cooldown(self, email: str, cooldown_minutes: int = 5):
@@ -61,7 +62,8 @@ class CreateAccountSecurityService:
                 AuthException.too_many_signup_from_this_email(remaining_minutes)
             
         except Exception as e:
-            logger.error(f"Failed to set email cooldown: {str(e)}")
+            logger.error(f"Failed to check email signup cooldown: {str(e)}")
+            raise
             
     
     async def set_email_signup_cooldown(self, email: str, cooldown_minutes: int = 5):
@@ -78,6 +80,7 @@ class CreateAccountSecurityService:
             
         except Exception as e:
             logger.error(f"Failed to set email cooldown: {str(e)}")
+            raise
             
             
     async def cache_verification_token(self, token: str, user_id: str, email: str, ttl: int = 86400):
@@ -95,6 +98,7 @@ class CreateAccountSecurityService:
             
         except Exception as e:
             logger.error(f"Failed to cache verification token: {str(e)}")
+            raise
     
     
     

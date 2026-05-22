@@ -45,6 +45,7 @@ class ForgotPasswordSecurityService:
 
         except Exception as e:
             logger.error(f"Lỗi khi kiểm tra forgot password rate limit: {str(e)}")
+            raise
             
     
     # Lưu vào cache thay vì DB

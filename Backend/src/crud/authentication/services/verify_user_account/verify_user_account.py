@@ -5,6 +5,7 @@ from src.crud.authentication.services.verify_user_account.verify_account_securit
 from src.crud.authentication.utils import decode_url_safe_token
 from src.crud.user.repositories import UserRepository
 from src.database.models import User
+from fastapi import HTTPException
 from src.errors.authentication import AuthException
 from fastapi import Request
 from src.schemas.user import UserRole
@@ -74,25 +75,18 @@ class VerifyUserAccountService:
             if role == UserRole.STAFF and not user.is_staff:
                 AuthException.authentication_error()
 
-            try:
-                update_data = {
-                    "is_verified": True,
-                    "updated_at": datetime.now()
-                }
+            update_data = {
+                "is_verified": True,
+                "updated_at": datetime.now()
+            }
 
-                condition_update = [
-                    User.id == user.id,
-                    User.deleted_at.is_(None),
-                ]
+            condition_update = [
+                User.id == user.id,
+                User.deleted_at.is_(None),
+            ]
 
-                user_tuple = await user_repository.update_user(condition_update, update_data, session)
-                user = user_tuple[0]
-
-            except Exception as e:
-                await session.rollback()
-                logger.error(f"Failed to update user verified status: {str(e)}")
-                AuthException.verification_failed()
-                
+            user_tuple = await user_repository.update_user(condition_update, update_data, session)
+            user = user_tuple[0]
             
             await token_blacklist_service.add_token_to_blocklist(
                 token=token,
@@ -106,11 +100,14 @@ class VerifyUserAccountService:
             )
 
             await session.commit()
-            
+        
+        except HTTPException:
+            await session.rollback()
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"Email verification failed: {str(e)}")
-            AuthException.verification_failed()
+            raise
 
 
 

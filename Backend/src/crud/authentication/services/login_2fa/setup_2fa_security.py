@@ -42,6 +42,7 @@ class Setup2FASecurityService:
             raise
         except Exception as e:
             logger.error(f"Error checking setup 2FA rate limit: {str(e)}")
+            raise
 
 
     async def log_setup_2fa_attempt(self, user_id: str, session: AsyncSession):
