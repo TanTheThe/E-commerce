@@ -1,0 +1,44 @@
+[
+  {
+    "id": "9b1c5f80-aaaa-4bbb-8ccc-000000000001",
+    "name": "Kho Hà Nội Trung Tâm",
+    "phone": "02431234567",
+    "email": "khohn@mailinator.com",
+    "address_line": "Số 12 Phố Huế, Quận Hoàn Kiếm, Hà Nội",
+    "manager_id": "2f1b7c2a-1111-4a11-8111-000000000002",
+    "is_active": true,
+    "is_default": true,
+    "created_at": "2026-05-26T09:00:00Z",
+    "updated_at": null,
+    "ward_id": "37ab6420-7481-4e2e-af2f-3521770c69eb",
+    "province_id": "f55acde3-3cdd-470a-b60e-5b6ec6d5d9a6"
+  },
+  {
+    "id": "9b1c5f80-aaaa-4bbb-8ccc-000000000002",
+    "name": "Kho Miền Bắc",
+    "phone": "02439876543",
+    "email": "khomb@mailinator.com",
+    "address_line": "Số 88 Lưng Hương, Quận Đống Đa, Hà Nội",
+    "manager_id": "2f1b7c2a-1111-4a11-8111-000000000003",
+    "is_active": true,
+    "is_default": false,
+    "created_at": "2026-05-26T09:10:00Z",
+    "updated_at": null,
+    "ward_id": "8a334a31-6a6b-4335-91c9-09668bcbc6df",
+    "province_id": "a87354da-181a-41d3-96ec-cf711e3fd02f"
+  },
+  {
+    "id": "9b1c5f80-aaaa-4bbb-8ccc-000000000003",
+    "name": "Kho Hà Trung Bắn Hưng",
+    "phone": "02831234567",
+    "email": "support-warehouse@mailinator.com",
+    "address_line": "Số 45 Nguyễn Văn Linh, Quận 7, TP. Hà Chí Minh",
+    "manager_id": "2f1b7c2a-1111-4a11-8111-000000000008",
+    "is_active": true,
+    "is_default": false,
+    "created_at": "2026-05-26T09:20:00Z",
+    "updated_at": null,
+    "ward_id": "4b72afdf-86c3-43ee-94cb-a59fa9a5f8c3",
+    "province_id": "2acbf385-ca78-4b18-81f7-e8d8c55efe76"
+  }
+]

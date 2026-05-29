@@ -1,0 +1,167 @@
+[
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000001",
+    "name": "Dirty Coins",
+    "slug": "dirty-coins",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/logo-dirtycoins.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvbG9nby1kaXJ0eWNvaW5zLndlYnAiLCJpYXQiOjE3Nzk4NTI0MDIsImV4cCI6MTgxMTM4ODQwMn0.O-9Q29es0GV5NcFq9X42oAkvkGrnJ1xSLCwUUg4wTLo",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000002",
+    "name": "HADES",
+    "slug": "hades",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/hades.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvaGFkZXMuanBnIiwiaWF0IjoxNzc5ODUyNDY0LCJleHAiOjE4MTEzODg0NjR9.AIqRChqI-7KE27qtkHy0mjSN4_wDYwQScNR2nJICygg",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000003",
+    "name": "DEGREY",
+    "slug": "degrey",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/hades.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvaGFkZXMuanBnIiwiaWF0IjoxNzc5ODUyNTI5LCJleHAiOjE4MTEzODg1Mjl9.PbMNBoP1H-m4nUm535o50aNizyyRsraPTk7PLjAySPc",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000004",
+    "name": "ClownZ",
+    "slug": "clownz",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/clownz.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvY2xvd256LmpwZyIsImlhdCI6MTc3OTg1MjYzMSwiZXhwIjoxODExMzg4NjMxfQ.BC3atoU-qEUq7kvYxxwoayZ5Zh_P53yvmcmWYQ_sxDg",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000005",
+    "name": "Grimm DC",
+    "slug": "grimm-dc",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/logo-grimdc.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvbG9nby1ncmltZGMud2VicCIsImlhdCI6MTc3OTg1MjY2MSwiZXhwIjoxODExMzg4NjYxfQ.KkgtzNT3o5q27aSXkfG7TyGBKiG8yMEa4wZbwK7GLKA",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000006",
+    "name": "5THEWAY",
+    "slug": "5theway",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/5theway.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvNXRoZXdheS5wbmciLCJpYXQiOjE3Nzk4NTI2OTgsImV4cCI6MTgxMTM4ODY5OH0.nPIfvz_Y1K4QeNOyPukJMXUaDl7RL9Z5hVu9LwDGCfg",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000007",
+    "name": "Coolmate",
+    "slug": "coolmate",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/coolmate.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvY29vbG1hdGUucG5nIiwiaWF0IjoxNzc5ODUyNzM1LCJleHAiOjE4MTEzODg3MzV9.N0BMh0zIL-_1LV61BLwCG_oAijqU6Y1MyXCo3ci6Zqc",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000008",
+    "name": "Ssstutter",
+    "slug": "ssstutter",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/sss.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvc3NzLndlYnAiLCJpYXQiOjE3Nzk4NTI3ODUsImV4cCI6MTgxMTM4ODc4NX0.socu8g4fmZmf_OA0ORf9zYwmB0C1VB-NSXKfuh6kvuI",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000009",
+    "name": "Davies",
+    "slug": "davies",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/logo-davies.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvbG9nby1kYXZpZXMud2VicCIsImlhdCI6MTc3OTg1MjgwOCwiZXhwIjoxODExMzg4ODA4fQ.TKGyLznR-QScLc6yQ47i50g6tKgHBt0h5we61b4ke3k",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000010",
+    "name": "BOBUI",
+    "slug": "bobui",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/bubui.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvYnVidWkuanBnIiwiaWF0IjoxNzc5ODUyODQyLCJleHAiOjE4MTEzODg4NDJ9.dXuV1AcblJyrnPg9TZFMpH62WpF4q-f0QEWnitgU8H4",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000011",
+    "name": "Freakers",
+    "slug": "freakers",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/freakers.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvZnJlYWtlcnMuanBnIiwiaWF0IjoxNzc5ODUyOTI4LCJleHAiOjE4MTEzODg5Mjh9.xjpCmyd4cffP2xrzvpEKu3KKQEuJaU355emuwe2lkWI",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000012",
+    "name": "DVRK",
+    "slug": "dvrk",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/dvrk.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvZHZyay5qcGciLCJpYXQiOjE3Nzk4NTI5NTQsImV4cCI6MTgxMTM4ODk1NH0.Zt5Rr-kMi8sQmAZKqXRcL0NmznVxBMfa3CD0VLVjRUc",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000013",
+    "name": "LYOS",
+    "slug": "lyos",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/lyos.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvbHlvcy5wbmciLCJpYXQiOjE3Nzk4NTI5OTAsImV4cCI6MTgxMTM4ODk5MH0.MtXo-mkuhfHRJBMytd_dpveLEIlbiW2tZquYenuaGIY",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000014",
+    "name": "Teelab",
+    "slug": "teelab",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/teelab.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvdGVlbGFiLnBuZyIsImlhdCI6MTc3OTg1MzAxNiwiZXhwIjoxODExMzg5MDE2fQ.sBYZZLS8jjZ8eTERpaeLw0AOol0hOEN4uVr2R62ZQzA",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "8b7e1f90-2000-4000-9000-000000000015",
+    "name": "Libe Workshop",
+    "slug": "libe-workshop",
+    "logo": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/brand/libe.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvYnJhbmQvbGliZS5wbmciLCJpYXQiOjE3Nzk4NTMwNTEsImV4cCI6MTgxMTM4OTA1MX0.dAcrk3G_6n2ZLW1tIs8x6dOyrdScYxh6YYPkWU9UVIE",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T10:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  }
+]

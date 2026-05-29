@@ -1,0 +1,242 @@
+[
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000001",
+    "name": "Casual",
+    "slug": "casual",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000002",
+    "name": "Streetwear",
+    "slug": "streetwear",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000003",
+    "name": "Minimal",
+    "slug": "minimal",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000004",
+    "name": "Basic",
+    "slug": "basic",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000005",
+    "name": "Vintage",
+    "slug": "vintage",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000006",
+    "name": "Korean Style",
+    "slug": "korean-style",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000007",
+    "name": "Y2K",
+    "slug": "y2k",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000008",
+    "name": "Sporty",
+    "slug": "sporty",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000009",
+    "name": "Office",
+    "slug": "office",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000010",
+    "name": "Slim Fit",
+    "slug": "slim-fit",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000011",
+    "name": "Oversize",
+    "slug": "oversize",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000012",
+    "name": "Đi học",
+    "slug": "di-hoc",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000013",
+    "name": "Đi làm",
+    "slug": "di-lam",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000014",
+    "name": "Đi chơi",
+    "slug": "di-choi",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000015",
+    "name": "Party",
+    "slug": "party",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000016",
+    "name": "Date",
+    "slug": "date",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000017",
+    "name": "Gym",
+    "slug": "gym",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000018",
+    "name": "Outdoor",
+    "slug": "outdoor",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000019",
+    "name": "Du lịch",
+    "slug": "du-lich",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000020",
+    "name": "Mặc nhà",
+    "slug": "mac-nha",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000021",
+    "name": "Summer",
+    "slug": "summer",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000022",
+    "name": "Winter",
+    "slug": "winter",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000023",
+    "name": "Autumn",
+    "slug": "autumn",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "c1b2d3e4-7000-4000-8000-000000000024",
+    "name": "Spring",
+    "slug": "spring",
+    "is_active": true,
+    "products_count": 0,
+    "created_at": "2026-05-26T13:00:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  }
+]

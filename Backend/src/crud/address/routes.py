@@ -45,7 +45,7 @@ async def create_address(address_data: AddressCreateModel, session: AsyncSession
 
 @address_admin_router.post('/import-all')
 async def import_all_data(session: AsyncSession = Depends(get_session)):
-    result = await import_all_data_service.import_all_data(session)
+    result = import_all_data_service.import_all_data()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,

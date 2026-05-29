@@ -1,0 +1,122 @@
+[
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000001",
+    "name": "Đen",  
+    "code": "000000",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000002",
+    "name": "Trắng",
+    "code": "FFFFFF",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000003",
+    "name": "Xám",
+    "code": "808080",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000004",
+    "name": "Bạc",
+    "code": "C0C0C0",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000005",
+    "name": "Navy",
+    "code": "000080",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000006",
+    "name": "Xanh dương",
+    "code": "1E90FF",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000007",
+    "name": "Xanh lá",
+    "code": "2E8B57",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000008",
+    "name": "Đỏ",
+    "code": "FF0000",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000009",
+    "name": "Đỏ đậm",
+    "code": "8B0000",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000010",
+    "name": "Hồng",
+    "code": "FF69B4",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000011",
+    "name": "Tím",
+    "code": "800080",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000012",
+    "name": "Vàng",
+    "code": "FFD700",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000013",
+    "name": "Kem",
+    "code": "FFFDD0",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000014",
+    "name": "Nâu",
+    "code": "8B4513",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  },
+  {
+    "id": "5e2d4c10-5000-4000-8000-000000000015",
+    "name": "Cam",
+    "code": "FFA500",
+    "created_at": "2026-05-26T10:30:00Z",
+    "updated_at": null,
+    "deleted_at": null
+  }
+]

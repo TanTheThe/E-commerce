@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, text, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import JSONB
-
+import sqlalchemy as sa
 
 
 class Province(SQLModel, table=True):
@@ -55,6 +55,10 @@ class Ward(SQLModel, table=True):
 
 class Address(SQLModel, table=True):
     __tablename__ = 'address'
+    __table_args__ = (
+        Index('ix_address_user_deleted', 'user_id', 'deleted_at'),
+        Index('ix_address_ward_id', 'ward_id'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -85,6 +89,27 @@ class Address(SQLModel, table=True):
 
 class Order(SQLModel, table=True):
     __tablename__ = 'order'
+    __table_args__ = (
+        Index('ix_order_user_status', 'user_id', 'status'),
+        Index('ix_order_status_created', 'status', 'created_at'),
+        Index('ix_order_payment_status', 'payment_status'),
+        Index('ix_order_deleted_at', 'deleted_at'),
+        CheckConstraint('sub_total >= 0', name='ck_order_sub_total_positive'),
+        CheckConstraint('total_price >= 0', name='ck_order_total_price_positive'),
+        CheckConstraint('discount >= 0', name='ck_order_discount_positive'),
+        CheckConstraint('discount_percent BETWEEN 0 AND 100', name='ck_order_discount_percent_range'),
+
+        Index('ix_order_code', 'code'),
+        Index('ix_order_special_offer_id', 'special_offer_id'),
+        CheckConstraint(
+            'delivered_at IS NULL OR delivered_at >= created_at',
+            name='ck_order_delivered_after_created'
+        ),
+        CheckConstraint(
+            'received_at IS NULL OR received_at >= created_at',
+            name='ck_order_received_after_created'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -142,6 +167,12 @@ class Order(SQLModel, table=True):
 
 class Order_Detail(SQLModel, table=True):
     __tablename__ = 'order_detail'
+    __table_args__ = (
+        Index('ix_order_detail_order_id', 'order_id'),
+        Index('ix_order_detail_product_variant', 'product_id', 'product_variant_id'),
+        CheckConstraint('quantity > 0', name='ck_order_detail_quantity_positive'),
+        CheckConstraint('price > 0', name='ck_order_detail_price_positive'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -440,6 +471,17 @@ class Supplier_Product(SQLModel, table=True):
 
 class Product(SQLModel, table=True):
     __tablename__ = 'product'
+    __table_args__ = (
+        Index('ix_product_status_popularity', 'status', 'popularity_score'),
+        Index('ix_product_status_rating', 'status', 'avg_rating'),
+        Index('ix_product_brand_status', 'brand_id', 'status'),
+        Index('ix_product_deleted_at', 'deleted_at'),
+        Index('ix_product_special_offer_status', 'special_offer_id', 'status', 'deleted_at'),
+        CheckConstraint('avg_rating BETWEEN 0 AND 5', name='ck_product_avg_rating_range'),
+        CheckConstraint('total_sold >= 0', name='ck_product_total_sold_non_negative'),
+        CheckConstraint('review_count >= 0', name='ck_product_review_count_non_negative'),
+        CheckConstraint('popularity_score >= 0', name='ck_product_popularity_non_negative'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -484,6 +526,21 @@ class Product(SQLModel, table=True):
 
 class Product_Variant(SQLModel, table=True):
     __tablename__ = 'product_variant'
+    __table_args__ = (
+        CheckConstraint('price > 0', name='ck_variant_price_positive'),
+        CheckConstraint('quantity >= 0', name='ck_variant_quantity_non_negative'),
+        Index('ix_variant_product_id', 'product_id'),
+        Index(
+            'ix_variant_sku_unique_not_deleted',
+            'sku',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        CheckConstraint(
+            'color_id IS NULL OR color_name IS NOT NULL',
+            name='ck_variant_color_name_required'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -558,6 +615,10 @@ class Evaluate(SQLModel, table=True):
     __tablename__ = 'evaluate'
     __table_args__ = (
         UniqueConstraint('order_detail_id', name='uq_evaluate_order_detail_id'),  # Đảm bảo 1-1
+        Index('ix_evaluate_product_created', 'product_id', 'created_at'),
+        Index('ix_evaluate_product_rate', 'product_id', 'rate'),
+        CheckConstraint('rate BETWEEN 1 AND 5', name='ck_evaluate_rate_range'),
+        Index('ix_evaluate_user_id', 'user_id'),
     )
 
     id: uuid.UUID = Field(
@@ -597,6 +658,31 @@ class Evaluate(SQLModel, table=True):
 
 class Special_Offer(SQLModel, table=True):
     __tablename__ = 'special_offer'
+    __table_args__ = (
+        CheckConstraint('end_time > start_time', name='ck_special_offer_time_range'),
+        CheckConstraint('discount > 0', name='ck_special_offer_discount_positive'),
+        CheckConstraint('total_quantity > 0', name='ck_special_offer_quantity_positive'),
+        Index(
+            'ix_special_offer_code_unique_not_deleted',
+            'code',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        Index(
+            'ix_special_offer_active_time',
+            'start_time',
+            'end_time',
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+        CheckConstraint(
+            'used_quantity <= total_quantity',
+            name='ck_special_offer_used_lte_total'
+        ),
+        CheckConstraint(
+            'condition IS NULL OR condition >= 0',
+            name='ck_special_offer_condition_non_negative'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -722,7 +808,7 @@ class Cart(SQLModel, table=True):
     updated_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
     deleted_at: Optional[datetime] = Field(sa_column=Column(pg.TIMESTAMP))
 
-    user: Optional["User"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    user: Optional["User"] = Relationship(back_populates="cart", sa_relationship_kwargs={"lazy": "noload"})
     items: List["Cart_Item"] = Relationship(
         back_populates="cart", 
         sa_relationship_kwargs={
@@ -767,7 +853,8 @@ class Cart_Item(SQLModel, table=True):
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4)
     )
 
-    cart_id: uuid.UUID = Field(foreign_key="cart.id", nullable=False)
+    cart_id: uuid.UUID = Field(sa_column=Column(pg.UUID, nullable=False))  # bỏ foreign_key=
+
     product_id: uuid.UUID = Field(foreign_key="product.id", nullable=False)
     product_variant_id: uuid.UUID = Field(foreign_key="product_variant.id", nullable=True)
 
@@ -804,6 +891,11 @@ class OrderStatusHistory(SQLModel, table=True):
 
 class Payment(SQLModel, table=True):
     __tablename__ = "payment"
+    __table_args__ = (
+        Index('ix_payment_order_id', 'order_id'),
+        Index('ix_payment_status_created', 'status', 'created_at'),
+        CheckConstraint('amount > 0', name='ck_payment_amount_positive'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -837,6 +929,12 @@ class Payment(SQLModel, table=True):
 
 class PaymentRefund(SQLModel, table=True):
     __tablename__ = "payment_refund"
+    __table_args__ = (
+        Index('ix_payment_refund_payment_id', 'payment_id'),
+        Index('ix_payment_refund_status', 'status', 'created_at'),
+        CheckConstraint('refund_amount > 0', name='ck_refund_amount_positive'),
+        CheckConstraint('attempt_count >= 0', name='ck_refund_attempt_count_non_negative'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -869,6 +967,11 @@ class PaymentRefund(SQLModel, table=True):
 
 class Notification(SQLModel, table=True):
     __tablename__ = 'notification'
+    __table_args__ = (
+        Index('ix_notification_recipient_read', 'recipient_id', 'is_read', 'created_at'),
+        Index('ix_notification_recipient_type', 'recipient_type', 'recipient_id'),
+        Index('ix_notification_return_order_id', 'return_order_id'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -918,6 +1021,14 @@ class Notification(SQLModel, table=True):
 
 class ReturnOrder(SQLModel, table=True):
     __tablename__ = "return_order"
+    __table_args__ = (
+        Index('ix_return_order_status', 'status', 'created_at'),
+        Index('ix_return_order_user', 'user_id', 'status'),
+        CheckConstraint('refunded_amount >= 0', name='ck_return_order_refunded_non_negative'),
+        CheckConstraint('refunded_amount <= total_refund_amount', name='ck_return_order_refunded_lte_total'),
+        Index('ix_return_order_order_id', 'order_id'),
+        CheckConstraint('total_refund_amount >= 0', name='ck_return_order_total_non_negative'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -949,6 +1060,12 @@ class ReturnOrder(SQLModel, table=True):
 
 class ReturnItem(SQLModel, table=True):
     __tablename__ = "return_item"
+    __table_args__ = (
+        Index('ix_return_item_return_order_id', 'return_order_id'),
+        Index('ix_return_item_order_detail_id', 'order_detail_id'),
+        CheckConstraint('quantity > 0', name='ck_return_item_quantity_positive'),
+        CheckConstraint('refund_amount >= 0', name='ck_return_item_refund_non_negative'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -971,6 +1088,20 @@ class StockReservation(SQLModel, table=True):
     Tránh việc bán trùng khi có khách đặt nhưng chưa hoàn tất thanh toán hoặc chưa xử lý đơn hàng """
 
     __tablename__ = 'stock_reservation'
+    __table_args__ = (
+        Index('ix_stock_reservation_variant_status', 'product_variant_id', 'status'),
+        Index('ix_stock_reservation_reference', 'reference_type', 'reference_id'),
+        Index(
+            'ix_stock_reservation_expires_active',
+            'expires_at',
+            postgresql_where=text("status = 'active'")
+        ),
+        CheckConstraint('quantity > 0', name='ck_stock_reservation_quantity_positive'),
+        CheckConstraint(
+            "status IN ('active', 'fulfilled', 'cancelled', 'expired')",
+            name='ck_stock_reservation_status_valid'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1009,6 +1140,13 @@ class StockAdjustmentItem(SQLModel, table=True):
     trong đó chứa nhiều StockAdjustmentItem (mỗi item ứng với một variant) """
 
     __tablename__ = 'stock_adjustment_item'
+    __table_args__ = (
+        Index('ix_stock_adj_item_adjustment_id', 'stock_adjustment_id'),
+        CheckConstraint(
+            'difference_quantity = actual_quantity - system_quantity',
+            name='ck_adj_item_difference_consistent'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1086,6 +1224,10 @@ class StockAdjustment(SQLModel, table=True):
 class StockTransaction(SQLModel, table=True):
     """Lịch sử giao dịch kho"""
     __tablename__ = 'stock_transaction'
+    __table_args__ = (
+        Index('ix_stock_txn_warehouse_type_date', 'warehouse_id', 'transaction_type', 'created_at'),
+        Index('ix_stock_txn_reference', 'reference_type', 'reference_id'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1148,6 +1290,27 @@ class Stock(SQLModel, table=True):
         UniqueConstraint(
             "warehouse_id", "product_variant_id",
             name="uq_stock_warehouse_product_variant"
+        ),
+        CheckConstraint('available_quantity = quantity - reserved_quantity', name='ck_stock_available_qty'),
+        CheckConstraint('quantity >= 0', name='ck_stock_quantity_non_negative'),
+        CheckConstraint('reserved_quantity >= 0', name='ck_stock_reserved_non_negative'),
+        Index(
+            'ix_stock_low_stock',
+            'warehouse_id',
+            'available_quantity',
+            postgresql_where=text("status = 'low_stock'")
+        ),
+        CheckConstraint(
+            'min_stock_level IS NULL OR max_stock_level IS NULL OR min_stock_level <= max_stock_level',
+            name='ck_stock_min_lte_max'
+        ),
+        CheckConstraint(
+            'cost_price IS NULL OR cost_price >= 0',
+            name='ck_stock_cost_price_non_negative'
+        ),
+        CheckConstraint(
+            'last_cost_price IS NULL OR last_cost_price >= 0',
+            name='ck_stock_last_cost_price_non_negative'
         ),
     )
 
@@ -1216,11 +1379,20 @@ class Warehouse(SQLModel, table=True):
 
     name: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))
     code: str = Field(sa_column=Column(pg.VARCHAR, nullable=False, unique=True))
-    address: str = Field(sa_column=Column(pg.TEXT, nullable=False))
     phone: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     email: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
 
-    manager_id: Optional[uuid.UUID] = Field(foreign_key="user.id", nullable=True)
+    address_line: str = Field(sa_column=Column(pg.VARCHAR, nullable=False))  # số nhà, tên đường
+    ward_id: uuid.UUID = Field(foreign_key="ward.id", nullable=False)
+    province_id: uuid.UUID = Field(foreign_key="province.id", nullable=False)
+
+    manager_id: Optional[uuid.UUID] = Field(
+        sa_column=Column(
+            pg.UUID,
+            sa.ForeignKey("user.id", use_alter=True, name="fk_warehouse_manager_id"),
+            nullable=True
+        )
+    )
 
     is_active: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default="true"), default=True)
     # Có phải là kho mặc định không
@@ -1246,11 +1418,26 @@ class Warehouse(SQLModel, table=True):
 
     stocks: List["Stock"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
     stock_transactions: List["StockTransaction"] = Relationship(back_populates="warehouse", sa_relationship_kwargs={'lazy': 'noload'})
+    ward: Optional["Ward"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
+    province: Optional["Province"] = Relationship(sa_relationship_kwargs={"lazy": "noload"})
 
 
 class CashTransaction(SQLModel, table=True):
     """Giao dịch thu chi tiền mặt"""
     __tablename__ = 'cash_transaction'
+    __table_args__ = (
+        Index('ix_cash_txn_type_category_date', 'transaction_type', 'category', 'transaction_date'),
+        Index('ix_cash_txn_performed_by', 'performed_by'),
+        CheckConstraint('amount > 0', name='ck_cash_txn_amount_positive'),
+        CheckConstraint(
+            "transaction_type IN ('inflow', 'outflow', 'transfer')",
+            name='ck_cash_txn_type_valid'
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'completed', 'cancelled', 'failed')",
+            name='ck_cash_txn_status_valid'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
@@ -1311,6 +1498,12 @@ class CashTransaction(SQLModel, table=True):
 class SupplierPayment(SQLModel, table=True):
     """Thanh toán cho nhà cung cấp"""
     __tablename__ = 'supplier_payment'
+    __table_args__ = (
+        Index('ix_supplier_payment_supplier_id', 'supplier_id'),
+        Index('ix_supplier_payment_po_id', 'purchase_order_id'),
+        Index('ix_supplier_payment_status_date', 'status', 'payment_date'),
+        CheckConstraint('amount > 0', name='ck_supplier_payment_amount_positive'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1355,6 +1548,16 @@ class SupplierPayment(SQLModel, table=True):
 class PurchaseReturn(SQLModel, table=True):
     """Phiếu trả hàng cho nhà cung cấp"""
     __tablename__ = 'purchase_return'
+    __table_args__ = (
+        Index('ix_purchase_return_po_id', 'purchase_order_id'),
+        Index('ix_purchase_return_supplier_status', 'supplier_id', 'status', 'return_date'),
+        CheckConstraint('total_return_amount >= 0', name='ck_purchase_return_total_non_negative'),
+        CheckConstraint('refund_amount >= 0', name='ck_purchase_return_refund_non_negative'),
+        CheckConstraint(
+            'refund_amount <= total_return_amount',
+            name='ck_purchase_return_refund_lte_total'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1440,6 +1643,12 @@ class PurchaseReturn(SQLModel, table=True):
 class PurchaseReturnDetail(SQLModel, table=True):
     """Chi tiết phiếu trả hàng cho nhà cung cấp"""
     __tablename__ = 'purchase_return_detail'
+    __table_args__ = (
+        Index('ix_prd_purchase_return_id', 'purchase_return_id'),
+        CheckConstraint('return_quantity > 0', name='ck_prd_quantity_positive'),
+        CheckConstraint('unit_cost > 0', name='ck_prd_unit_cost_positive'),
+        CheckConstraint('total_cost > 0', name='ck_prd_total_cost_positive'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1491,6 +1700,15 @@ class PurchaseReturnDetail(SQLModel, table=True):
 class GoodsReceiptDetail(SQLModel, table=True):
     """Chi tiết phiếu nhập kho"""
     __tablename__ = 'goods_receipt_detail'
+    __table_args__ = (
+        CheckConstraint('received_quantity >= 0', name='ck_grd_received_non_negative'),
+        CheckConstraint('accepted_quantity >= 0', name='ck_grd_accepted_non_negative'),
+        CheckConstraint('rejected_quantity >= 0', name='ck_grd_rejected_non_negative'),
+        CheckConstraint('accepted_quantity + rejected_quantity <= received_quantity', name='ck_grd_qty_sum'),
+        Index('ix_grd_goods_receipt_id', 'goods_receipt_id'),
+        CheckConstraint('unit_cost > 0', name='ck_grd_unit_cost_positive'),
+        CheckConstraint('total_cost >= 0', name='ck_grd_total_cost_non_negative'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1544,6 +1762,10 @@ class GoodsReceiptDetail(SQLModel, table=True):
 class GoodsReceipt(SQLModel, table=True):
     """Phiếu nhập kho thực tế"""
     __tablename__ = 'goods_receipt'
+    __table_args__ = (
+        Index('ix_goods_receipt_po_status', 'purchase_order_id', 'status'),
+        Index('ix_goods_receipt_supplier_status', 'supplier_id', 'status', 'receipt_date'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1609,6 +1831,17 @@ class GoodsReceipt(SQLModel, table=True):
 class PurchaseOrderDetail(SQLModel, table=True):
     """Chi tiết đơn đặt hàng"""
     __tablename__ = 'purchase_order_detail'
+    __table_args__ = (
+        Index('ix_po_detail_purchase_order_id', 'purchase_order_id'),
+        CheckConstraint('quantity > 0', name='ck_po_detail_quantity_positive'),
+        CheckConstraint('received_quantity >= 0', name='ck_po_detail_received_non_negative'),
+        CheckConstraint(
+            'received_quantity <= quantity',
+            name='ck_po_detail_received_lte_ordered'
+        ),
+        CheckConstraint('unit_cost > 0', name='ck_po_detail_unit_cost_positive'),
+        CheckConstraint('total_cost > 0', name='ck_po_detail_total_cost_positive'),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1652,6 +1885,19 @@ class PurchaseOrderDetail(SQLModel, table=True):
 class PurchaseOrder(SQLModel, table=True):
     """Đơn đặt hàng từ nhà cung cấp"""
     __tablename__ = 'purchase_order'
+    __table_args__ = (
+        Index('ix_po_supplier_status', 'supplier_id', 'status', 'order_date'),
+        Index('ix_po_payment_status', 'payment_status'),
+        CheckConstraint('paid_amount <= total_amount', name='ck_po_paid_lte_total'),
+        CheckConstraint('paid_amount >= 0', name='ck_po_paid_non_negative'),
+        CheckConstraint('sub_total >= 0', name='ck_po_sub_total_non_negative'),
+        CheckConstraint('discount_amount >= 0', name='ck_po_discount_non_negative'),
+        CheckConstraint('shipping_cost >= 0', name='ck_po_shipping_non_negative'),
+        CheckConstraint(
+            'expected_delivery_date IS NULL OR expected_delivery_date >= order_date',
+            name='ck_po_delivery_after_order'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -1723,6 +1969,14 @@ class PurchaseOrder(SQLModel, table=True):
 class Supplier(SQLModel, table=True):
     """Nhà cung cấp"""
     __tablename__ = 'supplier'
+    __table_args__ = (
+        Index('ix_supplier_name', 'name'),
+        CheckConstraint('current_debt >= 0', name='ck_supplier_debt_non_negative'),
+        CheckConstraint(
+            'credit_limit IS NULL OR current_debt <= credit_limit',
+            name='ck_supplier_debt_lte_credit_limit'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -2024,6 +2278,22 @@ class UserRole(SQLModel, table=True):
 
 class User(SQLModel, table=True):
     __tablename__ = 'user'
+    __table_args__ = (
+        Index(
+            'ix_user_email_unique_not_deleted',
+            'email',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL')
+        ),
+
+        Index('ix_user_customer_status', 'is_customer', 'customer_status', 'deleted_at'),
+        Index('ix_user_staff_status', 'is_staff', 'staff_status', 'deleted_at'),
+
+        CheckConstraint(
+            '(warehouse_role IS NULL) OR (is_staff = true)',
+            name='ck_user_warehouse_role_requires_staff'
+        ),
+    )
 
     id: uuid.UUID = Field(
         sa_column=Column(
@@ -2051,8 +2321,14 @@ class User(SQLModel, table=True):
     two_fa_secret: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))
     two_fa_enabled: bool = Field(sa_column=Column(pg.BOOLEAN, nullable=False, server_default=text("false")), default=False)
 
-    warehouse_id: Optional[uuid.UUID] = Field(foreign_key="warehouse.id", nullable=True, default=None)
-    warehouse_role: Optional[str] = Field(sa_column=Column(pg.VARCHAR, nullable=True))  # "manager", "staff", "picker", "checker"
+    warehouse_id: Optional[uuid.UUID] = Field(
+        sa_column=Column(
+            pg.UUID,
+            sa.ForeignKey("warehouse.id", use_alter=True, name="fk_user_warehouse_id"),
+            nullable=True,
+            default=None
+        )
+    )
 
     address: List["Address"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
     order: List["Order"] = Relationship(back_populates="user", sa_relationship_kwargs={'lazy': 'noload'})
@@ -2083,6 +2359,12 @@ class User(SQLModel, table=True):
             "foreign_keys": "[UserRole.user_id]"
         }
     )
+
+    return_orders: List["ReturnOrder"] = Relationship(
+        sa_relationship_kwargs={"lazy": "noload"}
+    )
+
+    cart: Optional["Cart"] = Relationship(back_populates="user", sa_relationship_kwargs={"lazy": "noload"})
 
 
 

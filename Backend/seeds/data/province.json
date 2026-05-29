@@ -1,0 +1,274 @@
+[
+  {
+    "id": "f55acde3-3cdd-470a-b60e-5b6ec6d5d9a6",
+    "code": 1,
+    "name": "Thành phố Hà Nội",
+    "code_name": "ha_noi",
+    "division_type": "thành phố trung ương",
+    "phone_code": 24
+  },
+  {
+    "id": "a87354da-181a-41d3-96ec-cf711e3fd02f",
+    "code": 4,
+    "name": "Cao Bằng",
+    "code_name": "cao_bang",
+    "division_type": "tỉnh",
+    "phone_code": 206
+  },
+  {
+    "id": "2acbf385-ca78-4b18-81f7-e8d8c55efe76",
+    "code": 8,
+    "name": "Tuyên Quang",
+    "code_name": "tuyen_quang",
+    "division_type": "tỉnh",
+    "phone_code": 207
+  },
+  {
+    "id": "8c7588e5-f88d-40ef-9f05-1173b5af3813",
+    "code": 11,
+    "name": "Điện Biên",
+    "code_name": "dien_bien",
+    "division_type": "tỉnh",
+    "phone_code": 215
+  },
+  {
+    "id": "20f1c3af-7d44-4e08-a61b-87a5860c6c06",
+    "code": 12,
+    "name": "Lai Châu",
+    "code_name": "lai_chau",
+    "division_type": "tỉnh",
+    "phone_code": 213
+  },
+  {
+    "id": "6c74105a-c82d-40db-be12-dc776bb4cb3d",
+    "code": 14,
+    "name": "Sơn La",
+    "code_name": "son_la",
+    "division_type": "tỉnh",
+    "phone_code": 212
+  },
+  {
+    "id": "a0fda9b7-4883-4de9-9e20-e50de808d433",
+    "code": 15,
+    "name": "Lào Cai",
+    "code_name": "lao_cai",
+    "division_type": "tỉnh",
+    "phone_code": 214
+  },
+  {
+    "id": "82ec16d9-05a9-4e32-bb76-5138b978d75b",
+    "code": 19,
+    "name": "Thái Nguyên",
+    "code_name": "thai_nguyen",
+    "division_type": "tỉnh",
+    "phone_code": 208
+  },
+  {
+    "id": "740f5356-ebe1-4da9-be2d-90e7ab96f2b7",
+    "code": 20,
+    "name": "Lạng Sơn",
+    "code_name": "lang_son",
+    "division_type": "tỉnh",
+    "phone_code": 205
+  },
+  {
+    "id": "e0cc9562-9fad-4c91-9fd3-6269484275ae",
+    "code": 22,
+    "name": "Quảng Ninh",
+    "code_name": "quang_ninh",
+    "division_type": "tỉnh",
+    "phone_code": 203
+  },
+  {
+    "id": "2e86ea62-6173-40ad-92d0-4630cdc4df13",
+    "code": 24,
+    "name": "Bắc Ninh",
+    "code_name": "bac_ninh",
+    "division_type": "tỉnh",
+    "phone_code": 222
+  },
+  {
+    "id": "236b44c3-f818-420c-b569-97e3735b7ac0",
+    "code": 25,
+    "name": "Phú Thọ",
+    "code_name": "phu_tho",
+    "division_type": "tỉnh",
+    "phone_code": 210
+  },
+  {
+    "id": "5729a9dc-ff2d-472f-91be-42d858780b7c",
+    "code": 31,
+    "name": "Thành phố Hải Phòng",
+    "code_name": "hai_phong",
+    "division_type": "thành phố trung ương",
+    "phone_code": 225
+  },
+  {
+    "id": "81db86ba-b4bc-4618-bf41-4200c27cc044",
+    "code": 33,
+    "name": "Hưng Yên",
+    "code_name": "hung_yen",
+    "division_type": "tỉnh",
+    "phone_code": 221
+  },
+  {
+    "id": "3b01708a-8935-4b81-990a-ce8bd8c8a97f",
+    "code": 37,
+    "name": "Ninh Bình",
+    "code_name": "ninh_binh",
+    "division_type": "tỉnh",
+    "phone_code": 229
+  },
+  {
+    "id": "bf2e6005-aa0c-48ef-9448-ed59c2732a71",
+    "code": 38,
+    "name": "Thanh Hóa",
+    "code_name": "thanh_hoa",
+    "division_type": "tỉnh",
+    "phone_code": 237
+  },
+  {
+    "id": "4f938e71-0c25-49f5-8e1e-77edb54172f0",
+    "code": 40,
+    "name": "Nghệ An",
+    "code_name": "nghe_an",
+    "division_type": "tỉnh",
+    "phone_code": 238
+  },
+  {
+    "id": "9ec48216-a5c4-4654-90c2-7561c15b2659",
+    "code": 42,
+    "name": "Hà Tĩnh",
+    "code_name": "ha_tinh",
+    "division_type": "tỉnh",
+    "phone_code": 239
+  },
+  {
+    "id": "2fc21380-57de-4a09-b262-c96bc11fcbaa",
+    "code": 44,
+    "name": "Quảng Trị",
+    "code_name": "quang_tri",
+    "division_type": "tỉnh",
+    "phone_code": 233
+  },
+  {
+    "id": "e289c6be-90d3-4660-ad65-5845d40fe727",
+    "code": 46,
+    "name": "Thành phố Huế",
+    "code_name": "hue",
+    "division_type": "thành phố trung ương",
+    "phone_code": 234
+  },
+  {
+    "id": "7a1e0e87-9d1e-42ec-bbb9-afe6d6eec586",
+    "code": 48,
+    "name": "Thành phố Đà Nẵng",
+    "code_name": "da_nang",
+    "division_type": "thành phố trung ương",
+    "phone_code": 236
+  },
+  {
+    "id": "7f69771c-ccc4-4d85-a945-e5b44f4a02d4",
+    "code": 51,
+    "name": "Quảng Ngãi",
+    "code_name": "quang_ngai",
+    "division_type": "tỉnh",
+    "phone_code": 255
+  },
+  {
+    "id": "0cc88c66-70dc-422f-8621-4aee79e476f9",
+    "code": 52,
+    "name": "Gia Lai",
+    "code_name": "gia_lai",
+    "division_type": "tỉnh",
+    "phone_code": 269
+  },
+  {
+    "id": "ead8f1cf-ba4e-452f-91b2-19e1ff0ecdf4",
+    "code": 56,
+    "name": "Khánh Hòa",
+    "code_name": "khanh_hoa",
+    "division_type": "tỉnh",
+    "phone_code": 258
+  },
+  {
+    "id": "9c83eed8-1c4b-42ed-aff8-fcd3e567ef6a",
+    "code": 66,
+    "name": "Đắk Lắk",
+    "code_name": "dak_lak",
+    "division_type": "tỉnh",
+    "phone_code": 262
+  },
+  {
+    "id": "d210dbe9-06ec-4af3-bc8c-99b6c8110f18",
+    "code": 68,
+    "name": "Lâm Đồng",
+    "code_name": "lam_dong",
+    "division_type": "tỉnh",
+    "phone_code": 263
+  },
+  {
+    "id": "472e0308-b276-4853-bb2d-19b165b5af3e",
+    "code": 75,
+    "name": "Đồng Nai",
+    "code_name": "dong_nai",
+    "division_type": "tỉnh",
+    "phone_code": 251
+  },
+  {
+    "id": "d79b2b8c-9085-4360-94c4-5dc3297a0bf5",
+    "code": 79,
+    "name": "Thành phố Hồ Chí Minh",
+    "code_name": "ho_chi_minh",
+    "division_type": "thành phố trung ương",
+    "phone_code": 28
+  },
+  {
+    "id": "69674e11-2574-482c-8986-9441cc4efcf3",
+    "code": 80,
+    "name": "Tây Ninh",
+    "code_name": "tay_ninh",
+    "division_type": "tỉnh",
+    "phone_code": 276
+  },
+  {
+    "id": "b3c3432e-2261-4184-b7fb-f4f415583915",
+    "code": 82,
+    "name": "Đồng Tháp",
+    "code_name": "dong_thap",
+    "division_type": "tỉnh",
+    "phone_code": 277
+  },
+  {
+    "id": "b3d939e5-2f4b-43dd-bc6a-2498ba265e96",
+    "code": 86,
+    "name": "Vĩnh Long",
+    "code_name": "vinh_long",
+    "division_type": "tỉnh",
+    "phone_code": 270
+  },
+  {
+    "id": "e0139018-e11b-4c07-a0fe-df27ea0081da",
+    "code": 91,
+    "name": "An Giang",
+    "code_name": "an_giang",
+    "division_type": "tỉnh",
+    "phone_code": 296
+  },
+  {
+    "id": "f58e90cd-4ccb-4b0f-9afc-4ccae5bfbc87",
+    "code": 92,
+    "name": "Thành phố Cần Thơ",
+    "code_name": "can_tho",
+    "division_type": "thành phố trung ương",
+    "phone_code": 292
+  },
+  {
+    "id": "ebf1ac2a-58c7-446f-b6a2-293c5207fc85",
+    "code": 96,
+    "name": "Cà Mau",
+    "code_name": "ca_mau",
+    "division_type": "tỉnh",
+    "phone_code": 290
+  }
+]

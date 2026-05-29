@@ -1,7 +1,7 @@
 from redis import asyncio as aioredis
 from typing import Optional
 import logging
-from src.config import Settings
+from src.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,10 @@ class RedisManager:
 
         try:
             self._redis = await aioredis.from_url(
-                Settings.redis_url,
+                Config.redis_url,
                 encoding="utf-8",
-                decode_responses=Settings.REDIS_DECODE_RESPONSES,
-                max_connections=Settings.REDIS_MAX_CONNECTIONS,
+                decode_responses=Config.REDIS_DECODE_RESPONSES,
+                max_connections=Config.REDIS_MAX_CONNECTIONS,
                 socket_connect_timeout=5,
                 socket_keepalive=True,
                 health_check_interval=30
@@ -38,7 +38,7 @@ class RedisManager:
 
             await self._redis.ping()
 
-            logger.info(f"Redis connected successfully at {Settings.REDIS_HOST}:{Settings.REDIS_PORT}")
+            logger.info(f"Redis connected successfully at {Config.REDIS_HOST}:{Config.REDIS_PORT}")
 
             info = await self._redis.info()
             logger.info(f"Redis version: {info.get('redis_version', 'unknown')}")
@@ -116,7 +116,7 @@ class RedisManager:
             info = await self._redis.info("stats")
             keyspace = await self._redis.info("keyspace")
 
-            db_info = keyspace.get(f"db{Settings.REDIS_DB}", {})
+            db_info = keyspace.get(f"db{Config.REDIS_DB}", {})
 
             return {
                 "total_commands_processed": info.get("total_commands_processed", 0),
