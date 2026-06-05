@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+from uuid import uuid4
 
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker
@@ -17,6 +18,10 @@ engine: AsyncEngine = create_async_engine(
     connect_args={
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
+        "server_settings": {
+            "application_name": f"ecommerce-api-{uuid4().hex}",
+            "prepared_statement_cache_size": "0",
+        },
     },
     pool_pre_ping=True,
     pool_recycle=3600

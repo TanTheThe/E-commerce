@@ -1,5 +1,5 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi import Request
+from fastapi import HTTPException, Request
 from src.crud.authentication.services.login_security.login_attempt_logger import AttemptLoggerService
 from src.crud.authentication.services.login_security.login_security import LoginSecurityService
 from src.crud.authentication.utils import verify_password, create_url_safe_token
@@ -81,6 +81,9 @@ class LoginAdminStaffService:
                             "role": role.value
                         }
                     }
+
+        except HTTPException:
+            raise
 
         except Exception as e:
             logger.error(f"Login failed for {email}: {str(e)}")

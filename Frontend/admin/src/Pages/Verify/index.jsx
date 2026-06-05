@@ -1,17 +1,10 @@
 import Button from "@mui/material/Button";
 import React, { useContext, useEffect, useState } from "react";
 import { CgLogIn } from "react-icons/cg";
-import { FaEyeSlash, FaRegEye, FaRegUser } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Line } from "recharts";
-import Checkbox from "@mui/material/Checkbox";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import OtpBox from "../../Components/OtpBox";
 import { postDataApi } from "../../utils/api";
 import { MyContext } from "../../App";
-
-
 
 const Verify = () => {
     const [otp, setOtp] = useState("")
@@ -23,6 +16,7 @@ const Verify = () => {
     const navigate = useNavigate()
     const [token, setToken] = useState("")
     const context = useContext(MyContext)
+    const [isFirstLogin, setIsFirstLogin] = useState(false)
 
     useEffect(() => {
         if (shouldNavigate) {
@@ -43,16 +37,19 @@ const Verify = () => {
             if (!loginToken) {
                 navigate("/login");
             } else {
-                const isFirstLogin = sessionStorage.getItem("isFirstLogin");
-                if (isFirstLogin === 'true') {
+                const firstLoginFlag = sessionStorage.getItem("isFirstLogin");
+                const isFirstLoginValue = firstLoginFlag === 'true';
+                setIsFirstLogin(isFirstLoginValue);
+                setToken(loginToken);
+
+                if (isFirstLoginValue) {
                     const response = await postDataApi("/admin/auth/login/2fa", {
                         token: loginToken
                     });
 
-                    setQrCodeBase64(response?.data?.qr_code_base64)
+                    setQrCodeBase64(response?.data?.qr_code_base64 || "")
                     setIsShowQR(true)
                 }
-                setToken(loginToken);
             }
             setIsCheckingToken(false);
         })()
@@ -87,7 +84,11 @@ const Verify = () => {
             setShouldNavigate(true);
         } else {
             setIsLoading(false);
-            context.openAlertBox("error", response?.data?.detail.message)
+            const detail = response?.data?.detail;
+            const errorMessage = Array.isArray(detail)
+                ? detail?.[0]?.msg
+                : detail?.message || response?.data?.message || "Xác thực OTP thất bại";
+            context.openAlertBox("error", errorMessage?.replace(/^Value error,\s*/i, ""))
         }
     }
 

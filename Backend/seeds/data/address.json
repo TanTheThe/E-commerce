@@ -6,7 +6,7 @@
     "province_id": "f55acde3-3cdd-470a-b60e-5b6ec6d5d9a6",
     "district": "Thành phố Hà Nội",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000001"
@@ -18,7 +18,7 @@
     "province_id": "a87354da-181a-41d3-96ec-cf711e3fd02f",
     "district": "Cao Bằng",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:01:00Z",
+    "created_at": "2026-05-26T10:01:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000002"
@@ -30,7 +30,7 @@
     "province_id": "2acbf385-ca78-4b18-81f7-e8d8c55efe76",
     "district": "Tuyên Quang",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:02:00Z",
+    "created_at": "2026-05-26T10:02:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000003"
@@ -42,7 +42,7 @@
     "province_id": "8c7588e5-f88d-40ef-9f05-1173b5af3813",
     "district": "Điện Biên",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:03:00Z",
+    "created_at": "2026-05-26T10:03:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000004"
@@ -54,7 +54,7 @@
     "province_id": "20f1c3af-7d44-4e08-a61b-87a5860c6c06",
     "district": "Lai Châu",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:04:00Z",
+    "created_at": "2026-05-26T10:04:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000005"
@@ -66,7 +66,7 @@
     "province_id": "6c74105a-c82d-40db-be12-dc776bb4cb3d",
     "district": "Sơn La",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:05:00Z",
+    "created_at": "2026-05-26T10:05:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000006"
@@ -78,7 +78,7 @@
     "province_id": "a0fda9b7-4883-4de9-9e20-e50de808d433",
     "district": "Lào Cai",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:06:00Z",
+    "created_at": "2026-05-26T10:06:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000007"
@@ -90,7 +90,7 @@
     "province_id": "82ec16d9-05a9-4e32-bb76-5138b978d75b",
     "district": "Thái Nguyên",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:07:00Z",
+    "created_at": "2026-05-26T10:07:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000008"
@@ -102,7 +102,7 @@
     "province_id": "740f5356-ebe1-4da9-be2d-90e7ab96f2b7",
     "district": "Lạng Sơn",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:08:00Z",
+    "created_at": "2026-05-26T10:08:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000009"
@@ -114,7 +114,7 @@
     "province_id": "e0cc9562-9fad-4c91-9fd3-6269484275ae",
     "district": "Quảng Ninh",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:09:00Z",
+    "created_at": "2026-05-26T10:09:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000010"
@@ -126,7 +126,7 @@
     "province_id": "2e86ea62-6173-40ad-92d0-4630cdc4df13",
     "district": "Bắc Ninh",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:10:00Z",
+    "created_at": "2026-05-26T10:10:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000011"
@@ -138,7 +138,7 @@
     "province_id": "236b44c3-f818-420c-b569-97e3735b7ac0",
     "district": "Phú Thọ",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:11:00Z",
+    "created_at": "2026-05-26T10:11:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000012"
@@ -150,7 +150,7 @@
     "province_id": "5729a9dc-ff2d-472f-91be-42d858780b7c",
     "district": "Thành phố Hải Phòng",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:12:00Z",
+    "created_at": "2026-05-26T10:12:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000013"
@@ -162,7 +162,7 @@
     "province_id": "81db86ba-b4bc-4618-bf41-4200c27cc044",
     "district": "Hưng Yên",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:13:00Z",
+    "created_at": "2026-05-26T10:13:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000014"
@@ -174,7 +174,7 @@
     "province_id": "3b01708a-8935-4b81-990a-ce8bd8c8a97f",
     "district": "Ninh Bình",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:14:00Z",
+    "created_at": "2026-05-26T10:14:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000015"
@@ -186,7 +186,7 @@
     "province_id": "bf2e6005-aa0c-48ef-9448-ed59c2732a71",
     "district": "Thanh Hóa",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:15:00Z",
+    "created_at": "2026-05-26T10:15:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000016"
@@ -198,7 +198,7 @@
     "province_id": "4f938e71-0c25-49f5-8e1e-77edb54172f0",
     "district": "Nghệ An",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:16:00Z",
+    "created_at": "2026-05-26T10:16:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000017"
@@ -210,7 +210,7 @@
     "province_id": "9ec48216-a5c4-4654-90c2-7561c15b2659",
     "district": "Hà Tĩnh",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:17:00Z",
+    "created_at": "2026-05-26T10:17:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000018"
@@ -222,7 +222,7 @@
     "province_id": "2fc21380-57de-4a09-b262-c96bc11fcbaa",
     "district": "Quảng Trị",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:18:00Z",
+    "created_at": "2026-05-26T10:18:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000019"
@@ -234,7 +234,7 @@
     "province_id": "e289c6be-90d3-4660-ad65-5845d40fe727",
     "district": "Thành phố Huế",
     "country": "Việt Nam",
-    "created_at": "2026-05-26T10:19:00Z",
+    "created_at": "2026-05-26T10:19:00",
     "updated_at": null,
     "deleted_at": null,
     "user_id": "2f1b7c2a-1111-4a11-8111-000000000020"

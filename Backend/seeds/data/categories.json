@@ -6,9 +6,40 @@
     "parent_id": null,
     "type_size": "clothing",
     "slug": "ao",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000001",
+      "aa9c1d2f-5000-4000-9000-000000000002",
+      "aa9c1d2f-5000-4000-9000-000000000003",
+      "aa9c1d2f-5000-4000-9000-000000000004",
+      "aa9c1d2f-5000-4000-9000-000000000005",
+      "aa9c1d2f-5000-4000-9000-000000000006",
+      "aa9c1d2f-5000-4000-9000-000000000007",
+      "aa9c1d2f-5000-4000-9000-000000000008",
+      "aa9c1d2f-5000-4000-9000-000000000009",
+      "aa9c1d2f-5000-4000-9000-000000000010",
+      "aa9c1d2f-5000-4000-9000-000000000011",
+      "aa9c1d2f-5000-4000-9000-000000000012",
+      "aa9c1d2f-5000-4000-9000-000000000013",
+      "aa9c1d2f-5000-4000-9000-000000000014",
+      "aa9c1d2f-5000-4000-9000-000000000015",
+      "aa9c1d2f-5000-4000-9000-000000000018",
+      "aa9c1d2f-5000-4000-9000-000000000019",
+      "aa9c1d2f-5000-4000-9000-000000000020",
+      "aa9c1d2f-5000-4000-9000-000000000021",
+      "aa9c1d2f-5000-4000-9000-000000000023",
+      "aa9c1d2f-5000-4000-9000-000000000024",
+      "aa9c1d2f-5000-4000-9000-000000000026",
+      "aa9c1d2f-5000-4000-9000-000000000027",
+      "aa9c1d2f-5000-4000-9000-000000000028",
+      "aa9c1d2f-5000-4000-9000-000000000029",
+      "aa9c1d2f-5000-4000-9000-000000000030",
+      "aa9c1d2f-5000-4000-9000-000000000034",
+      "aa9c1d2f-5000-4000-9000-000000000035",
+      "aa9c1d2f-5000-4000-9000-000000000036"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000002",
@@ -17,9 +48,12 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-ba-lo",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000009"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000003",
@@ -28,9 +62,16 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-khoac",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000006",
+      "aa9c1d2f-5000-4000-9000-000000000014",
+      "aa9c1d2f-5000-4000-9000-000000000023",
+      "aa9c1d2f-5000-4000-9000-000000000030",
+      "aa9c1d2f-5000-4000-9000-000000000034"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000004",
@@ -39,9 +80,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-the-thao",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000005",
@@ -50,9 +92,32 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-thun",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000001",
+      "aa9c1d2f-5000-4000-9000-000000000002",
+      "aa9c1d2f-5000-4000-9000-000000000003",
+      "aa9c1d2f-5000-4000-9000-000000000004",
+      "aa9c1d2f-5000-4000-9000-000000000005",
+      "aa9c1d2f-5000-4000-9000-000000000008",
+      "aa9c1d2f-5000-4000-9000-000000000010",
+      "aa9c1d2f-5000-4000-9000-000000000011",
+      "aa9c1d2f-5000-4000-9000-000000000012",
+      "aa9c1d2f-5000-4000-9000-000000000013",
+      "aa9c1d2f-5000-4000-9000-000000000015",
+      "aa9c1d2f-5000-4000-9000-000000000018",
+      "aa9c1d2f-5000-4000-9000-000000000021",
+      "aa9c1d2f-5000-4000-9000-000000000024",
+      "aa9c1d2f-5000-4000-9000-000000000026",
+      "aa9c1d2f-5000-4000-9000-000000000027",
+      "aa9c1d2f-5000-4000-9000-000000000028",
+      "aa9c1d2f-5000-4000-9000-000000000029",
+      "aa9c1d2f-5000-4000-9000-000000000032",
+      "aa9c1d2f-5000-4000-9000-000000000033",
+      "aa9c1d2f-5000-4000-9000-000000000036"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000006",
@@ -61,9 +126,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-vest",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000007",
@@ -72,9 +138,15 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000001",
     "type_size": "clothing",
     "slug": "ao-so-mi",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000007",
+      "aa9c1d2f-5000-4000-9000-000000000019",
+      "aa9c1d2f-5000-4000-9000-000000000020",
+      "aa9c1d2f-5000-4000-9000-000000000035"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000008",
@@ -83,9 +155,13 @@
     "parent_id": null,
     "type_size": "clothing",
     "slug": "vay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000031",
+      "aa9c1d2f-5000-4000-9000-000000000037"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000009",
@@ -94,9 +170,13 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000008",
     "type_size": "clothing",
     "slug": "chan-vay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000031",
+      "aa9c1d2f-5000-4000-9000-000000000037"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000010",
@@ -105,9 +185,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000008",
     "type_size": "clothing",
     "slug": "dam-body",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000011",
@@ -116,9 +197,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000008",
     "type_size": "clothing",
     "slug": "vay-dai",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000012",
@@ -127,9 +209,16 @@
     "parent_id": null,
     "type_size": "clothing",
     "slug": "quan",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000016",
+      "aa9c1d2f-5000-4000-9000-000000000017",
+      "aa9c1d2f-5000-4000-9000-000000000022",
+      "aa9c1d2f-5000-4000-9000-000000000025",
+      "aa9c1d2f-5000-4000-9000-000000000032"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000013",
@@ -138,9 +227,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-kaki",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000014",
@@ -149,9 +239,12 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-jogger",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000025"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000015",
@@ -160,9 +253,12 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-jean",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000017"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000016",
@@ -171,9 +267,13 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-short",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000016",
+      "aa9c1d2f-5000-4000-9000-000000000022"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000017",
@@ -182,9 +282,12 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-tay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000032"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000018",
@@ -193,9 +296,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000012",
     "type_size": "clothing",
     "slug": "quan-the-thao",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000019",
@@ -204,9 +308,10 @@
     "parent_id": null,
     "type_size": "footwear",
     "slug": "giay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000020",
@@ -215,9 +320,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000019",
     "type_size": "footwear",
     "slug": "giay-the-thao",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000021",
@@ -226,9 +332,12 @@
     "parent_id": null,
     "type_size": "footwear",
     "slug": "sandals",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000033"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000022",
@@ -237,9 +346,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000019",
     "type_size": "footwear",
     "slug": "giay-tay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000024",
@@ -248,20 +358,24 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000021",
     "type_size": "footwear",
     "slug": "dep-kep",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000025",
-    "name": "Dép quai hậu", 
+    "name": "Dép quai hậu",
     "image": "https://dcebzpkcpeqymcypkbcc.supabase.co/storage/v1/object/sign/Images/categories/dep-quai-hau.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84NTBiNzdkMS00NjhjLTRjM2ItOWEyMy05MTE2MWIzOTQyMzciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZXMvY2F0ZWdvcmllcy9kZXAtcXVhaS1oYXUud2VicCIsImlhdCI6MTc3OTg3NTkxNiwiZXhwIjoxODExNDExOTE2fQ.laiEHQwshvpgw5YoACJqiMn_PxJMqFsiJOKKDCCMX7U",
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000021",
     "type_size": "footwear",
     "slug": "dep-quai-hau",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": [
+      "aa9c1d2f-5000-4000-9000-000000000033"
+    ]
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000026",
@@ -270,9 +384,10 @@
     "parent_id": null,
     "type_size": "jewelry",
     "slug": "trang-suc",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000027",
@@ -281,9 +396,10 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000026",
     "type_size": "jewelry",
     "slug": "nhan",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   },
   {
     "id": "7c9f1d2e-3000-4000-8000-000000000028",
@@ -292,8 +408,9 @@
     "parent_id": "7c9f1d2e-3000-4000-8000-000000000026",
     "type_size": "jewelry",
     "slug": "lac-tay",
-    "created_at": "2026-05-26T10:00:00Z",
+    "created_at": "2026-05-26T10:00:00",
     "updated_at": null,
-    "deleted_at": null
+    "deleted_at": null,
+    "product_ids": []
   }
 ]

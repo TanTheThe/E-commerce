@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 
 
+
 class AuthException:
     @staticmethod
     def invalid_account():
@@ -57,7 +58,7 @@ class AuthException:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": "OTP không chính xác, ",
+                "message": "OTP không chính xác",
                 "error_code": "auth_006",
             },
         )

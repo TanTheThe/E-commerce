@@ -64,52 +64,52 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="E-commerce", version="v1", lifespan=lifespan)
 
 
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    detail = exc.detail
-    if isinstance(detail, dict):
-        message = detail.get("message", "Request failed")
-        errors = detail
-    else:
-        message = str(detail)
-        errors = {"detail": detail}
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+#     detail = exc.detail
+#     if isinstance(detail, dict):
+#         message = detail.get("message", "Request failed")
+#         errors = detail
+#     else:
+#         message = str(detail)
+#         errors = {"detail": detail}
 
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "status": "error",
-            "message": message,
-            "data": None,
-            "errors": errors
-        }
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=422,
-        content={
-            "status": "error",
-            "message": "Validation error",
-            "data": None,
-            "errors": exc.errors()
-        }
-    )
+#     return JSONResponse(
+#         status_code=exc.status_code,
+#         content={
+#             "status": "error",
+#             "message": message,
+#             "data": None,
+#             "errors": errors
+#         }
+#     )
 
 
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled API error")
-    return JSONResponse(
-        status_code=500,
-        content={
-            "status": "error",
-            "message": "Internal server error",
-            "data": None,
-            "errors": None
-        }
-    )
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     return JSONResponse(
+#         status_code=422,
+#         content={
+#             "status": "error",
+#             "message": "Validation error",
+#             "data": None,
+#             "errors": exc.errors()
+#         }
+#     )
+
+
+# @app.exception_handler(Exception)
+# async def unhandled_exception_handler(request: Request, exc: Exception):
+#     logger.exception("Unhandled API error")
+#     return JSONResponse(
+#         status_code=500,
+#         content={
+#             "status": "error",
+#             "message": "Internal server error",
+#             "data": None,
+#             "errors": None
+#         }
+#     )
 
 register_middleware(app)
 

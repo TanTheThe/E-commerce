@@ -4,7 +4,7 @@
     "name": "warehouse_manager",
     "description": "Quản lý nhập kho, xuất kho và tồn kho.",
     "is_active": true,
-    "created_at": "2026-05-26T08:00:00Z",
+    "created_at": "2026-05-26T08:00:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [
@@ -46,7 +46,7 @@
     "name": "order_manager",
     "description": "Theo dõi, xử lý và cập nhật trạng thái đơn hàng.",
     "is_active": true,
-    "created_at": "2026-05-26T08:05:00Z",
+    "created_at": "2026-05-26T08:05:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [
@@ -83,7 +83,7 @@
     "name": "accountant",
     "description": "Phụ trách đối soát thanh toán và báo cáo tài chính.",
     "is_active": true,
-    "created_at": "2026-05-26T08:10:00Z",
+    "created_at": "2026-05-26T08:10:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [
@@ -107,7 +107,7 @@
     "name": "customer_support",
     "description": "Hỗ trợ khách hàng, xử lý khiếu nại và yêu cầu.",
     "is_active": true,
-    "created_at": "2026-05-26T08:15:00Z",
+    "created_at": "2026-05-26T08:15:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [
@@ -136,7 +136,7 @@
     "name": "product_manager",
     "description": "Quản lý danh mục, thông tin và vòng đời sản phẩm.",
     "is_active": true,
-    "created_at": "2026-05-26T08:20:00Z",
+    "created_at": "2026-05-26T08:20:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [
@@ -188,7 +188,7 @@
     "name": "admin",
     "description": "Quản trị hệ thống với toàn quyền thao tác.",
     "is_active": true,
-    "created_at": "2026-05-26T08:25:00Z",
+    "created_at": "2026-05-26T08:25:00",
     "updated_at": null,
     "deleted_at": null,
     "permission_ids": [

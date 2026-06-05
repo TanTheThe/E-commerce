@@ -59,6 +59,8 @@ const Login = () => {
             if (response?.data?.access_token) {
                 localStorage.setItem("accesstoken", response?.data?.access_token);
                 localStorage.setItem("refreshtoken", response?.data?.refresh_token);
+                sessionStorage.removeItem("loginToken");
+                sessionStorage.removeItem("isFirstLogin");
 
                 setIsLoading(false);
                 context.openAlertBox("success", response?.message);
@@ -70,7 +72,8 @@ const Login = () => {
 
                 history("/");
             } else {
-                sessionStorage.setItem("loginToken", response?.data?.token);
+                sessionStorage.setItem("loginToken", response?.data?.token || "");
+                sessionStorage.setItem("isFirstLogin", String(Boolean(response?.data?.requiresSetup)));
 
                 setIsLoading(false);
                 context.openAlertBox("success", response?.message);
@@ -84,7 +87,11 @@ const Login = () => {
             }
         } else {
             setIsLoading(false)
-            context.openAlertBox("error", response?.data?.detail?.message)
+            const detail = response?.data?.detail;
+            const errorMessage = Array.isArray(detail)
+                ? detail?.[0]?.msg
+                : detail?.message || response?.data?.message || "Đăng nhập không thành công";
+            context.openAlertBox("error", errorMessage?.replace(/^Value error,\s*/i, ""))
         }
     }
 

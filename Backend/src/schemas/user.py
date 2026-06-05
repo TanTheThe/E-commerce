@@ -9,10 +9,10 @@ from src.schemas.stock import WarehouseRole
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
 class UserCreateModel(BaseModel):
-    first_name: str = Field(..., min_length=1, max_length=50)
-    last_name: str = Field(..., min_length=1, max_length=50)
-    email: str = Field(..., max_length=255)
-    password: str = Field(..., min_length=8, max_length=128)
+    first_name: str
+    last_name: str
+    email: str
+    password: str
 
     @field_validator('first_name', 'last_name')
     @classmethod
@@ -21,6 +21,9 @@ class UserCreateModel(BaseModel):
             raise ValueError("Tên không được để trống")
 
         v = v.strip()
+
+        if len(v) > 50:
+            raise ValueError("Tên không được vượt quá 50 ký tự")
 
         if '  ' in v:
             raise ValueError("Tên không được chứa khoảng trắng thừa")
@@ -37,13 +40,13 @@ class UserCreateModel(BaseModel):
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: str) -> str:
-        email = v.strip().lower()
-
-        if not email:
+        if not v or not v.strip():
             raise ValueError("Email không được để trống")
 
+        email = v.strip().lower()
+
         if len(email) > 255:
-            raise ValueError("Email quá dài")
+            raise ValueError("Email quá dài (tối đa 255 ký tự)")
 
         if not re.match(EMAIL_REGEX, email):
             raise ValueError("Định dạng email không hợp lệ")
@@ -61,6 +64,12 @@ class UserCreateModel(BaseModel):
 
         if ' ' in v:
             raise ValueError("Mật khẩu mới không được chứa khoảng trắng")
+
+        if len(v) < 8:
+            raise ValueError("Mật khẩu mới phải có ít nhất 8 ký tự")
+
+        if len(v) > 128:
+            raise ValueError("Mật khẩu mới không được vượt quá 128 ký tự")
 
         if not any(c.isupper() for c in v):
             raise ValueError("Mật khẩu mới phải chứa ít nhất 1 chữ hoa")
@@ -91,24 +100,29 @@ class UserCreateModel(BaseModel):
 
         return v
 
+
 class UserUpdateModel(BaseModel):
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50)
-    phone: Optional[str] = Field(None, min_length=9, max_length=20)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
 
     @field_validator('first_name', 'last_name')
     @classmethod
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v = v.strip()
+
             if not v:
                 raise ValueError('Tên không được để trống')
 
-            if not re.match(r'^[a-zA-ZÀ-ỹ\s]+$', v):
-                raise ValueError('Tên chỉ được chứa chữ cái và khoảng trắng')
+            if len(v) > 50:
+                raise ValueError('Tên không được vượt quá 50 ký tự')
 
             if '  ' in v:
                 raise ValueError('Tên không được chứa khoảng trắng liên tiếp')
+
+            if not re.match(r'^[a-zA-ZÀ-ỹ\s]+$', v):
+                raise ValueError('Tên chỉ được chứa chữ cái và khoảng trắng')
 
         return v
 
@@ -117,31 +131,35 @@ class UserUpdateModel(BaseModel):
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
             v = v.strip()
+
+            if not v:
+                raise ValueError('Số điện thoại không được để trống')
+
             v = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
 
             if not v.isdigit():
                 raise ValueError('Số điện thoại chỉ được chứa chữ số')
 
-            if len(v) < 9 or len(v) > 15:
-                raise ValueError('Số điện thoại phải có từ 9-15 chữ số')
+            if len(v) < 9 or len(v) > 20:
+                raise ValueError('Số điện thoại phải có từ 9-20 chữ số')
 
         return v
 
 
 class UserLoginModel(BaseModel):
-    email: str = Field(..., max_length=255)
-    password: str = Field(..., min_length=8, max_length=128)
+    email: str
+    password: str
 
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: str) -> str:
-        email = v.strip().lower()
-
-        if not email:
+        if not v or not v.strip():
             raise ValueError("Email không được để trống")
 
+        email = v.strip().lower()
+
         if len(email) > 255:
-            raise ValueError("Email quá dài")
+            raise ValueError("Email quá dài (tối đa 255 ký tự)")
 
         if not re.match(EMAIL_REGEX, email):
             raise ValueError("Định dạng email không hợp lệ")
@@ -154,11 +172,11 @@ class UserLoginModel(BaseModel):
         if not v or not v.strip():
             raise ValueError("Password không được để trống")
 
-        if len(v) > 128:
-            raise ValueError(f"Password không được quá 128 ký tự")
-
         if len(v) < 8:
-            raise ValueError(f"Password phải có ít nhất 8 ký tự")
+            raise ValueError("Password phải có ít nhất 8 ký tự")
+
+        if len(v) > 128:
+            raise ValueError("Password không được quá 128 ký tự")
 
         return v
 
@@ -209,33 +227,17 @@ class VerifyLoginAdminModel(BaseModel):
 
         return v.strip()
 
+
 class ChangePasswordModel(BaseModel):
-    old_password: str = Field(
-        ...,
-        min_length=1,
-    )
-    new_password: str = Field(
-        ...,
-        min_length=8,
-        max_length=100,
-    )
-    confirm_new_password: str = Field(
-        ...,
-        min_length=8,
-        max_length=100,
-    )
+    old_password: str
+    new_password: str
+    confirm_new_password: str
 
     @field_validator('old_password')
     @classmethod
     def validate_old_password(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("Mật khẩu cũ không được để trống")
-
-        if len(v.strip()) < 1:
-            raise ValueError("Mật khẩu cũ không hợp lệ")
-
-        if v.isspace():
-            raise ValueError("Mật khẩu cũ không được chỉ chứa khoảng trắng")
 
         return v
 
@@ -250,6 +252,12 @@ class ChangePasswordModel(BaseModel):
 
         if ' ' in v:
             raise ValueError("Mật khẩu mới không được chứa khoảng trắng")
+
+        if len(v) < 8:
+            raise ValueError("Mật khẩu mới phải có ít nhất 8 ký tự")
+
+        if len(v) > 100:
+            raise ValueError("Mật khẩu mới không được vượt quá 100 ký tự")
 
         if not any(c.isupper() for c in v):
             raise ValueError("Mật khẩu mới phải chứa ít nhất 1 chữ hoa")
@@ -289,6 +297,12 @@ class ChangePasswordModel(BaseModel):
         if v != v.strip():
             raise ValueError("Xác nhận mật khẩu không được có khoảng trắng ở đầu hoặc cuối")
 
+        if len(v) < 8:
+            raise ValueError("Xác nhận mật khẩu phải có ít nhất 8 ký tự")
+
+        if len(v) > 100:
+            raise ValueError("Xác nhận mật khẩu không được vượt quá 100 ký tự")
+
         return v
 
     @model_validator(mode='after')
@@ -299,19 +313,19 @@ class ChangePasswordModel(BaseModel):
 
 
 class VerifyOTPModel(BaseModel):
-    otp: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
-    email: str = Field(..., min_length=1, max_length=255)
+    otp: str
+    email: str
 
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: str) -> str:
-        email = v.strip().lower()
-
-        if not email:
+        if not v or not v.strip():
             raise ValueError("Email không được để trống")
 
+        email = v.strip().lower()
+
         if len(email) > 255:
-            raise ValueError("Email quá dài")
+            raise ValueError("Email quá dài (tối đa 255 ký tự)")
 
         if not re.match(EMAIL_REGEX, email):
             raise ValueError("Định dạng email không hợp lệ")
@@ -322,12 +336,21 @@ class VerifyOTPModel(BaseModel):
     @classmethod
     def validate_otp(cls, v: str) -> str:
         v = v.strip()
-        if not v.isdigit() or len(v) != 6:
-            raise ValueError('Mã OTP phải gồm 6 chữ số')
+
+        if not v:
+            raise ValueError('Mã OTP không được để trống')
+
+        if len(v) != 6:
+            raise ValueError('Mã OTP phải gồm đúng 6 ký tự')
+
+        if not v.isdigit():
+            raise ValueError('Mã OTP chỉ được chứa chữ số')
+
         return v
 
+
 class UserDeleteModel(BaseModel):
-    user_ids: List[str] = Field(..., min_length=1, max_length=100)
+    user_ids: List[str]
 
     @field_validator('user_ids')
     @classmethod
@@ -335,10 +358,14 @@ class UserDeleteModel(BaseModel):
         if not v:
             raise ValueError('Danh sách user_ids không được trống')
 
+        if len(v) > 100:
+            raise ValueError('Danh sách user_ids không được vượt quá 100 phần tử')
+
         if len(v) != len(set(v)):
             raise ValueError('Danh sách user_ids không được chứa ID trùng lặp')
 
         return v
+
     
 class UserRole(str, Enum):
     CUSTOMER = "customer"
@@ -361,50 +388,18 @@ class UserStatus(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
 
-class FilterUserInputModel(BaseModel):
-    search: Optional[str] = Field(None, max_length=100)
-    email: Optional[str] = Field(None, max_length=255)
-    phone: Optional[str] = Field(None, max_length=20)
-    status: Optional[UserStatus] = None
-    is_verified: Optional[bool] = None
-    sort_by_created_at: Optional[SortOrder] = None
-    warehouse_code: Optional[str] = Field(None, max_length=50)
-    warehouse_role: Optional[WarehouseRole] = None
-
-    @field_validator('search', 'email', 'phone', 'warehouse_code')
-    @classmethod
-    def strip_whitespace(cls, v: Optional[str]) -> Optional[str]:
-        return v.strip() if v else v
-
-    @field_validator('email')
-    @classmethod
-    def validate_email(cls, v: Optional[str]) -> Optional[str]:
-        if v:
-            v = v.lower().strip()
-            if '@' not in v or '.' not in v.split('@')[-1]:
-                raise ValueError('Email không hợp lệ')
-        return v
-
-    @field_validator('phone')
-    @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        if v:
-            v = v.strip()
-            v = v.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-            if not v.isdigit() or len(v) < 9 or len(v) > 15:
-                raise ValueError('Số điện thoại không hợp lệ')
-        return v
-
 
 class ForgotPasswordConfirmModel(BaseModel):
-    token: str = Field(..., min_length=1, max_length=500)
-    new_password: str = Field(..., min_length=8, max_length=100)
-    new_password_confirm: str = Field(..., min_length=8, max_length=100)
+    token: str
+    new_password: str
+    new_password_confirm: str
 
     @field_validator('token')
     @classmethod
     def validate_token(cls, v: str) -> str:
         if not v or not v.strip():
+            raise ValueError('Token không hợp lệ')
+        if len(v.strip()) > 500:
             raise ValueError('Token không hợp lệ')
         return v.strip()
 
@@ -419,6 +414,12 @@ class ForgotPasswordConfirmModel(BaseModel):
 
         if ' ' in v:
             raise ValueError("Mật khẩu mới không được chứa khoảng trắng")
+
+        if len(v) < 8:
+            raise ValueError("Mật khẩu mới phải có ít nhất 8 ký tự")
+
+        if len(v) > 100:
+            raise ValueError("Mật khẩu mới không được vượt quá 100 ký tự")
 
         if not any(c.isupper() for c in v):
             raise ValueError("Mật khẩu mới phải chứa ít nhất 1 chữ hoa")
@@ -458,47 +459,95 @@ class ForgotPasswordConfirmModel(BaseModel):
         if v != v.strip():
             raise ValueError("Xác nhận mật khẩu không được có khoảng trắng ở đầu hoặc cuối")
 
+        if len(v) < 8:
+            raise ValueError("Xác nhận mật khẩu phải có ít nhất 8 ký tự")
+
+        if len(v) > 100:
+            raise ValueError("Xác nhận mật khẩu không được vượt quá 100 ký tự")
+
+        return v
+
+
+class FilterUserInputModel(BaseModel):
+    search: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    status: Optional[UserStatus] = None
+    is_verified: Optional[bool] = None
+    sort_by_created_at: Optional[SortOrder] = None
+    warehouse_code: Optional[str] = None
+    warehouse_role: Optional[WarehouseRole] = None
+
+    @field_validator('search', 'warehouse_code')
+    @classmethod
+    def strip_and_validate_short(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if len(v) > 100:
+                raise ValueError('Giá trị không được vượt quá 100 ký tự')
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip().lower()
+            if len(v) > 255:
+                raise ValueError('Email không được vượt quá 255 ký tự')
+            if '@' not in v or '.' not in v.split('@')[-1]:
+                raise ValueError('Email không hợp lệ')
+        return v
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+            if len(v) > 20:
+                raise ValueError('Số điện thoại không được vượt quá 20 ký tự')
+            if not v.isdigit() or len(v) < 9 or len(v) > 15:
+                raise ValueError('Số điện thoại không hợp lệ')
         return v
 
 
 class PasswordResetEmailModel(BaseModel):
-    email: str = Field(..., max_length=255)
+    email: str
     check: ResetMethod
 
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: str) -> str:
-        email = v.strip().lower()
-
-        if not email:
+        if not v or not v.strip():
             raise ValueError("Email không được để trống")
 
+        email = v.strip().lower()
+
         if len(email) > 255:
-            raise ValueError("Email quá dài")
+            raise ValueError("Email quá dài (tối đa 255 ký tự)")
 
         if not re.match(EMAIL_REGEX, email):
             raise ValueError("Định dạng email không hợp lệ")
 
         return email
 
+
 class StaffMultipleDeleteModel(BaseModel):
-    user_ids: List[str] = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="Danh sách ID nhân viên cần remove (tối đa 100)"
-    )
+    user_ids: List[str]
 
     @field_validator('user_ids')
     @classmethod
-    def validate_no_duplicates(cls, v: List[str]) -> List[str]:
-        if len(v) != len(set(v)):
-            duplicates = [uid for uid in v if v.count(uid) > 1]
-            raise ValueError(
-                f"Có user_id bị trùng lặp trong danh sách: {list(set(duplicates))}"
-            )
+    def validate_user_ids(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError('Danh sách user_ids không được trống')
+
+        if len(v) > 100:
+            raise ValueError('Danh sách user_ids không được vượt quá 100 phần tử')
+
+        duplicates = list(set(uid for uid in v if v.count(uid) > 1))
+        if duplicates:
+            raise ValueError(f'Có user_id bị trùng lặp trong danh sách: {duplicates}')
+
         return v
-    
 
 
 

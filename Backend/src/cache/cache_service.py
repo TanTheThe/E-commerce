@@ -7,15 +7,23 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+
 class CacheService:
     def __init__(self):
         self._redis: Optional[aioredis.Redis] = None
 
-    @property
-    def redis(self) -> aioredis.Redis:
-        """Get Redis instance"""
-        if self._redis is None:
-            self._redis = RedisManager.redis
+    async def _get_redis(self) -> aioredis.Redis:
+        """Get a ready-to-use Redis client."""
+        if self._redis is not None:
+            return self._redis
+
+        manager = RedisManager()
+        try:
+            self._redis = manager.redis
+        except RuntimeError:
+            await manager.connect()
+            self._redis = manager.redis
+
         return self._redis
 
     # ============================================== BASIC OPERATIONS =================================================
@@ -30,7 +38,8 @@ class CacheService:
             deserialize: Tự động deserialize JSON
         """
         try:
-            value = await self.redis.get(key)
+            redis = await self._get_redis()
+            value = await redis.get(key)
 
             if value is None:
                 return default
@@ -61,10 +70,11 @@ class CacheService:
             if serialize and not isinstance(value, str):
                 value = json.dumps(value, default=str)
 
+            redis = await self._get_redis()
             if ttl:
-                await self.redis.setex(key, ttl, value)
+                await redis.setex(key, ttl, value)
             else:
-                await self.redis.set(key, value)
+                await redis.set(key, value)
 
             return True
 
@@ -75,7 +85,8 @@ class CacheService:
     async def delete(self, key: str) -> bool:
         """Xóa một key"""
         try:
-            deleted = await self.redis.delete(key)
+            redis = await self._get_redis()
+            deleted = await redis.delete(key)
             return deleted > 0
         except Exception as e:
             logger.error(f"Cache delete error for key '{key}': {e}")
@@ -88,11 +99,13 @@ class CacheService:
         """
         try:
             keys = []
-            async for key in self.redis.scan_iter(match=pattern, count=100):
+            redis = await self._get_redis()
+            async for key in redis.scan_iter(match=pattern, count=100):
                 keys.append(key)
 
             if keys:
-                deleted = await self.redis.delete(*keys)
+                redis = await self._get_redis()
+                deleted = await redis.delete(*keys)
                 logger.info(f"Deleted {deleted} keys matching pattern '{pattern}'")
                 return deleted
             return 0
@@ -104,7 +117,8 @@ class CacheService:
     async def exists(self, key: str) -> bool:
         """Kiểm tra key có tồn tại không"""
         try:
-            return await self.redis.exists(key) > 0
+            redis = await self._get_redis()
+            return await redis.exists(key) > 0
         except Exception as e:
             logger.error(f"Cache exists error for key '{key}': {e}")
             return False
@@ -112,7 +126,8 @@ class CacheService:
     async def ttl(self, key: str) -> int:
         """Lấy TTL của key (seconds). -1 = no expiry, -2 = not exist"""
         try:
-            return await self.redis.ttl(key)
+            redis = await self._get_redis()
+            return await redis.ttl(key)
         except Exception as e:
             logger.error(f"Cache TTL error for key '{key}': {e}")
             return -2
@@ -120,7 +135,8 @@ class CacheService:
     async def expire(self, key: str, ttl: int) -> bool:
         """Set expiration time cho key"""
         try:
-            return await self.redis.expire(key, ttl)
+            redis = await self._get_redis()
+            return await redis.expire(key, ttl)
         except Exception as e:
             logger.error(f"Cache expire error for key '{key}': {e}")
             return False
@@ -159,7 +175,8 @@ class CacheService:
     async def increment(self, key: str, amount: int = 1) -> int:
         """Tăng giá trị counter"""
         try:
-            return await self.redis.incrby(key, amount)
+            redis = await self._get_redis()
+            return await redis.incrby(key, amount)
         except Exception as e:
             logger.error(f"Cache increment error for key '{key}': {e}")
             return 0
@@ -167,7 +184,8 @@ class CacheService:
     async def decrement(self, key: str, amount: int = 1) -> int:
         """Giảm giá trị counter"""
         try:
-            return await self.redis.decrby(key, amount)
+            redis = await self._get_redis()
+            return await redis.decrby(key, amount)
         except Exception as e:
             logger.error(f"Cache decrement error for key '{key}': {e}")
             return 0
@@ -181,8 +199,9 @@ class CacheService:
             True nếu key đã tồn tại (duplicate), False nếu chưa (first time)
         """
         try:
-            result = await self.redis.set(key, "1", nx=True, ex=ttl)
-            return result is None
+            redis = await self._get_redis()
+            result = await redis.set(key, "1", nx=True, ex=ttl)
+            return result is True
         except Exception as e:
             logger.error(f"Check exists error for key '{key}': {e}")
             return False
@@ -195,8 +214,9 @@ class CacheService:
         => Lock tự động bị xóa, worker khác có thể acquire
         """
         try:
-            result = await self.redis.set(key, "1", nx=True, ex=timeout)
-            return result is not None
+            redis = await self._get_redis()
+            result = await redis.set(key, "1", nx=True, ex=timeout)
+            return result is True
         except Exception as e:
             logger.error(f"Lock acquire error for key '{key}': {e}")
             return False

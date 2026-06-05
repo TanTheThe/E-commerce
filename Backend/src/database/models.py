@@ -287,7 +287,6 @@ class Product_Material(SQLModel, table=True):
     )
     product_id: uuid.UUID = Field(foreign_key="product.id")
     material_id: uuid.UUID = Field(foreign_key="material.id")
-    percentage: Optional[float] = Field(sa_column=Column(pg.FLOAT, nullable=True))
     created_at: datetime = Field(
         sa_column=Column(pg.TIMESTAMP, nullable=False, server_default=text("CURRENT_TIMESTAMP")),
         default=datetime.now

@@ -96,33 +96,32 @@ class Setup2FAService:
         account_name = f"{user.first_name} {user.last_name} ({user.email})"
         
         qr_cache_key = f"2fa:qr_code:{user_id}"
-        cached_qr = await cache_service.get(qr_cache_key)
+        await cache_service.delete(qr_cache_key)
 
-        if cached_qr:
-            logger.info(f"QR code retrieved from cache for user: {user_id}")
-            qr_base64 = cached_qr
-        else:
-            otp_url = pyotp.totp.TOTP(secret).provisioning_uri(
-                name=account_name,
-                issuer_name=issuer
-            )
+        await user_repository.update_user(where_conditions=condition, update_data=update_data, session=session)
+        await session.commit()
 
-            try:
-                qr = QRCode(version=1, box_size=10, border=5)
-                qr.add_data(otp_url)
-                qr.make(fit=True)
+        otp_url = pyotp.totp.TOTP(secret).provisioning_uri(
+            name=account_name,
+            issuer_name=issuer
+        )
 
-                qr_img: Image.Image = qr.make_image(fill_color="black", back_color="white")
+        try:
+            qr = QRCode(version=1, box_size=10, border=5)
+            qr.add_data(otp_url)
+            qr.make(fit=True)
 
-                buffered = BytesIO()
-                qr_img.save(buffered, format="PNG")
-                qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                
-                await cache_service.set(qr_cache_key, qr_base64, ttl=600)
-                
-            except Exception as e:
-                logger.error(f"Failed to generate QR code: {str(e)}")
-                qr_base64 = None
+            qr_img: Image.Image = qr.make_image(fill_color="black", back_color="white")
+
+            buffered = BytesIO()
+            qr_img.save(buffered, format="PNG")
+            qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            
+            await cache_service.set(qr_cache_key, qr_base64, ttl=600)
+            
+        except Exception as e:
+            logger.error(f"Failed to generate QR code: {str(e)}")
+            qr_base64 = None
         
         await setup_2fa_security_service.reset_setup_attempts(user_id)
             

@@ -218,6 +218,8 @@ async def verify_login_admin(user_data: VerifyLoginAdminModel, request: Request,
     allowed_roles = [AdminStaffRole.ADMIN, AdminStaffRole.STAFF]
     admin_staff_role = await detect_user_role_service.detect_role_from_token(user_data.token, allowed_roles, "first_class_login", session)
 
+    print("user_data: ", user_data)
+
     result = await verify_login_service.verify_login(user_data, admin_staff_role, request, session)
 
     return JSONResponse(

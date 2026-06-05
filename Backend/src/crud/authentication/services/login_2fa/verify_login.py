@@ -3,6 +3,7 @@ from datetime import timedelta, datetime
 import pyotp
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.crud.authentication.services.login_2fa.verify_login_security import VerifyLoginSecurityService
+from src.crud.authentication.services.login_2fa.verify_login_security import VerifyLoginSecurityService
 from src.crud.authentication.services.logout.token_blacklist_service import TokenBlacklistService
 from src.crud.authentication.utils import decode_url_safe_token, create_access_token
 from src.crud.user.repositories import UserRepository
@@ -23,7 +24,7 @@ user_repository = UserRepository()
 class VerifyLoginService:
     async def verify_login(self, user_data: VerifyLoginAdminModel, role: AdminStaffRole, request: Request, session: AsyncSession):
         token = user_data.token
-        otp = user_data.otp
+        otp = user_data.otp.strip()
 
         is_blacklisted = await token_blacklist_service.token_in_blocklist(
             token=token,
@@ -31,7 +32,10 @@ class VerifyLoginService:
             purpose="first_class_login",
         )
 
+        print("38901u2093u1902")
+
         if is_blacklisted:
+            print("djaiojdoiajo")
             AuthException.token_already_used()
 
         token_data = decode_url_safe_token(
@@ -44,6 +48,8 @@ class VerifyLoginService:
         if not user_id:
             AuthException.token_invalid()
 
+        print("aw45d64aw65d465aw")
+
         await verify_login_security_service.check_otp_rate_limit(user_id, session)
 
         condition = [User.id == user_id, User.deleted_at.is_(None)]
@@ -51,6 +57,8 @@ class VerifyLoginService:
         if not user:
             await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
             AuthException.user_not_found()
+
+        print("da0-w-dak-0k0-")
 
         token_email = token_data.get('email')
         if not token_email or token_email != user.email:
@@ -60,6 +68,8 @@ class VerifyLoginService:
         if not user.is_verified:
             await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
             AuthException.user_not_verified()
+
+        print("j90daj90dja90wjd90")
 
         if role == AdminStaffRole.ADMIN:
             if not user.is_admin:
@@ -73,23 +83,50 @@ class VerifyLoginService:
                 await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
                 AuthException.staff_account_disabled()
 
+        print("-003123ki20k0-da")
+
         if not user.two_fa_secret or not user.two_fa_enabled:
             await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
             AuthException.two_fa_not_setup()
 
+        print("d0-ak-0dka-0w312")
+
         try:
             totp = pyotp.TOTP(user.two_fa_secret)
 
-            if not totp.verify(otp, valid_window=1):
+            print("totp: ", totp)
+
+            if not totp.verify(otp, valid_window=2):
                 await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
+                print("316278368127")
                 AuthException.invalid_otp()
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"OTP verification error: {str(e)}")
+            print("534o5jhio34")
             await verify_login_security_service.log_otp_attempt(user_id, False, request, session)
-            AuthException.invalid_otp()
+            raise AuthException.invalid_otp()
 
         await verify_login_security_service.log_otp_attempt(user_id, True, request, session)
+
+        await token_blacklist_service.add_token_to_blocklist(
+            token=token,
+            role=role.value,
+            purpose="first_class_login",
+            metadata={
+                "user_id": str(user.id),
+                "action": "otp_verified"
+            }
+        )
+
+        user_payload = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "id": str(user.id),
+            "email": user.email
+        }
 
         await token_blacklist_service.add_token_to_blocklist(
             token=token,
